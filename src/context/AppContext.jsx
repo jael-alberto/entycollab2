@@ -105,17 +105,47 @@ export function AppProvider({ children }) {
   // ========================================================================
   // PROFILE
   // ========================================================================
-  const saveProfile = useCallback(({ bio, skills, categories }) => {
+  const saveProfile = useCallback(({ bio, skills, categories, githubUrl, portfolioUrl }) => {
     const current = getUsers();
     const idx = current.findIndex(u => u.id === userId);
     if (idx >= 0) {
       current[idx].bio = bio;
       current[idx].skills = skills.slice();
       if (categories) current[idx].categories = categories.slice();
+      if (githubUrl !== undefined) current[idx].githubUrl = githubUrl;
+      if (portfolioUrl !== undefined) current[idx].portfolioUrl = portfolioUrl;
       saveUsers(current);
       setUsers(current);
       refresh();
     }
+  }, [userId, refresh]);
+
+  // Edita los datos de la cuenta desde Ajustes. El correo y el usuario
+  // siguen siendo únicos, igual que en register(). La contraseña solo se
+  // cambia si viene una nueva.
+  const updateAccount = useCallback(({ name, username, email, password }) => {
+    const current = getUsers();
+    const idx = current.findIndex(u => u.id === userId);
+    if (idx < 0) return 'error';
+
+    const cleanName = String(name || '').trim();
+    const cleanUsername = String(username || '').trim();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanName || !cleanUsername || !cleanEmail) return 'incomplete';
+
+    if (current.some(u => u.id !== userId && u.email === cleanEmail)) return 'email';
+    if (current.some(u => u.id !== userId && u.username === cleanUsername)) return 'username';
+
+    const target = current[idx];
+    target.name = cleanName;
+    target.username = cleanUsername;
+    target.email = cleanEmail;
+    if (password) target.password = password;
+
+    saveUsers(current);
+    setUsers(current);
+    refresh();
+    return 'ok';
   }, [userId, refresh]);
 
   const setAvatar = useCallback((avatar) => {
@@ -316,7 +346,7 @@ export function AppProvider({ children }) {
     selectedPeopleTechFilters, setSelectedPeopleTechFilters,
     t, l10n, toggleLang, toggleTheme,
     login, register, logout,
-    saveProfile, setAvatar, toggleAvailability, saveFeaturedProjects,
+    saveProfile, updateAccount, setAvatar, toggleAvailability, saveFeaturedProjects,
     createProject, changeProjectStatus,
     applyToProject, handleApplication, respondInvite, sendInvite,
     saveRatings, refresh

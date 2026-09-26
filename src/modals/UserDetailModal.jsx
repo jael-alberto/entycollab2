@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Modal, Avatar, Stars, SkillTags } from '../components/common.jsx';
+import { Modal, Avatar, Stars, SkillTags, ProfileLinks } from '../components/common.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { getUserAvgRating, escapeHTML, userCategories, getCategoryLabel } from '../lib/helpers.js';
 
@@ -34,6 +34,7 @@ export default function UserDetailModal() {
             </div>
           )}
           <div className="profile-skills">{<SkillTags skills={u.skills} limit={999} />}</div>
+          <ProfileLinks user={u} />
         </div>
         <div className="profile-history">
           <h3>{t('profile.history')}</h3>

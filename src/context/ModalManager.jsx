@@ -6,6 +6,7 @@ import SelectFilterModal from '../modals/SelectFilterModal.jsx';
 import UserDetailModal from '../modals/UserDetailModal.jsx';
 import InviteModal from '../modals/InviteModal.jsx';
 import FeaturedModal from '../modals/FeaturedModal.jsx';
+import SettingsSkillsModal from '../modals/SettingsSkillsModal.jsx';
 
 const ModalContext = createContext(null);
 
@@ -16,6 +17,7 @@ export function ModalProvider({ children }) {
   const [invitePersonId, setInvitePersonId] = useState(null);
   const [userDetailId, setUserDetailId] = useState(null);
   const [featuredOpen, setFeaturedOpen] = useState(false);
+  const [skillsSettingsOpen, setSkillsSettingsOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [techOpen, setTechOpen] = useState(false);
   const [peopleCatOpen, setPeopleCatOpen] = useState(false);
@@ -33,6 +35,8 @@ export function ModalProvider({ children }) {
   const closeUserDetail = useCallback(() => setUserDetailId(null), []);
   const openFeatured = useCallback(() => setFeaturedOpen(true), []);
   const closeFeatured = useCallback(() => setFeaturedOpen(false), []);
+  const openSkillsSettings = useCallback(() => setSkillsSettingsOpen(true), []);
+  const closeSkillsSettings = useCallback(() => setSkillsSettingsOpen(false), []);
   const openCategoryFilter = useCallback(() => setCatOpen(true), []);
   const closeCategoryFilter = useCallback(() => setCatOpen(false), []);
   const openTechFilter = useCallback(() => setTechOpen(true), []);
@@ -49,6 +53,7 @@ export function ModalProvider({ children }) {
     openInvite, closeInvite, invitePersonId,
     openUserDetail, closeUserDetail, userDetailId,
     openFeatured, closeFeatured, featuredOpen,
+    openSkillsSettings, closeSkillsSettings, skillsSettingsOpen,
     openCategoryFilter, closeCategoryFilter, catOpen,
     openTechFilter, closeTechFilter, techOpen,
     openPeopleCategoryFilter, closePeopleCategoryFilter, peopleCatOpen,
@@ -65,6 +70,7 @@ export function ModalProvider({ children }) {
       {invitePersonId && <InviteModal />}
       {userDetailId && <UserDetailModal />}
       {featuredOpen && <FeaturedModal />}
+      {skillsSettingsOpen && <SettingsSkillsModal />}
       {catOpen && <SelectFilterModal kind="category" />}
       {techOpen && <SelectFilterModal kind="tech" />}
       {peopleCatOpen && <SelectFilterModal kind="peopleCategory" />}

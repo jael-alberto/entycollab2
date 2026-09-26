@@ -79,6 +79,17 @@ export function setLang(lang) {
 // MIGRACIONES
 // ==========================================================================
 
+// Imágenes de los proyectos de demostración. Solo un tercio tiene imagen a
+// propósito: así se ven ambos estados del banner (foto / gradiente con ícono).
+const DEMO_PROJECT_IMAGES = {
+  proj1: '/img/projects/taskboard.jpg',
+  proj2: '/img/projects/apiserver.jpg',
+  proj3: '/img/projects/recipes.jpg',
+  proj4: '/img/projects/dashboard.jpg',
+  proj5: '/img/projects/restaurant.jpg',
+  proj6: '/img/projects/community.jpg'
+};
+
 export function migrateLegacyData() {
   let changed = false;
 
@@ -120,6 +131,12 @@ export function migrateLegacyData() {
     // Las categorías "backend"/"devops" ya no existen: se agrupan en "web"
     if (out.category === 'backend' || out.category === 'devops') {
       out.category = 'web';
+      changed = true;
+    }
+    // Asignar la imagen a los proyectos demo que todavía no tienen una.
+    // Solo completa las vacías: nunca pisa la que haya subido el usuario.
+    if (!out.image && DEMO_PROJECT_IMAGES[out.id]) {
+      out.image = DEMO_PROJECT_IMAGES[out.id];
       changed = true;
     }
     return out;
@@ -309,6 +326,7 @@ export function seedDemoData() {
       minRating: 2,
       deadline: '2026-12-01',
       repo: 'https://github.com/demo/task-manager',
+      image: DEMO_PROJECT_IMAGES.proj1,
       status: 'open',
       createdAt: '2026-08-20T10:00:00Z'
     },
@@ -329,6 +347,7 @@ export function seedDemoData() {
       minRating: 3,
       deadline: '2026-11-15',
       repo: null,
+      image: DEMO_PROJECT_IMAGES.proj2,
       status: 'in-progress',
       createdAt: '2026-07-10T10:00:00Z'
     },
@@ -349,6 +368,7 @@ export function seedDemoData() {
       minRating: 1,
       deadline: '2027-01-20',
       repo: 'https://github.com/demo/recipe-ai',
+      image: DEMO_PROJECT_IMAGES.proj3,
       status: 'open',
       createdAt: '2026-08-25T10:00:00Z'
     }
@@ -444,7 +464,7 @@ export function seedDemoExtraData() {
         es: 'Panel de métricas con actualización en vivo para equipos de ventas. Incluirá gráficos, filtros y alertas personalizadas.',
         en: 'Live-updating metrics dashboard for sales teams. Will include charts, filters and custom alerts.'
       },
-      minRating: 1, deadline: '2026-12-20', repo: null, status: 'open', createdAt: '2026-09-01T10:00:00Z'
+      minRating: 1, deadline: '2026-12-20', repo: null, image: DEMO_PROJECT_IMAGES.proj4, status: 'open', createdAt: '2026-09-01T10:00:00Z'
     },
     {
       id: 'proj5', ownerId: 'demo5',
@@ -454,7 +474,7 @@ export function seedDemoExtraData() {
         es: 'API para gestionar reservas de mesas en tiempo real, con notificaciones por email y reportes de ocupación.',
         en: 'API to manage table reservations in real time, with email notifications and occupancy reports.'
       },
-      minRating: 2, deadline: '2026-12-10', repo: null, status: 'open', createdAt: '2026-09-05T10:00:00Z'
+      minRating: 2, deadline: '2026-12-10', repo: null, image: DEMO_PROJECT_IMAGES.proj5, status: 'open', createdAt: '2026-09-05T10:00:00Z'
     },
     {
       id: 'proj6', ownerId: 'demo6',
@@ -464,7 +484,7 @@ export function seedDemoExtraData() {
         es: 'Portal para una comunidad de desarrolladores locales: foros, eventos y directorio de miembros.',
         en: 'Portal for a community of local developers: forums, events and a members directory.'
       },
-      minRating: 1, deadline: '2026-12-30', repo: null, status: 'open', createdAt: '2026-09-08T10:00:00Z'
+      minRating: 1, deadline: '2026-12-30', repo: null, image: DEMO_PROJECT_IMAGES.proj6, status: 'open', createdAt: '2026-09-08T10:00:00Z'
     },
     {
       id: 'proj7', ownerId: 'demo7',

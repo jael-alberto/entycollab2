@@ -1,5 +1,5 @@
 import { useApp } from '../context/AppContext.jsx';
-import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML } from '../lib/helpers.js';
+import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profileLinks } from '../lib/helpers.js';
 
 // ==========================================================================
 // COMPONENTES UI PEQUEÑOS REUTILIZABLES
@@ -86,6 +86,28 @@ export function Avatar({ user, cls = 'person-avatar' }) {
     );
   }
   return <div className={`${cls} ${avatarColorClass(user)}`}>{escapeHTML(user.name.charAt(0).toUpperCase())}</div>;
+}
+
+// Botones con los enlaces públicos del perfil (GitHub / portafolio).
+export function ProfileLinks({ user }) {
+  const { t } = useApp();
+  const links = profileLinks(user);
+  if (links.length === 0) return null;
+  return (
+    <div className="person-categories profile-links">
+      {links.map(l => (
+        <a
+          key={l.key}
+          className="person-cat-chip"
+          href={l.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {l.key === 'github' ? t('profile.linkGitHub') : t('profile.linkPortfolio')}
+        </a>
+      ))}
+    </div>
+  );
 }
 
 export function SkillTags({ skills, limit = 3 }) {

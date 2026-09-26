@@ -88,6 +88,33 @@ export function userCategories(user) {
   return cats;
 }
 
+// Normaliza un link escrito a mano: recorta, agrega "https://" cuando falta
+// el protocolo y descarta cualquier esquema que no sea http/https, para que
+// no se puedan guardar URLs como "javascript:..." o "data:...".
+export function normalizeLinkUrl(value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (!raw) return '';
+  const hasScheme = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(raw);
+  const candidate = hasScheme ? raw : `https://${raw.replace(/^\/+/, '')}`;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    return url.href;
+  } catch {
+    return '';
+  }
+}
+
+// Enlaces públicos de un perfil, ya normalizados. Las etiquetas se resuelven
+// en el componente porque dependen del idioma.
+export function profileLinks(user) {
+  if (!user) return [];
+  const links = [];
+  if (user.githubUrl) links.push({ key: 'github', url: user.githubUrl });
+  if (user.portfolioUrl) links.push({ key: 'portfolio', url: user.portfolioUrl });
+  return links;
+}
+
 export function escapeHTML(str) {
   if (!str) return '';
   return String(str).replace(/[&<>"']/g, c => ({

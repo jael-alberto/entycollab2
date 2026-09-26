@@ -1,9 +1,11 @@
 import { useApp } from '../context/AppContext.jsx';
+import { useModals } from '../context/ModalManager.jsx';
 import { userHistoryItems, escapeHTML } from '../lib/helpers.js';
 
 // Historial de proyectos de un usuario (estilo userHistoryHTML del vanilla)
 export default function UserHistory({ user }) {
-  const { user: me, projects, applications, lang, t, l10n, openFeatured } = useApp();
+  const { user: me, projects, applications, lang, t, l10n } = useApp();
+  const { openFeatured } = useModals();
 
   const items = userHistoryItems(user, projects, applications, lang);
   const featured = Array.isArray(user.featuredProjectIds) ? user.featuredProjectIds : [];

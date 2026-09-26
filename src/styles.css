@@ -1033,6 +1033,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   color: var(--color-primary-deep);
 }
 
+.profile-links {
+  justify-content: center;
+}
+
 .person-actions {
   display: flex;
   gap: 0.5rem;
@@ -1094,20 +1098,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   color: var(--color-primary-deep);
 }
 
-/* Editor de tecnologías del perfil */
-.profile-edit-btn {
-  align-self: flex-start;
-  margin-top: 0.25rem;
-}
-
-.edit-skills-panel {
-  margin-top: 0.5rem;
-  padding: 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background-color: var(--color-surface);
-}
-
+/* Acciones de guardado de los formularios de ajustes */
 .edit-skills-actions {
   display: flex;
   gap: 0.5rem;
@@ -1431,6 +1422,72 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   text-align: center;
 }
 
+/* Tarjeta de perfil: avatar + fichas de datos */
+.profile-hero {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.profile-hero-body {
+  padding: 1.5rem 1.25rem;
+}
+
+.profile-avatar-hero {
+  width: 104px;
+  height: 104px;
+  border: 3px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+.profile-stats {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 1.1rem 0;
+  padding: 0;
+}
+
+.profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.6rem 0.3rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-accent-soft), var(--color-surface));
+  border: 1px solid var(--color-accent-border);
+}
+
+.profile-stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-primary-deep);
+}
+
+.profile-stat-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* Recorta la bio a 3 líneas para que la tarjeta no crezca */
+.profile-bio-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: left;
+}
+
 .profile-avatar {
   width: 100px;
   height: 100px;
@@ -1565,6 +1622,21 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   max-height: 340px;
   overflow-y: auto;
   padding: 0.1rem;
+}
+
+/* Variante para listas de nombres cortos (categorías, tecnologías) */
+.featured-list-compact {
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  max-height: 230px;
+}
+
+.featured-list-compact .featured-proj-card {
+  padding: 0.5rem 0.65rem;
+}
+
+.featured-list-compact .featured-proj-title {
+  font-size: 0.82rem;
+  padding-right: 1.1rem;
 }
 
 .featured-proj-card {
@@ -2300,6 +2372,78 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .avatar-color-7 { background: linear-gradient(135deg, #ec4899, #f472b6); }
 .avatar-color-8 { background: linear-gradient(135deg, #64748b, #475569); }
 .avatar-color-9 { background: linear-gradient(135deg, #d946ef, #c026d3); }
+
+/* ==========================================================================
+   AJUSTES
+   ========================================================================== */
+.settings-subtitle {
+  color: var(--color-text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.settings-storage-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+}
+
+.settings-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-card-head {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-card-head h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  margin-bottom: 0.15rem;
+}
+
+.settings-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.settings-photo-row .profile-avatar {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.settings-photo-row .profile-photo-actions {
+  margin-bottom: 0;
+}
+
+.settings-skills-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.settings-summary-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-dim);
+  min-width: 86px;
+}
+
+.settings-skills-summary .project-card-tech {
+  margin-bottom: 0;
+}
 
 /* ==========================================================================
    MODO OSCURO

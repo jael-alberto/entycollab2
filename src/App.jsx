@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Projects from './pages/Projects.jsx';
 import People from './pages/People.jsx';
 import Profile from './pages/Profile.jsx';
+import Settings from './pages/Settings.jsx';
 
 function RequireAuth({ children }) {
   const { user } = useApp();
@@ -53,6 +54,7 @@ function App() {
           <Route path="/proyectos/*" element={<RequireAuth><Projects /></RequireAuth>} />
           <Route path="/personas" element={<RequireAuth><People /></RequireAuth>} />
           <Route path="/perfil" element={<RequireAuth><Profile /></RequireAuth>} />
+          <Route path="/ajustes" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="/" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
           <Route path="*" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
         </Routes>
