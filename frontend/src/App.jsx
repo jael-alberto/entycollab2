@@ -42,11 +42,14 @@ function App() {
 
   const logged = !!user;
 
+  const { pathname } = useLocation();
+  const isAuthPage = ['/login', '/register'].includes(pathname);
+
   return (
     <>
       <ScrollToTop />
-      {logged ? <LoggedHeader /> : <PublicHeader />}
-      <main className="content-wrapper">
+      {!isAuthPage && (logged ? <LoggedHeader /> : <PublicHeader />)}
+      <main className={isAuthPage ? 'auth-main' : 'content-wrapper'}>
         <Routes>
           <Route path="/login" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
           <Route path="/register" element={<RedirectIfAuthed><Register /></RedirectIfAuthed>} />
@@ -59,7 +62,7 @@ function App() {
           <Route path="*" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
         </Routes>
       </main>
-      <Footer />
+      {!isAuthPage && <Footer />}
     </>
   );
 }
