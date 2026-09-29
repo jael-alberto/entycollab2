@@ -1,0 +1,10 @@
+-- ==========================================================================
+-- ENTYCOLLAB · Seeds de demostración (PENDIENTE DE DEFINIR)
+-- Convención (skill database-migrations): los seeds van separados del
+-- esquema. Sembrar una sola vez por entorno, nunca en producción real.
+-- ==========================================================================
+-- TODO(Fase 3): inserts de los usuarios/proyectos demo de `src/lib/store.js`
+-- (seedDemoData + seedDemoExtraData). Los passwords NO se migran:
+-- hoy están en texto plano en localStorage; con Supabase Auth cada
+-- usuario deberá crear su contraseña (reset/signup).
+-- Hoy: archivo intencionalmente vacío.

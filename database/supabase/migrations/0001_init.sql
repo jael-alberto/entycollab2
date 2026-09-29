@@ -1,0 +1,12 @@
+-- ==========================================================================
+-- ENTYCOLLAB · Migración 0001 · Esquema inicial (PENDIENTE DE DEFINIR)
+-- Convención (skill database-migrations): cada cambio es una migración
+-- forward-only, numerada y versionada. Nunca editar una migración ya aplicada.
+-- ==========================================================================
+-- TODO(Fase 2, con acceso al proyecto Supabase):
+--   1. Crear tabla `profiles` (ligada a auth.users).
+--   2. Crear tabla `projects` (owner_id → profiles.id).
+--   3. Crear tabla `applications` (project_id, user_id, unique(project_id, user_id)).
+--   4. Crear tabla `ratings` (unique(project_id, rated_user_id, rated_by)).
+--   5. Índices, RLS y triggers (cupos, completed, featured máx 5).
+-- Hoy: archivo intencionalmente vacío. No aplicar en ningún entorno.

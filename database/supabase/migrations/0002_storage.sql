@@ -1,0 +1,10 @@
+-- ==========================================================================
+-- ENTYCOLLAB · Migración 0002 · Storage (PENDIENTE DE DEFINIR)
+-- Convención (skill database-migrations): schema y datos separados;
+-- los buckets y sus políticas viven en su propia migración.
+-- ==========================================================================
+-- TODO(Fase 3, con acceso al proyecto Supabase):
+--   1. Crear bucket `avatars` (lectura pública, escritura solo dueño).
+--   2. Crear bucket `project-images` (lectura pública, escritura autenticada).
+--   3. Políticas: límite de tamaño, solo image/*, carpeta por usuario.
+-- Hoy: archivo intencionalmente vacío. No aplicar en ningún entorno.
