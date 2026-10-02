@@ -7,6 +7,11 @@
     "doc": "docs"
   },
   "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm run setup && npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "lint": "npm --prefix frontend run lint",
+    "setup": "npm --prefix frontend install",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
