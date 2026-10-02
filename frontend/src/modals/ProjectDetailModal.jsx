@@ -126,8 +126,10 @@ export default function ProjectDetailModal() {
     );
   }
 
+  // Layer 1: se abre desde el historial del perfil de usuario y desde las
+  // tarjetas, así que tiene que quedar por encima de esos modales.
   return (
-    <Modal open onClose={closeDetail} size="modal-large">
+    <Modal open onClose={closeDetail} size="modal-large" layer={1}>
       <ProjectBanner project={project} mode="detail" />
       <div className="detail-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>

@@ -1,10 +1,20 @@
 import { useApp } from '../context/AppContext.jsx';
 import UserHistory from '../components/UserHistory.jsx';
-import { Avatar, SkillTags, ProfileLinks } from '../components/common.jsx';
+import { Avatar, SkillTags, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
 import {
   getUserAvgRating, getUserRatingCount, escapeHTML,
-  userProjectsList, userCategories, getCategoryLabel
+  userCategories, getCategoryLabel
 } from '../lib/helpers.js';
+import {
+  completedProjectsCount,
+  disciplineLabel,
+  favoriteGenreLabel,
+  gameTypeLabel,
+  userDisciplines,
+  userFavoriteGenres,
+  userGameTypes,
+  userLanguages
+} from '../lib/talent.js';
 
 export default function Profile() {
   const { user, users, projects, applications, ratings, lang, t, l10n, toggleAvailability } = useApp();
@@ -14,9 +24,10 @@ export default function Profile() {
   const avg = getUserAvgRating(user.id, ratings);
   const count = getUserRatingCount(user.id, ratings);
   const categories = userCategories(user);
-  const myProjects = userProjectsList(user, projects, applications);
   const bio = l10n(user.bio);
   const receivedRatings = ratings.filter(r => r.ratedUserId === user.id);
+  const completed = completedProjectsCount(user.id, projects, applications);
+  const languages = userLanguages(user);
 
   return (
     <div className="section-block">
@@ -41,13 +52,17 @@ export default function Profile() {
             <h3>{escapeHTML(user.name)}</h3>
             <p className="profile-username">@{escapeHTML(user.username)}</p>
 
+            <div className="person-rating">
+              {avg > 0 ? <Stars rating={avg} /> : t('person.noRatings')}
+            </div>
+
             <ul className="profile-stats">
               <li className="profile-stat">
-                <span className="profile-stat-value">{myProjects.length}</span>
-                <span className="profile-stat-label">{t('profile.statProjects')}</span>
+                <span className="profile-stat-value">{completed}</span>
+                <span className="profile-stat-label">{t('profile.completedProjects')}</span>
               </li>
               <li className="profile-stat">
-                <span className="profile-stat-value">{(user.skills || []).length}</span>
+                <span className="profile-stat-value">{languages.length > 0 ? languages.length : (user.skills || []).length}</span>
                 <span className="profile-stat-label">{t('profile.statTechs')}</span>
               </li>
               <li className="profile-stat">
@@ -58,6 +73,22 @@ export default function Profile() {
 
             {bio && <p className="profile-bio profile-bio-clamp">{bio}</p>}
 
+            <TalentRow
+              centered
+              label={t('settings.gameTypesLabel')}
+              values={userGameTypes(user).map(v => gameTypeLabel(lang, v))}
+            />
+            <TalentRow
+              centered
+              label={t('filters.disciplines')}
+              values={userDisciplines(user).map(v => disciplineLabel(lang, v))}
+            />
+            <TalentRow
+              centered
+              label={t('settings.favoriteGenresLabel')}
+              values={userFavoriteGenres(user).map(v => favoriteGenreLabel(lang, v))}
+            />
+
             {categories.length > 0 && (
               <div className="person-categories profile-links">
                 {categories.map(c => <span key={c} className="person-cat-chip">{escapeHTML(getCategoryLabel(lang, c))}</span>)}
@@ -65,7 +96,9 @@ export default function Profile() {
             )}
 
             <div className="profile-skills">
-              <SkillTags skills={user.skills} limit={999} />
+              {languages.length > 0
+                ? <SkillTags skills={languages} limit={999} />
+                : <SkillTags skills={user.skills} limit={999} />}
             </div>
 
             <ProfileLinks user={user} />

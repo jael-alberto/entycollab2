@@ -33,7 +33,8 @@ export default function RateModal() {
   };
 
   return (
-    <Modal open onClose={closeRate} title={t('rate.title')} subtitle={t('rate.subtitle')}>
+    // Layer 2: la valoración se abre desde el detalle de proyecto (layer 1).
+    <Modal open onClose={closeRate} title={t('rate.title')} subtitle={t('rate.subtitle')} layer={2}>
       {apps.length === 0 ? (
         <EmptyState title={t('rate.noParticipants')} icon={null} />
       ) : (

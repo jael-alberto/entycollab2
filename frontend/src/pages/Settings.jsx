@@ -3,7 +3,16 @@ import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Avatar, SkillTags } from '../components/common.jsx';
-import { fileToDataURL, userCategories, getCategoryLabel, normalizeLinkUrl } from '../lib/helpers.js';
+import { fileToDataURL, userCategories, getCategoryLabel, normalizeLinkUrl, escapeHTML } from '../lib/helpers.js';
+import {
+  disciplineLabel,
+  favoriteGenreLabel,
+  gameTypeLabel,
+  userDisciplines,
+  userFavoriteGenres,
+  userGameTypes,
+  userLanguages
+} from '../lib/talent.js';
 
 export default function Settings() {
   const { user, lang, t, l10n, saveProfile, updateAccount, setAvatar } = useApp();
@@ -48,7 +57,11 @@ export default function Settings() {
       skills: (user.skills || []).slice(),
       categories,
       githubUrl,
-      portfolioUrl
+      portfolioUrl,
+      gameTypes: userGameTypes(user),
+      languages: userLanguages(user),
+      favoriteGenres: userFavoriteGenres(user),
+      disciplines: userDisciplines(user)
     });
     setAcc(prev => ({ ...prev, password: '' }));
     showToast(t('settings.savedAccount'), 'success');
@@ -184,6 +197,60 @@ export default function Settings() {
           {(user.skills || []).length === 0
             ? <span className="form-hint">{t('settings.noSkills')}</span>
             : <SkillTags skills={user.skills} limit={999} />}
+        </div>
+
+        <div className="edit-skills-actions">
+          <button type="button" className="btn btn-primary btn-sm" onClick={openSkillsSettings}>
+            {t('settings.editSkills')}
+          </button>
+        </div>
+      </section>
+
+      {/* ====== PERFIL DE TALENTO ====== */}
+      <section className="settings-card">
+        <header className="settings-card-head">
+          <h3>{t('settings.talentSection')}</h3>
+          <p className="form-hint">{t('settings.talentHint')}</p>
+        </header>
+
+        {/* Sin tipo de juego ni habilidad la persona desaparece en cuanto alguien
+            filtra por el buscador, así que se avisa. */}
+        {userGameTypes(user).length === 0 && (
+          <div className="talent-warning">{t('settings.talentIncomplete')}</div>
+        )}
+
+        <div className="settings-skills-summary">
+          <span className="settings-summary-label">{t('settings.gameTypesLabel')}</span>
+          {userGameTypes(user).length === 0
+            ? <span className="form-hint">{t('settings.noGameTypes')}</span>
+            : userGameTypes(user).map(v => (
+              <span key={v} className="person-cat-chip">{escapeHTML(gameTypeLabel(lang, v))}</span>
+            ))}
+        </div>
+
+        <div className="settings-skills-summary">
+          <span className="settings-summary-label">{t('settings.languagesLabel')}</span>
+          {userLanguages(user).length === 0
+            ? <span className="form-hint">{t('settings.noLanguages')}</span>
+            : <SkillTags skills={userLanguages(user)} limit={999} />}
+        </div>
+
+        <div className="settings-skills-summary">
+          <span className="settings-summary-label">{t('settings.favoriteGenresLabel')}</span>
+          {userFavoriteGenres(user).length === 0
+            ? <span className="form-hint">{t('settings.noGenres')}</span>
+            : userFavoriteGenres(user).map(v => (
+              <span key={v} className="person-cat-chip">{escapeHTML(favoriteGenreLabel(lang, v))}</span>
+            ))}
+        </div>
+
+        <div className="settings-skills-summary">
+          <span className="settings-summary-label">{t('settings.disciplinesLabel')}</span>
+          {userDisciplines(user).length === 0
+            ? <span className="form-hint">{t('settings.noDisciplines')}</span>
+            : userDisciplines(user).map(v => (
+              <span key={v} className="person-cat-chip">{escapeHTML(disciplineLabel(lang, v))}</span>
+            ))}
         </div>
 
         <div className="edit-skills-actions">

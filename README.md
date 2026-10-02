@@ -10,12 +10,15 @@ ENTYCOLLAB es una aplicación web (SPA) que permite:
 - Publicar proyectos propios, indicando categoría, tecnologías requeridas, cupos, calificación mínima y fecha límite.
 - Colaborar: invitar a personas, aceptar/rechazar postulantes, iniciar el proyecto y calificar a los participantes al finalizar.
 - Perfiles de desarrolladores con disponibilidad, historial de proyectos y calificaciones.
+- Buscar personas por tipo de juego, lenguaje, juego favorito, habilidad, proyectos completados y valoración.
 
 ## Estado actual del proyecto
 
 - **Datos locales:** toda la información se guarda en el `localStorage` del navegador mediante una capa de datos (`src/lib/store.js`) con datos de demostración sembrados al primer arranque (`bootstrap()`). Cada navegador tiene su propia copia.
 - **Categorías de proyectos:** Desarrollo Web, Desarrollo Móvil y Videojuegos y Entretenimiento (más categorías personalizadas escritas por el usuario).
-- **Tecnologías por categoría:** para crear un proyecto o filtrarlo, primero se elige la categoría y luego se listan solo las tecnologías relacionadas a esa categoría. Lo mismo aplica para los perfiles y el filtro de personas.
+- **Tecnologías por categoría:** para crear un proyecto o filtrarlo, primero se elige la categoría y luego se listan solo las tecnologías relacionadas a esa categoría. Lo mismo aplica para los perfiles.
+- **Buscador de personas:** la página `/personas` es un buscador facetado al estilo Upwork. Un buscador superior (nombre, usuario, bio, habilidades y etiquetas) más un sidebar con seis facetas: tipo de juego, lenguaje, juego favorito, habilidad, proyectos completados y valoración por estrellas. Cada opción muestra cuántas personas devolvería y las seleccionadas se pueden quitar como chips; el orden es por relevancia, proyectos completados, valoración o nombre.
+- **Perfil de talento:** cada persona declara tipo de juego, lenguajes, juegos favoritos y habilidad. La valoración con estrellas viene de las reseñas recibidas, no se edita a mano, y hay una opción "sin valoraciones" para que alguien recién llegado todavía aparezca en el buscador. Los proyectos completados se calculan del historial (propio o como participante aceptado). El perfil se edita en Ajustes → Perfil de talento, y los lenguajes disponibles dependen de los tipos de juego elegidos.
 - **Ruta futura:** conectar el frontend a una base de datos en la nube (Supabase) manteniendo el despliegue en Vercel.
 
 ## Stack
@@ -34,7 +37,7 @@ entycollab2/
 ├─ frontend/                # App Vite (React 19 + Router). Raíz del proyecto web
 │  ├─ public/               # Assets estáticos (imágenes, favicon)
 │  ├─ src/
-│  │  ├─ components/        # Componentes reutilizables (Header, ProjectCard, ...)
+│  │  ├─ components/        # Componentes reutilizables (Header, ProjectCard, PeopleSidebar, ...)
 │  │  ├─ context/           # Estado global: AppContext, ModalManager, ToastContext
 │  │  ├─ lib/               # Capa de datos, i18n, helpers
 │  │  │  ├─ store.js        # LocalStorage, seeds y migraciones (fuente actual)
@@ -48,8 +51,10 @@ entycollab2/
 │  │  │  │  └─ storage.js    # Subida de avatar/imagen (futuros buckets)
 │  │  │  ├─ i18n.js         # Diccionario ES/EN
 │  │  │  ├─ helpers.js      # Categorías, tecnologías por categoría, utilidades
-│  │  │  └─ filters.js      # Listas disponibles para filtros
-│  │  ├─ modals/            # Modales (crear proyecto, detalle, filtros, ...)
+│  │  │  ├─ filters.js      # Listas disponibles para filtros
+│  │  │  ├─ talent.js       # Taxonomías del perfil de talento (tipos de juego, géneros, habilidades)
+│  │  │  └─ talentSearch.js # Búsqueda facetada de personas (filtros, conteos, orden)
+│  │  ├─ modals/            # Modales (crear proyecto, detalle, perfil de talento, filtros)
 │  │  ├─ pages/             # Vistas (Dashboard, Projects, People, Profile, ...)
 │  │  └─ styles.css         # Estilos globales
 │  ├─ .env.example          # Nombres de variables Supabase (sin valores)

@@ -3,55 +3,36 @@ import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Modal, EmptyState } from '../components/common.jsx';
 import { escapeHTML } from '../lib/helpers.js';
-import { availableCategoriesList, availablePeopleCategoriesList, availablePeopleTechList, availableTechList } from '../lib/filters.js';
+import { availableCategoriesList, availableTechList } from '../lib/filters.js';
 
-// kind: "category" | "tech" | "peopleCategory" | "peopleTech"
+// kind: "category" | "tech"
 export default function SelectFilterModal({ kind }) {
   const {
     lang,
-    projects, users,
+    projects,
     t,
     selectedCategories, setSelectedCategories,
-    selectedTechFilters, setSelectedTechFilters,
-    selectedPeopleCategories, setSelectedPeopleCategories,
-    selectedPeopleTechFilters, setSelectedPeopleTechFilters
+    selectedTechFilters, setSelectedTechFilters
   } = useApp();
   const modals = useModals();
 
   const isCategory = kind === 'category';
-  const isPeopleCategory = kind === 'peopleCategory';
-  const isPeople = kind === 'peopleTech';
-  const techNeedsCategory = kind === 'tech'
-    ? selectedCategories.length === 0
-    : kind === 'peopleTech'
-      ? selectedPeopleCategories.length === 0
-      : false;
+  const techNeedsCategory = isCategory ? false : selectedCategories.length === 0;
 
   const [draft, setDraft] = useState(() => snapshot());
 
-  const apply = isCategory ? setSelectedCategories
-    : isPeopleCategory ? setSelectedPeopleCategories
-      : isPeople ? setSelectedPeopleTechFilters
-        : setSelectedTechFilters;
-  const onClose = isCategory ? modals.closeCategoryFilter
-    : isPeopleCategory ? modals.closePeopleCategoryFilter
-      : isPeople ? modals.closePeopleTechFilter
-        : modals.closeTechFilter;
+  const apply = isCategory ? setSelectedCategories : setSelectedTechFilters;
+  const onClose = isCategory ? modals.closeCategoryFilter : modals.closeTechFilter;
 
   const options = isCategory
     ? availableCategoriesList(projects, lang)
-    : isPeopleCategory
-      ? availablePeopleCategoriesList(lang)
-      : isPeople
-        ? availablePeopleTechList(users, selectedPeopleCategories)
-        : availableTechList(projects, selectedCategories);
+    : availableTechList(projects, selectedCategories);
 
   function title() {
-    return isCategory || isPeopleCategory ? t('catFilter.title') : t('techFilter.title');
+    return isCategory ? t('catFilter.title') : t('techFilter.title');
   }
   function subtitle() {
-    if (isPeople) return t('peopleTechFilter.subtitle');
-    return isCategory || isPeopleCategory ? t('catFilter.subtitle') : t('techFilter.subtitle');
+    return isCategory ? t('catFilter.subtitle') : t('techFilter.subtitle');
   }
 
   const toggle = (value) => {
@@ -60,12 +41,11 @@ export default function SelectFilterModal({ kind }) {
 
   const confirm = () => {
     apply(draft);
+    // Al cambiar las categorías se descartan las tecnologías que ya no
+    // pertenece a ninguna categoría elegida.
     if (isCategory) {
       const techList = availableTechList(projects, draft);
       setSelectedTechFilters(selectedTechFilters.filter(tt => techList.includes(tt)));
-    } else if (isPeopleCategory) {
-      const techList = availablePeopleTechList(users, draft);
-      setSelectedPeopleTechFilters(selectedPeopleTechFilters.filter(tt => techList.includes(tt)));
     }
     onClose();
   };
@@ -79,7 +59,7 @@ export default function SelectFilterModal({ kind }) {
           <div className="featured-counter">{t('catFilter.counterSelected', { n: draft.length, total: options.length })}</div>
           <div className="featured-list">
             {options.length === 0 ? (
-              <EmptyState title={isCategory || isPeopleCategory ? t('empty.noCategories') : t('empty.noTechs')} icon={null} />
+              <EmptyState title={isCategory ? t('empty.noCategories') : t('empty.noTechs')} icon={null} />
             ) : (
               options.map((opt, i) => {
                 const value = typeof opt === 'string' ? opt : opt.value;
@@ -111,9 +91,6 @@ export default function SelectFilterModal({ kind }) {
   );
 
   function snapshot() {
-    return isCategory ? selectedCategories.slice()
-      : isPeopleCategory ? selectedPeopleCategories.slice()
-        : isPeople ? selectedPeopleTechFilters.slice()
-          : selectedTechFilters.slice();
+    return isCategory ? selectedCategories.slice() : selectedTechFilters.slice();
   }
 }

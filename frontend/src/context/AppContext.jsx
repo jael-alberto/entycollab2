@@ -22,8 +22,6 @@ export function AppProvider({ children }) {
 
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedTechFilters, setSelectedTechFilters] = useState([]);
-  const [selectedPeopleCategories, setSelectedPeopleCategories] = useState([]);
-  const [selectedPeopleTechFilters, setSelectedPeopleTechFilters] = useState([]);
 
   const user = users.find(u => u.id === userId) || null;
 
@@ -87,6 +85,13 @@ export function AppProvider({ children }) {
       skills: data.skills,
       categories: userCategories({ skills: data.skills }),
       bio: data.bio,
+      // Perfil de talento: arranca vacío. Las cuentas nuevas no aparecen en
+      // los filtros hasta que completan tipo de juego y habilidad, y Ajustes
+      // avisa de ello. Las estrellas vienen de las reseñas, no se editan aquí.
+      gameTypes: [],
+      languages: [],
+      favoriteGenres: [],
+      disciplines: [],
       createdAt: new Date().toISOString()
     };
     current.push(newUser);
@@ -105,15 +110,20 @@ export function AppProvider({ children }) {
   // ========================================================================
   // PROFILE
   // ========================================================================
-  const saveProfile = useCallback(({ bio, skills, categories, githubUrl, portfolioUrl }) => {
+  const saveProfile = useCallback((data) => {
     const current = getUsers();
     const idx = current.findIndex(u => u.id === userId);
     if (idx >= 0) {
-      current[idx].bio = bio;
-      current[idx].skills = skills.slice();
-      if (categories) current[idx].categories = categories.slice();
-      if (githubUrl !== undefined) current[idx].githubUrl = githubUrl;
-      if (portfolioUrl !== undefined) current[idx].portfolioUrl = portfolioUrl;
+      current[idx].bio = data.bio;
+      current[idx].skills = data.skills.slice();
+      if (data.categories) current[idx].categories = data.categories.slice();
+      if (data.githubUrl !== undefined) current[idx].githubUrl = data.githubUrl;
+      if (data.portfolioUrl !== undefined) current[idx].portfolioUrl = data.portfolioUrl;
+      // Perfil de talento: es lo que usa el buscador de Personas
+      current[idx].gameTypes = (data.gameTypes || []).slice();
+      current[idx].languages = (data.languages || []).slice();
+      current[idx].favoriteGenres = (data.favoriteGenres || []).slice();
+      current[idx].disciplines = (data.disciplines || []).slice();
       saveUsers(current);
       setUsers(current);
       refresh();
@@ -342,8 +352,6 @@ export function AppProvider({ children }) {
     lang, theme, menuOpen, setMenuOpen,
     selectedCategories, setSelectedCategories,
     selectedTechFilters, setSelectedTechFilters,
-    selectedPeopleCategories, setSelectedPeopleCategories,
-    selectedPeopleTechFilters, setSelectedPeopleTechFilters,
     t, l10n, toggleLang, toggleTheme,
     login, register, logout,
     saveProfile, updateAccount, setAvatar, toggleAvailability, saveFeaturedProjects,

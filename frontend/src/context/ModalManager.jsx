@@ -20,8 +20,6 @@ export function ModalProvider({ children }) {
   const [skillsSettingsOpen, setSkillsSettingsOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [techOpen, setTechOpen] = useState(false);
-  const [peopleCatOpen, setPeopleCatOpen] = useState(false);
-  const [peopleTechOpen, setPeopleTechOpen] = useState(false);
 
   const openCreate = useCallback(() => setCreateOpen(true), []);
   const closeCreate = useCallback(() => setCreateOpen(false), []);
@@ -41,10 +39,6 @@ export function ModalProvider({ children }) {
   const closeCategoryFilter = useCallback(() => setCatOpen(false), []);
   const openTechFilter = useCallback(() => setTechOpen(true), []);
   const closeTechFilter = useCallback(() => setTechOpen(false), []);
-  const openPeopleCategoryFilter = useCallback(() => setPeopleCatOpen(true), []);
-  const closePeopleCategoryFilter = useCallback(() => setPeopleCatOpen(false), []);
-  const openPeopleTechFilter = useCallback(() => setPeopleTechOpen(true), []);
-  const closePeopleTechFilter = useCallback(() => setPeopleTechOpen(false), []);
 
   const value = {
     openCreate, closeCreate, createOpen,
@@ -55,9 +49,7 @@ export function ModalProvider({ children }) {
     openFeatured, closeFeatured, featuredOpen,
     openSkillsSettings, closeSkillsSettings, skillsSettingsOpen,
     openCategoryFilter, closeCategoryFilter, catOpen,
-    openTechFilter, closeTechFilter, techOpen,
-    openPeopleCategoryFilter, closePeopleCategoryFilter, peopleCatOpen,
-    openPeopleTechFilter, closePeopleTechFilter, peopleTechOpen
+    openTechFilter, closeTechFilter, techOpen
   };
 
   return (
@@ -73,8 +65,6 @@ export function ModalProvider({ children }) {
       {skillsSettingsOpen && <SettingsSkillsModal />}
       {catOpen && <SelectFilterModal kind="category" />}
       {techOpen && <SelectFilterModal kind="tech" />}
-      {peopleCatOpen && <SelectFilterModal kind="peopleCategory" />}
-      {peopleTechOpen && <SelectFilterModal kind="peopleTech" />}
       {createOpen && <CreateProjectModal />}
     </ModalContext.Provider>
   );

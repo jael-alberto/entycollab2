@@ -1,73 +1,151 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
-import { useModals } from '../context/ModalManager.jsx';
 import PersonCard from '../components/PersonCard.jsx';
+import PeopleSidebar from '../components/PeopleSidebar.jsx';
 import { EmptyState } from '../components/common.jsx';
-import { userCategories } from '../lib/helpers.js';
-import { availablePeopleCategoriesList } from '../lib/filters.js';
+import {
+  SORT_OPTIONS,
+  activeChips,
+  emptyFilters,
+  facetCounts,
+  filterPeople,
+  revealedOptions,
+  sortPeople,
+  toggleValue
+} from '../lib/talentSearch.js';
+
+// Solo se listan quienes activaron "Estoy disponible para colaborar".
+function availableUsers(users) {
+  return users.filter(u => u.available === true);
+}
 
 export default function People() {
-  const { user, users, lang, t, selectedPeopleCategories, selectedPeopleTechFilters } = useApp();
-  const { openPeopleCategoryFilter, openPeopleTechFilter } = useModals();
+  const { user, users, projects, applications, ratings, lang, t } = useApp();
   const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState(emptyFilters);
+  const [sortBy, setSortBy] = useState('relevance');
 
-  const list = useMemo(() => {
-    let out = users.filter(u => u.available === true);
-    const q = search.toLowerCase();
-    if (q) {
-      out = out.filter(u =>
-        u.name.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q) ||
-        (u.skills || []).some(s => s.toLowerCase().includes(q))
-      );
-    }
-    if (selectedPeopleCategories.length > 0) {
-      out = out.filter(u => userCategories(u).some(c => selectedPeopleCategories.includes(c)));
-    }
-    if (selectedPeopleTechFilters.length > 0) {
-      out = out.filter(u => (u.skills || []).some(s => selectedPeopleTechFilters.includes(s)));
-    }
-    return [...out].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [users, search, selectedPeopleCategories, selectedPeopleTechFilters]);
+  const pool = useMemo(() => availableUsers(users), [users]);
+  const ctx = useMemo(
+    () => ({ projects, applications, ratings }),
+    [projects, applications, ratings]
+  );
 
-  const catLabel = useMemo(() => {
-    if (selectedPeopleCategories.length === 0) return t('filter.allCat');
-    if (selectedPeopleCategories.length === 1) return (availablePeopleCategoriesList(lang).find(o => o.value === selectedPeopleCategories[0]) || {}).label;
-    return t('filter.catsCount', { n: selectedPeopleCategories.length });
-  }, [selectedPeopleCategories, lang, t]);
+  const counts = useMemo(
+    () => facetCounts(pool, filters, search, lang, ctx),
+    [pool, filters, search, lang, ctx]
+  );
 
-  const techLabel = useMemo(() => {
-    if (selectedPeopleTechFilters.length === 0) return t('filter.allTech');
-    if (selectedPeopleTechFilters.length === 1) return selectedPeopleTechFilters[0];
-    return t('filter.techsCount', { n: selectedPeopleTechFilters.length });
-  }, [selectedPeopleTechFilters, t]);
+  const results = useMemo(() => {
+    const matched = filterPeople(pool, filters, search, lang, ctx);
+    return sortPeople(matched, sortBy, ctx);
+  }, [pool, filters, search, lang, sortBy, ctx]);
+
+  const chips = useMemo(() => activeChips(filters, lang), [filters, lang]);
+
+  // El contador de proyectos de la tarjeta solo sale cuando se está
+  // mirando esa faceta: con el filtro de historial marcado o con una búsqueda.
+  const showCompleted = filters.completed.length > 0 || search.trim() !== '';
+
+  // Qué etiquetas se revelan en cada tarjeta: solo las opciones que esa
+  // persona tiene y que coinciden con los filtros o con lo escrito.
+  const optionsByUser = useMemo(() => {
+    const out = new Map();
+    results.forEach(u => out.set(u.id, revealedOptions(u, filters, search, lang)));
+    return out;
+  }, [results, filters, search, lang]);
+
+  const removeChip = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: toggleValue(prev[key], value) }));
+  };
+
+  const resultsLabel = results.length === 1
+    ? t('people.resultsOne')
+    : t('people.results', { n: results.length });
 
   return (
-    <div className="section-block">
+    <div className="section-block people-page">
       <div className="section-header-row">
         <h2 className="section-title">{t('nav.people')}</h2>
       </div>
       <p className="section-subtitle">{t('people.subtitle')}</p>
 
-      <div className="filters-bar">
-        <div className="form-group form-group-inline">
-          <input type="text" placeholder={t('people.searchPh')} value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <div className="form-group form-group-inline">
-          <button type="button" className="filters-toggle-btn" onClick={openPeopleCategoryFilter}>{catLabel}</button>
-        </div>
-        <div className="form-group form-group-inline">
-          <button type="button" className="filters-toggle-btn" onClick={openPeopleTechFilter}>{techLabel}</button>
-        </div>
+      {/* ====== BÚSQUEDA ====== */}
+      <div className="people-search">
+        <span className="people-search-icon" aria-hidden="true">{t('people.searchIcon')}</span>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder={t('people.searchPh')}
+          aria-label={t('people.searchPh')}
+        />
+        {search && (
+          <button type="button" className="people-search-clear" onClick={() => setSearch('')} aria-label={t('people.clearSearch')}>
+            &times;
+          </button>
+        )}
       </div>
 
-      {list.length === 0 ? (
-        <EmptyState icon="🔍" title={t('empty.people')} sub={t('empty.peopleSub')} />
-      ) : (
-        <div className="people-grid">
-          {list.map(u => <PersonCard key={u.id} person={u} me={user} />)}
+      <div className="people-layout">
+        <PeopleSidebar
+          filters={filters}
+          counts={counts}
+          shown={results.length}
+          total={pool.length}
+          onChange={setFilters}
+        />
+
+        <div className="people-results">
+          <div className="people-results-head">
+            <span className="people-results-count">{resultsLabel}</span>
+            <label className="people-sort">
+              <span>{t('people.sortLabel')}</span>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label={t('people.sortLabel')}>
+                {SORT_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {chips.length > 0 && (
+            <div className="people-chips">
+              {chips.map(chip => (
+                <button
+                  type="button"
+                  key={`${chip.key}:${chip.value}`}
+                  className="people-chip"
+                  onClick={() => removeChip(chip.key, chip.value)}
+                  title={t('invite.cancel')}
+                >
+                  {chip.label}
+                  <span className="people-chip-x" aria-hidden="true">&times;</span>
+                </button>
+              ))}
+              <button type="button" className="people-chips-clear" onClick={() => setFilters(emptyFilters())}>
+                {t('people.clearAll')}
+              </button>
+            </div>
+          )}
+
+          {results.length === 0 ? (
+            <EmptyState icon="🔍" title={t('empty.people')} sub={t('empty.peopleSub')} />
+          ) : (
+            <div className="people-grid">
+              {results.map(u => (
+                <PersonCard
+                  key={u.id}
+                  person={u}
+                  me={user}
+                  options={optionsByUser.get(u.id)}
+                  showCompleted={showCompleted}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

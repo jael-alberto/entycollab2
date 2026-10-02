@@ -5,11 +5,14 @@ import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profil
 // COMPONENTES UI PEQUEÑOS REUTILIZABLES
 // ==========================================================================
 
-export function Modal({ open, onClose, size = '', title, subtitle, children }) {
+// `layer` apila un modal sobre otro (detalle de proyecto encima del detalle de
+// usuario, por ejemplo). Todos los overlays comparten el mismo z-index, así que
+// sin esto el que se monte después en el DOM acaba tapando al anterior.
+export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, children }) {
   return (
     <div
       className="modal-overlay"
-      style={{ display: open ? 'flex' : 'none' }}
+      style={{ display: open ? 'flex' : 'none', zIndex: 1000 + layer * 10 }}
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className={`modal-card${size ? ' ' + size : ''}`}>
@@ -42,9 +45,16 @@ export function StatusPill({ status, label }) {
   return <span className={`project-status ${statusClass(status)}`}>{label}</span>;
 }
 
+// Tres tamaños: la tarjeta de proyecto, el detalle y la miniatura del
+// historial. El nombre de cada clase sale del modo, así no se duplica el CSS.
+const BANNER_CLASS = {
+  detail: 'detail-project-image',
+  thumb: 'history-project-image'
+};
+
 export function ProjectBanner({ project, mode = 'card' }) {
   const { l10n, lang } = useApp();
-  const cssClass = mode === 'detail' ? 'detail-project-image' : 'project-card-image';
+  const cssClass = BANNER_CLASS[mode] || 'project-card-image';
   if (project.image) {
     return (
       <div className={cssClass}>
@@ -56,8 +66,8 @@ export function ProjectBanner({ project, mode = 'card' }) {
   const label = getCategoryLabel(lang, project.category);
   return (
     <div className={`${cssClass} ${cssClass}-default`} style={{ background: meta.gradient }}>
-      <span className={mode === 'detail' ? 'detail-project-image-icon' : 'project-card-image-icon'}>{meta.icon}</span>
-      <span className={mode === 'detail' ? 'detail-project-image-label' : 'project-card-image-label'}>{label}</span>
+      <span className={`${cssClass}-icon`}>{meta.icon}</span>
+      <span className={`${cssClass}-label`}>{label}</span>
     </div>
   );
 }
@@ -106,6 +116,19 @@ export function ProfileLinks({ user }) {
           {l.key === 'github' ? t('profile.linkGitHub') : t('profile.linkPortfolio')}
         </a>
       ))}
+    </div>
+  );
+}
+
+// Fila de "perfil de talento": título + etiquetas del usuario.
+export function TalentRow({ label, values, centered = false }) {
+  if (!values || values.length === 0) return null;
+  return (
+    <div className="person-chips-row">
+      <span className="person-chips-label">{label}</span>
+      <div className={'person-categories' + (centered ? ' profile-links' : '')}>
+        {values.map(v => <span key={v} className="person-cat-chip">{escapeHTML(v)}</span>)}
+      </div>
     </div>
   );
 }

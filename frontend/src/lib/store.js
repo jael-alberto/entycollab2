@@ -5,6 +5,7 @@
 
 import { userCategories } from './helpers.js';
 
+
 export const STORAGE_KEYS = {
   users: 'devcollab_users',
   projects: 'devcollab_projects',
@@ -90,6 +91,183 @@ const DEMO_PROJECT_IMAGES = {
   proj6: '/img/projects/community.jpg'
 };
 
+// ==========================================================================
+// PERFIL DE TALENTO DE LOS USUARIOS DE DEMOSTRACIÓN
+// Alimenta el buscador de Personas (tipos de juego, lenguajes, géneros
+// favoritos y habilidades). Los usuarios que no figuren acá se
+// completan por inferencia desde sus habilidades.
+// ==========================================================================
+const DEMO_TALENT = {
+  demo1: {
+    gameTypes: ['mobile', '2d-platformer'], languages: ['JavaScript', 'TypeScript', 'C#', 'Python'],
+    favoriteGenres: ['puzzle', 'adventure', 'platformer'], disciplines: ['programming']
+  },
+  demo2: {
+    gameTypes: ['multiplayer-online', 'strategy'], languages: ['Python', 'C#', 'TypeScript'],
+    favoriteGenres: ['strategy', 'simulation', 'multiplayer'], disciplines: ['programming']
+  },
+  demo3: {
+    gameTypes: ['mobile', 'card-board'], languages: ['TypeScript', 'JavaScript', 'Dart'],
+    favoriteGenres: ['puzzle', 'casual', 'card-board'], disciplines: ['programming']
+  },
+  demo4: {
+    gameTypes: ['multiplayer-online', 'simulation'], languages: ['TypeScript', 'JavaScript', 'Python', 'C#'],
+    favoriteGenres: ['multiplayer', 'co-op', 'strategy'], disciplines: ['programming']
+  },
+  demo5: {
+    gameTypes: ['strategy', 'simulation'], languages: ['Python', 'TypeScript', 'C++'],
+    favoriteGenres: ['strategy', 'simulation', 'open-world'], disciplines: ['programming']
+  },
+  demo6: {
+    gameTypes: ['2d-platformer', 'puzzle'], languages: ['JavaScript', 'C#', 'Lua'],
+    favoriteGenres: ['platformer', 'puzzle', 'rhythm'], disciplines: ['programming', 'animation']
+  },
+  demo7: {
+    gameTypes: ['multiplayer-online', 'racing'], languages: ['Python', 'Rust', 'C++'],
+    favoriteGenres: ['racing', 'simulation', 'sports'], disciplines: ['programming']
+  },
+  demo8: {
+    gameTypes: ['mobile', 'card-board'], languages: ['Dart', 'Swift', 'Kotlin', 'Java'],
+    favoriteGenres: ['casual', 'card-board', 'rhythm'], disciplines: ['programming']
+  },
+  demo9: {
+    gameTypes: ['rpg', '3d-adventure', 'horror'], languages: ['C#', 'C++', 'Lua'],
+    favoriteGenres: ['rpg', 'adventure', 'soulslike', 'open-world'], disciplines: ['programming', 'pixel-art']
+  },
+  demo10: {
+    gameTypes: ['2d-platformer', 'metroidvania', 'roguelike'], languages: ['GDScript', 'Lua', 'Python'],
+    favoriteGenres: ['platformer', 'metroidvania', 'roguelike', 'puzzle'],
+    disciplines: ['programming', 'pixel-art', 'animation']
+  }
+};
+
+// Habilidades que delatan un tipo de juego, para los usuarios que no tienen
+// el campo guardado (cuentas viejas creadas antes del buscador facetado).
+const GAME_TYPE_HINTS = {
+  '2d-platformer': ['Aseprite', 'Pixel Art', 'Spine 2D', 'GameMaker'],
+  '3d-adventure': ['Unreal Engine', 'Maya', 'ZBrush', 'Substance 3D'],
+  shooter: ['Unreal Engine', 'CryEngine', 'Photon', 'Netcode'],
+  rpg: ['RPG Maker', 'Unity'],
+  strategy: ['Photon', 'Netcode', 'Mirror'],
+  puzzle: ['Phaser', 'Defold', 'Godot'],
+  survival: ['Unreal Engine', 'CryEngine'],
+  roguelike: ['GameMaker', 'Bevy', 'Defold'],
+  metroidvania: ['Godot', 'GameMaker'],
+  simulation: ['Unity', 'Unreal Engine'],
+  sandbox: ['Unreal Engine', 'CryEngine'],
+  'multiplayer-online': ['Photon', 'Mirror', 'Netcode'],
+  vr: ['Vulkan', 'OpenXR'],
+  mobile: ['React Native', 'Flutter', 'Xcode'],
+  'retro-arcade': ['GameMaker', 'Defold', 'Raylib'],
+  'tower-defense': ['Godot', 'GameMaker'],
+  fighting: ['Unreal Engine', 'Unity'],
+  racing: ['Unreal Engine', 'CryEngine'],
+  horror: ['Unity', 'Unreal Engine'],
+  'card-board': ['Phaser', 'Defold']
+};
+
+// Un lenguaje aparece en el perfil si está entre las habilidades guardadas.
+const LANGUAGE_HINTS = [
+  'C#', 'C++', 'GDScript', 'Lua', 'Python', 'JavaScript', 'TypeScript',
+  'Rust', 'Java', 'Kotlin', 'Swift', 'Dart', 'Ruby', 'WebAssembly'
+];
+
+// Motores, editors y herramientas de arte que revelan la habilidad principal.
+const DISCIPLINE_HINTS = {
+  'pixel-art': ['Aseprite', 'Pixel Art', 'Photoshop'],
+  programming: ['Unity', 'Unreal Engine', 'Godot', 'GameMaker', 'C#', 'C++', 'GDScript', 'Lua', 'Python'],
+  animation: ['Spine 2D', 'Maya', 'Houdini', '3ds Max'],
+  sound: ['FMOD', 'Wwise', 'Audacity', 'Reaper'],
+  modeling: ['Blender', 'Maya', '3ds Max', 'ZBrush', 'Substance 3D', 'Houdini']
+};
+
+function inferGameTypes(user) {
+  const skills = user.skills || [];
+  const found = Object.keys(GAME_TYPE_HINTS).filter(gt =>
+    GAME_TYPE_HINTS[gt].some(h => skills.includes(h))
+  );
+  return found.length > 0 ? found : ['2d-platformer'];
+}
+
+function inferLanguages(user) {
+  const skills = user.skills || [];
+  const found = LANGUAGE_HINTS.filter(l => skills.includes(l));
+  return found.length > 0 ? found : ['C#'];
+}
+
+function inferDisciplines(user) {
+  const skills = user.skills || [];
+  const found = Object.keys(DISCIPLINE_HINTS).filter(d =>
+    DISCIPLINE_HINTS[d].some(h => skills.includes(h))
+  );
+  return found.length > 0 ? found : ['programming'];
+}
+
+// ==========================================================================
+// PROYECTOS COMPLETADOS (historial)
+// La faceta "proyectos completados" se calcula del historial real, así que
+// hace falta sembrar una梯队 de proyectos ya terminados con repartos
+// desiguales: alguien con muchos, alguien con uno solo y alguien sin
+// reseñas con ninguno.
+// ==========================================================================
+const COMPLETED_RUNS = [
+  { prefix: 'done-unity', ownerId: 'demo9', tech: ['Unity', 'C#'], count: 12, members: ['demo10', 'demo6', 'demo4'] },
+  { prefix: 'done-godot', ownerId: 'demo10', tech: ['Godot', 'GDScript'], count: 5, members: ['demo9'] },
+  { prefix: 'done-web1', ownerId: 'demo4', tech: ['React', 'Node.js'], count: 6, members: ['demo5'] },
+  { prefix: 'done-web2', ownerId: 'demo5', tech: ['Python', 'Django'], count: 3, members: ['demo4'] },
+  { prefix: 'done-web3', ownerId: 'demo7', tech: ['Docker', 'AWS'], count: 8, members: ['demo5'] },
+  { prefix: 'done-web4', ownerId: 'demo8', tech: ['Flutter', 'Dart'], count: 1, members: [] },
+  { prefix: 'done-web5', ownerId: 'demo6', tech: ['JavaScript', 'CSS'], count: 2, members: ['demo3'] },
+  { prefix: 'done-web6', ownerId: 'demo3', tech: ['Vue.js', 'Firebase'], count: 0, members: [] }
+];
+
+function completedRuns() {
+  const projects = [];
+  const apps = [];
+
+  COMPLETED_RUNS.forEach(run => {
+    for (let i = 0; i < run.count; i++) {
+      const id = `${run.prefix}-${i + 1}`;
+      const label = i + 1;
+      projects.push({
+        id,
+        ownerId: run.ownerId,
+        title: {
+          es: `Proyecto entregado ${label} · ${run.tech[0]}`,
+          en: `Delivered project ${label} · ${run.tech[0]}`
+        },
+        category: 'game',
+        slots: 2,
+        tech: run.tech,
+        description: {
+          es: 'Proyecto de demostración ya finalizado. Existe para dar volumen al historial de la persona y que la faceta de proyectos completados tenga resultados.',
+          en: 'Demo project already finished. It only exists to give volume to the person\'s history so the completed-projects facet has results.'
+        },
+        minRating: 1,
+        deadline: null,
+        repo: null,
+        image: null,
+        status: 'completed',
+        createdAt: '2026-03-10T10:00:00Z'
+      });
+
+      // Cada proyecto repartido entre los participantes de la tanda.
+      const member = run.members[i % (run.members.length || 1)];
+      if (member) {
+        apps.push({
+          id: `app-${id}`,
+          projectId: id,
+          userId: member,
+          status: 'accepted',
+          appliedAt: '2026-03-10T10:00:00Z'
+        });
+      }
+    }
+  });
+
+  return { projects, apps };
+}
+
 export function migrateLegacyData() {
   let changed = false;
 
@@ -107,6 +285,25 @@ export function migrateLegacyData() {
         out.categories = derived;
         changed = true;
       }
+    }
+    // Perfil de talento: los usuarios viejos no lo tienen. Se completa con
+    // la tabla de demo (si el id es conocido) o se infiere de sus habilidades
+    // para que no queden fuera de los filtros del buscador.
+    if (!Array.isArray(out.gameTypes) || !Array.isArray(out.languages) ||
+        !Array.isArray(out.favoriteGenres) || !Array.isArray(out.disciplines)) {
+      const talent = DEMO_TALENT[out.id] || {};
+      out.gameTypes = Array.isArray(out.gameTypes) ? out.gameTypes : (talent.gameTypes || inferGameTypes(out));
+      out.languages = Array.isArray(out.languages) ? out.languages : (talent.languages || inferLanguages(out));
+      out.favoriteGenres = Array.isArray(out.favoriteGenres) ? out.favoriteGenres : (talent.favoriteGenres || out.gameTypes);
+      out.disciplines = Array.isArray(out.disciplines) ? out.disciplines : (talent.disciplines || inferDisciplines(out));
+      changed = true;
+    }
+    // El nivel de programación se reemplazó por la valoración con estrellas:
+    // se borra de los datos guardados para que no quede nada que mostrar.
+    if (out.experienceLevel !== undefined || out.experienceYears !== undefined) {
+      delete out.experienceLevel;
+      delete out.experienceYears;
+      changed = true;
     }
     return out;
   });
@@ -260,6 +457,19 @@ function upgradeDemoContent() {
 // SEEDS
 // ==========================================================================
 
+// Marca de perfil de talento: se inyecta en cada usuario de demo al sembrar
+// y también se usa como fuente en la migración de cuentas viejas.
+function withTalent(user) {
+  const talent = DEMO_TALENT[user.id] || {};
+  return {
+    ...user,
+    gameTypes: talent.gameTypes || [],
+    languages: talent.languages || [],
+    favoriteGenres: talent.favoriteGenres || [],
+    disciplines: talent.disciplines || ['programming']
+  };
+}
+
 export function seedDemoData() {
   const demoUsers = [
     {
@@ -306,7 +516,7 @@ export function seedDemoData() {
       available: true,
       createdAt: '2026-03-05T10:00:00Z'
     }
-  ];
+  ].map(withTalent);
 
   const demoProjects = [
     {
@@ -453,7 +663,7 @@ export function seedDemoExtraData() {
       },
       available: true, createdAt: '2026-07-02T10:00:00Z'
     }
-  ];
+  ].map(withTalent);
 
   const extraProjects = [
     {
@@ -518,7 +728,12 @@ export function seedDemoExtraData() {
     }
   ];
 
-  // Aceptados (participaciones) que alimentan las referencias de cada persona
+  // Proyectos ya terminados. Sin ellos la faceta "proyectos completados"
+  // no tendría nada que filtrar. Se generan en tanda porque son muchos y
+  // solo sirven para dar volumen al historial.
+  const { projects: doneProjects, apps: doneApps } = completedRuns();
+
+  const allExtraProjects = extraProjects.concat(doneProjects);
   const extraApps = [
     { id: 'app-ref-1', projectId: 'proj2', userId: 'demo4', status: 'accepted', appliedAt: '2026-08-01T10:00:00Z' },
     { id: 'app-ref-2', projectId: 'proj1', userId: 'demo5', status: 'accepted', appliedAt: '2026-08-22T10:00:00Z' },
@@ -529,7 +744,7 @@ export function seedDemoExtraData() {
     { id: 'app-ref-7', projectId: 'proj3', userId: 'demo8', status: 'accepted', appliedAt: '2026-08-27T10:00:00Z' },
     { id: 'app-ref-8', projectId: 'proj8', userId: 'demo10', status: 'accepted', appliedAt: '2026-09-16T10:00:00Z' },
     { id: 'app-ref-9', projectId: 'proj9', userId: 'demo9', status: 'accepted', appliedAt: '2026-09-18T10:00:00Z' }
-  ];
+  ].concat(doneApps);
 
   const extraRatings = [
     { id: 'rating-6', projectId: 'proj2', ratedUserId: 'demo2', ratedBy: 'demo1', stars: 5, createdAt: '2026-08-05T10:00:00Z' },
@@ -557,7 +772,7 @@ export function seedDemoExtraData() {
     }
   });
 
-  extraProjects.forEach(p => {
+  allExtraProjects.forEach(p => {
     if (!projects.some(x => x.id === p.id)) {
       projects.push(p);
       changed = true;

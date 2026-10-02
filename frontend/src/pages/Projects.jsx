@@ -61,7 +61,7 @@ function NewProjects() {
       out = out.filter(p => (p.tech || []).some(tt => selectedTechFilters.includes(tt)));
     }
     return [...out].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [projects, applications, user, search, selectedCategories, selectedTechFilters]);
+  }, [projects, applications, user, search, selectedCategories, selectedTechFilters, lang]);
 
   const catLabel = useMemo(() => {
     if (selectedCategories.length === 0) return t('filter.allCat');
