@@ -65,8 +65,9 @@ export function AppProvider({ children }) {
   // ========================================================================
   // AUTH
   // ========================================================================
-  const login = useCallback((email, password) => {
-    const found = getUsers().find(u => u.email === email && u.password === password);
+  const login = useCallback((identifier, password) => {
+    const cleanIdentifier = String(identifier || '').trim().toLowerCase().replace(/^@/, '');
+    const found = getUsers().find(u => (u.email.toLowerCase() === cleanIdentifier || u.username.toLowerCase() === cleanIdentifier) && u.password === password);
     if (!found) return null;
     setUserInStore(found.id);
     return found;
@@ -88,7 +89,7 @@ export function AppProvider({ children }) {
       // Perfil de talento: arranca vacío. Las cuentas nuevas no aparecen en
       // los filtros hasta que completan tipo de juego y habilidad, y Ajustes
       // avisa de ello. Las estrellas vienen de las reseñas, no se editan aquí.
-      languages: [],
+      languages: (data.languages || []).slice(),
       disciplines: (data.disciplines || []).slice(),
       gameTypes: (data.gameTypes || []).slice(),
       favoriteGenres: (data.favoriteGenres || []).slice(),
