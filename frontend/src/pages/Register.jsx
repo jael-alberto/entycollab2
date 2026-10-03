@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
+import { GAME_TYPES, FAVORITE_GENRES, DISCIPLINES } from '../lib/talent.js';
+import { disciplineLabel, favoriteGenreLabel, gameTypeLabel } from '../lib/talent.js';
 
 export default function Register() {
   const { t, register } = useApp();
@@ -15,6 +17,11 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [skills, setSkills] = useState('');
   const [bio, setBio] = useState('');
+  const [gameTypes, setGameTypes] = useState([]);
+  const [favoriteGenres, setFavoriteGenres] = useState([]);
+  const [disciplines, setDisciplines] = useState([]);
+
+  const toggle = (setter, selected, value) => setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]);
 
   const submit = (e) => {
     e.preventDefault();
@@ -24,7 +31,7 @@ export default function Register() {
       email: email.trim().toLowerCase(),
       password,
       skills: skills.split(',').map(s => s.trim()).filter(Boolean),
-      bio: bio.trim()
+      bio: bio.trim(), gameTypes, favoriteGenres, disciplines
     });
     if (res === 'email') {
       showToast(t('toast.accountExists'), 'error');
@@ -35,7 +42,7 @@ export default function Register() {
       return;
     }
     showToast(t('toast.accountCreated'), 'success');
-    navigate('/dashboard');
+    navigate('/perfil');
   };
 
   return (
@@ -91,6 +98,18 @@ export default function Register() {
           <div className="form-group">
             <label htmlFor="reg-bio">{t('register.bio')}</label>
             <textarea id="reg-bio" rows="3" value={bio} onChange={e => setBio(e.target.value)} placeholder={t('register.bioPh')} required></textarea>
+          </div>
+          <div className="register-interest-group">
+            <strong>¿En qué tipos de juegos te gustaría colaborar?</strong>
+            <div className="register-choice-list">{GAME_TYPES.map(item => <button key={item.value} type="button" className={gameTypes.includes(item.value) ? 'register-choice selected' : 'register-choice'} aria-pressed={gameTypes.includes(item.value)} onClick={() => toggle(setGameTypes, gameTypes, item.value)}>{item.icon} {gameTypeLabel('es', item.value)}</button>)}</div>
+          </div>
+          <div className="register-interest-group">
+            <strong>¿Qué habilidades aportarías a un equipo?</strong>
+            <div className="register-choice-list">{DISCIPLINES.map(item => <button key={item.value} type="button" className={disciplines.includes(item.value) ? 'register-choice selected' : 'register-choice'} aria-pressed={disciplines.includes(item.value)} onClick={() => toggle(setDisciplines, disciplines, item.value)}>{item.icon} {disciplineLabel('es', item.value)}</button>)}</div>
+          </div>
+          <div className="register-interest-group">
+            <strong>Géneros de videojuegos que te gustan</strong>
+            <div className="register-choice-list">{FAVORITE_GENRES.map(item => <button key={item.value} type="button" className={favoriteGenres.includes(item.value) ? 'register-choice selected' : 'register-choice'} aria-pressed={favoriteGenres.includes(item.value)} onClick={() => toggle(setFavoriteGenres, favoriteGenres, item.value)}>{item.icon} {favoriteGenreLabel('es', item.value)}</button>)}</div>
           </div>
           <button type="submit" className="btn btn-primary btn-full" id="register-submit-btn">{t('register.submit')}</button>
         </form>

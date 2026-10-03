@@ -88,10 +88,10 @@ export function AppProvider({ children }) {
       // Perfil de talento: arranca vacío. Las cuentas nuevas no aparecen en
       // los filtros hasta que completan tipo de juego y habilidad, y Ajustes
       // avisa de ello. Las estrellas vienen de las reseñas, no se editan aquí.
-      gameTypes: [],
       languages: [],
-      favoriteGenres: [],
-      disciplines: [],
+      disciplines: (data.disciplines || []).slice(),
+      gameTypes: (data.gameTypes || []).slice(),
+      favoriteGenres: (data.favoriteGenres || []).slice(),
       createdAt: new Date().toISOString()
     };
     current.push(newUser);

@@ -12,6 +12,7 @@ import Projects from './pages/Projects.jsx';
 import People from './pages/People.jsx';
 import Profile from './pages/Profile.jsx';
 import Settings from './pages/Settings.jsx';
+import Landing from './pages/Landing.jsx';
 
 function RequireAuth({ children }) {
   const { user } = useApp();
@@ -44,12 +45,13 @@ function App() {
 
   const { pathname } = useLocation();
   const isAuthPage = ['/login', '/register'].includes(pathname);
+  const isLandingPage = pathname === '/';
 
   return (
     <>
       <ScrollToTop />
-      {!isAuthPage && (logged ? <LoggedHeader /> : <PublicHeader />)}
-      <main className={isAuthPage ? 'auth-main' : 'content-wrapper'}>
+      {!isAuthPage && !isLandingPage && (logged ? <LoggedHeader /> : <PublicHeader />)}
+      <main className={isAuthPage ? 'auth-main' : isLandingPage ? 'landing-main' : 'content-wrapper'}>
         <Routes>
           <Route path="/login" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
           <Route path="/register" element={<RedirectIfAuthed><Register /></RedirectIfAuthed>} />
@@ -58,11 +60,11 @@ function App() {
           <Route path="/personas" element={<RequireAuth><People /></RequireAuth>} />
           <Route path="/perfil" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/ajustes" element={<RequireAuth><Settings /></RequireAuth>} />
-          <Route path="/" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
+          <Route path="/" element={<Landing />} />
           <Route path="*" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
         </Routes>
       </main>
-      {!isAuthPage && <Footer />}
+      {!isAuthPage && !isLandingPage && <Footer />}
     </>
   );
 }
