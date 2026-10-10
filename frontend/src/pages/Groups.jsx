@@ -5,7 +5,6 @@ import { useToast } from '../context/ToastContext.jsx';
 import { EmptyState, Avatar } from '../components/common.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { escapeHTML } from '../lib/helpers.js';
 import { l10nValue } from '../lib/i18n.js';
 
 function memberFor(group, userId) {
@@ -136,7 +135,7 @@ function GroupWorkspace({ groupId }) {
   const {
     user, users, groups, projects, activeGroup, selectGroup,
     decideGroupRequest, setGroupMemberRole, updateGroup, removeGroupMember,
-    isActiveGroupAdmin, lang
+    lang
   } = useApp();
   const { openCreate } = useModals();
   const { showToast } = useToast();
@@ -156,16 +155,16 @@ function GroupWorkspace({ groupId }) {
   const [projectFilter, setProjectFilter] = useState('all');
   const [projectSearch, setProjectSearch] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
-  const [editName, setEditName] = useState('');
-  const [editDesc, setEditDesc] = useState('');
+  const [editName, setEditName] = useState(group?.name || '');
+  const [editDesc, setEditDesc] = useState(group?.description || '');
   const [savingInfo, setSavingInfo] = useState(false);
+  const [prevGroupId, setPrevGroupId] = useState(groupId);
 
-  useEffect(() => {
-    if (group) {
-      setEditName(group.name);
-      setEditDesc(group.description || '');
-    }
-  }, [group?.id, group?.name, group?.description]);
+  if (prevGroupId !== groupId) {
+    setPrevGroupId(groupId);
+    setEditName(group?.name || '');
+    setEditDesc(group?.description || '');
+  }
 
   useEffect(() => {
     if (group && (!activeGroup || activeGroup.id !== groupId) && memberFor(group, user.id)) {
@@ -591,7 +590,7 @@ function GroupWorkspace({ groupId }) {
                               @{applicant?.username || ''}
                             </span>
                             <small style={{ display: 'block', color: 'var(--color-text-dim)', fontSize: '0.78rem' }}>
-                              Solicitado el {new Date(request.requestedAt || Date.now()).toLocaleDateString()}
+                              Solicitado el {request.requestedAt ? new Date(request.requestedAt).toLocaleDateString() : 'Reciente'}
                             </small>
                           </div>
                         </div>
@@ -649,7 +648,7 @@ function GroupWorkspace({ groupId }) {
                           @{person?.username || ''}
                         </span>
                         <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--color-text-dim)' }}>
-                          Miembro desde {new Date(member.joinedAt || Date.now()).toLocaleDateString()}
+                          Miembro desde {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : 'Reciente'}
                         </span>
                       </div>
                     </div>

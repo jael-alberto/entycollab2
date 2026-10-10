@@ -11,6 +11,7 @@ export default function ProjectDetailModal() {
   const { user, users, projects, applications, ratings, lang, t, l10n, changeProjectStatus, handleApplication, activeGroup, isActiveGroupAdmin } = useApp();
   const { showToast } = useToast();
   const { detailProjectId, closeDetail, openRate } = useModals();
+  const [rolesByApplication, setRolesByApplication] = useState({});
 
   const project = projects.find(p => p.id === detailProjectId);
   if (!project) return null;
@@ -19,7 +20,6 @@ export default function ProjectDetailModal() {
   const apps = applications.filter(a => a.projectId === project.id);
   const isOwner = project.ownerId === user.id || (project.groupId && activeGroup?.id === project.groupId && isActiveGroupAdmin);
   const accepted = apps.filter(a => a.status === 'accepted');
-  const [rolesByApplication, setRolesByApplication] = useState({});
 
   const onStatusChange = (newStatus) => {
     const res = changeProjectStatus(project.id, newStatus);
