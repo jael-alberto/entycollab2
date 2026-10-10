@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   getUsers, getProjects, getApplications, getRatings,
-  saveUsers, saveProjects, saveApplications, saveRatingsData,
+  getGroups, saveUsers, saveProjects, saveApplications, saveRatingsData, saveGroups,
   getCurrentUserId, setCurrentUserId, clearCurrentUserId,
-  generateId, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
+  getActiveGroupId, setActiveGroupId, generateId, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
 } from '../lib/store.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { getUserAvgRating, userCategories } from '../lib/helpers.js';
@@ -15,7 +15,9 @@ export function AppProvider({ children }) {
   const [projects, setProjects] = useState(() => getProjects());
   const [applications, setApplications] = useState(() => getApplications());
   const [ratings, setRatings] = useState(() => getRatings());
+  const [groups, setGroups] = useState(() => getGroups());
   const [userId, setUserId] = useState(() => getCurrentUserId());
+  const [activeGroupId, setActiveGroupIdState] = useState(() => getActiveGroupId());
   const [lang, setLangState] = useState(() => getLang());
   const [theme, setThemeState] = useState(() => getTheme());
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,6 +26,9 @@ export function AppProvider({ children }) {
   const [selectedTechFilters, setSelectedTechFilters] = useState([]);
 
   const user = users.find(u => u.id === userId) || null;
+  const activeGroup = groups.find(g => g.id === activeGroupId) || null;
+  const activeMembership = activeGroup?.members?.find(m => m.userId === userId) || null;
+  const isActiveGroupAdmin = activeMembership?.role === 'owner' || activeMembership?.role === 'admin';
 
   // Resincronizar los datos tras cada cambio (localStorage siempre gana)
   const refresh = useCallback(() => {
@@ -31,7 +36,9 @@ export function AppProvider({ children }) {
     setProjects(getProjects());
     setApplications(getApplications());
     setRatings(getRatings());
+    setGroups(getGroups());
     setUserId(getCurrentUserId());
+    setActiveGroupIdState(getActiveGroupId());
   }, []);
 
   const setUserInStore = useCallback((id) => {
@@ -104,7 +111,9 @@ export function AppProvider({ children }) {
 
   const logout = useCallback(() => {
     clearCurrentUserId();
+    setActiveGroupId(null);
     setUserId(null);
+    setActiveGroupIdState(null);
     setMenuOpen(false);
   }, []);
 
@@ -197,6 +206,7 @@ export function AppProvider({ children }) {
   // PROJECTS
   // ========================================================================
   const createProject = useCallback((data) => {
+    if (activeGroup && !isActiveGroupAdmin) return null;
     const project = {
       id: generateId(),
       ownerId: userId,
@@ -209,6 +219,8 @@ export function AppProvider({ children }) {
       deadline: data.deadline || null,
       repo: data.repo || null,
       image: data.image || null,
+      groupId: activeGroup?.id || null,
+      roles: (data.roles || []).filter(Boolean),
       status: 'open',
       createdAt: new Date().toISOString()
     };
@@ -217,6 +229,87 @@ export function AppProvider({ children }) {
     saveProjects(current);
     setProjects(current);
     return project;
+  }, [userId, activeGroup, isActiveGroupAdmin]);
+
+  // ========================================================================
+  // GROUPS
+  // Un grupo encapsula su membresía y sus solicitudes. El dueño es el único
+  // que puede nombrar administradores; los administradores gestionan solicitudes
+  // y pueden crear proyectos dentro del contexto del grupo.
+  // ========================================================================
+  const selectGroup = useCallback((groupId) => {
+    setActiveGroupId(groupId);
+    setActiveGroupIdState(groupId || null);
+  }, []);
+
+  const createGroup = useCallback(({ name, description }) => {
+    const group = {
+      id: generateId(), name: name.trim(), description: description.trim(), ownerId: userId,
+      createdAt: new Date().toISOString(),
+      members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
+      requests: []
+    };
+    const current = getGroups();
+    current.push(group);
+    saveGroups(current);
+    setGroups(current);
+    selectGroup(group.id);
+    return group;
+  }, [userId, selectGroup]);
+
+  const requestToJoinGroup = useCallback((groupId) => {
+    const current = getGroups();
+    const group = current.find(g => g.id === groupId);
+    if (!group) return 'missing';
+    if ((group.members || []).some(m => m.userId === userId)) return 'member';
+    if ((group.requests || []).some(r => r.userId === userId && r.status === 'pending')) return 'pending';
+    group.requests = [...(group.requests || []), { id: generateId(), userId, status: 'pending', requestedAt: new Date().toISOString() }];
+    saveGroups(current); setGroups(current); return 'ok';
+  }, [userId]);
+
+  const decideGroupRequest = useCallback((groupId, requestId, accepted) => {
+    const current = getGroups(); const group = current.find(g => g.id === groupId);
+    const me = group?.members?.find(m => m.userId === userId);
+    if (!group || !me || !['owner', 'admin'].includes(me.role)) return false;
+    const request = group.requests?.find(r => r.id === requestId);
+    if (!request || request.status !== 'pending') return false;
+    request.status = accepted ? 'accepted' : 'rejected';
+    if (accepted) group.members.push({ userId: request.userId, role: 'member', joinedAt: new Date().toISOString() });
+    saveGroups(current); setGroups(current); return true;
+  }, [userId]);
+
+  const setGroupMemberRole = useCallback((groupId, memberId, role) => {
+    const current = getGroups(); const group = current.find(g => g.id === groupId);
+    if (!group || group.ownerId !== userId || !['admin', 'member'].includes(role)) return false;
+    const member = group.members?.find(m => m.userId === memberId);
+    if (!member || member.role === 'owner') return false;
+    member.role = role; saveGroups(current); setGroups(current); return true;
+  }, [userId]);
+
+  const updateGroup = useCallback((groupId, { name, description }) => {
+    const current = getGroups();
+    const group = current.find(g => g.id === groupId);
+    if (!group) return false;
+    const me = group.members?.find(m => m.userId === userId);
+    if (!me || !['owner', 'admin'].includes(me.role)) return false;
+    if (name && name.trim()) group.name = name.trim();
+    if (description !== undefined) group.description = description.trim();
+    saveGroups(current);
+    setGroups(current);
+    return true;
+  }, [userId]);
+
+  const removeGroupMember = useCallback((groupId, memberId) => {
+    const current = getGroups();
+    const group = current.find(g => g.id === groupId);
+    if (!group) return false;
+    const me = group.members?.find(m => m.userId === userId);
+    if (!me || !['owner', 'admin'].includes(me.role)) return false;
+    if (group.ownerId === memberId) return false;
+    group.members = (group.members || []).filter(m => m.userId !== memberId);
+    saveGroups(current);
+    setGroups(current);
+    return true;
   }, [userId]);
 
   const changeProjectStatus = useCallback((projectId, newStatus) => {
@@ -258,7 +351,7 @@ export function AppProvider({ children }) {
     return 'ok';
   }, [userId, ratings]);
 
-  const handleApplication = useCallback((appId, newStatus, projectId) => {
+  const handleApplication = useCallback((appId, newStatus, projectId, projectRole = '') => {
     const current = getApplications();
     const idx = current.findIndex(a => a.id === appId);
     if (idx < 0) return null;
@@ -271,6 +364,7 @@ export function AppProvider({ children }) {
     }
 
     current[idx].status = newStatus;
+    if (newStatus === 'accepted') current[idx].projectRole = projectRole;
     saveApplications(current);
     setApplications(current);
     const applicant = getUsers().find(u => u.id === current[idx].userId);
@@ -349,7 +443,7 @@ export function AppProvider({ children }) {
   }, [userId]);
 
   const value = {
-    user, users, projects, applications, ratings,
+    user, users, projects, applications, ratings, groups, activeGroup, activeGroupId, activeMembership, isActiveGroupAdmin,
     lang, theme, menuOpen, setMenuOpen,
     selectedCategories, setSelectedCategories,
     selectedTechFilters, setSelectedTechFilters,
@@ -357,6 +451,7 @@ export function AppProvider({ children }) {
     login, register, logout,
     saveProfile, updateAccount, setAvatar, toggleAvailability, saveFeaturedProjects,
     createProject, changeProjectStatus,
+    selectGroup, createGroup, updateGroup, removeGroupMember, requestToJoinGroup, decideGroupRequest, setGroupMemberRole,
     applyToProject, handleApplication, respondInvite, sendInvite,
     saveRatings, refresh
   };

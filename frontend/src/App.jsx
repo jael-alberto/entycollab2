@@ -13,6 +13,7 @@ import People from './pages/People.jsx';
 import Profile from './pages/Profile.jsx';
 import Settings from './pages/Settings.jsx';
 import Landing from './pages/Landing.jsx';
+import Groups from './pages/Groups.jsx';
 
 function RequireAuth({ children }) {
   const { user } = useApp();
@@ -58,6 +59,7 @@ function App() {
           <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
           <Route path="/proyectos/*" element={<RequireAuth><Projects /></RequireAuth>} />
           <Route path="/personas" element={<RequireAuth><People /></RequireAuth>} />
+          <Route path="/grupos/:groupId?" element={<RequireAuth><Groups /></RequireAuth>} />
           <Route path="/perfil" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/ajustes" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="/" element={<Landing />} />

@@ -11,7 +11,9 @@ export const STORAGE_KEYS = {
   projects: 'devcollab_projects',
   applications: 'devcollab_applications',
   ratings: 'devcollab_ratings',
+  groups: 'devcollab_groups',
   currentUser: 'devcollab_current_user',
+  activeGroup: 'devcollab_active_group',
   theme: 'devcollab_theme',
   lang: 'devcollab_lang'
 };
@@ -32,11 +34,13 @@ export function getUsers() { return getData(STORAGE_KEYS.users); }
 export function getProjects() { return getData(STORAGE_KEYS.projects); }
 export function getApplications() { return getData(STORAGE_KEYS.applications); }
 export function getRatings() { return getData(STORAGE_KEYS.ratings); }
+export function getGroups() { return getData(STORAGE_KEYS.groups); }
 
 export function saveUsers(u) { setData(STORAGE_KEYS.users, u); }
 export function saveProjects(p) { setData(STORAGE_KEYS.projects, p); }
 export function saveApplications(a) { setData(STORAGE_KEYS.applications, a); }
 export function saveRatingsData(r) { setData(STORAGE_KEYS.ratings, r); }
+export function saveGroups(groups) { setData(STORAGE_KEYS.groups, groups); }
 
 export function getCurrentUserId() {
   return localStorage.getItem(STORAGE_KEYS.currentUser);
@@ -48,6 +52,12 @@ export function setCurrentUserId(userId) {
 
 export function clearCurrentUserId() {
   localStorage.removeItem(STORAGE_KEYS.currentUser);
+}
+
+export function getActiveGroupId() { return localStorage.getItem(STORAGE_KEYS.activeGroup); }
+export function setActiveGroupId(groupId) {
+  if (groupId) localStorage.setItem(STORAGE_KEYS.activeGroup, groupId);
+  else localStorage.removeItem(STORAGE_KEYS.activeGroup);
 }
 
 export function getCurrentUser() {

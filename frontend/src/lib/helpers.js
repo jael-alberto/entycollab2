@@ -247,7 +247,7 @@ export function userHistoryItems(u, projects, applications, lang) {
       if (!p) return null;
       return {
         p,
-        role: t(lang, 'history.participant'),
+        role: a.projectRole || t(lang, 'history.participant'),
         statusText: a.status === 'accepted' ? getStatusLabel(lang, p.status) : t(lang, 'history.notAccepted')
       };
     })

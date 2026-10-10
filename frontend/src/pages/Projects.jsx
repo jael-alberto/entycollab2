@@ -23,7 +23,7 @@ export default function Projects() {
 // /proyectos — Nuevos proyectos (con filtros) + proyectos en los que participo
 // ==========================================================================
 function NewProjects() {
-  const { user, projects, applications, lang, t, selectedCategories, selectedTechFilters } = useApp();
+  const { user, projects, applications, lang, t, selectedCategories, selectedTechFilters, activeGroup, isActiveGroupAdmin } = useApp();
   const { openCreate, openCategoryFilter, openTechFilter } = useModals();
   const [search, setSearch] = useState('');
 
@@ -32,9 +32,10 @@ function NewProjects() {
     return accepted
       .map(a => projects.find(p => p.id === a.projectId))
       .filter(Boolean)
+      .filter(p => activeGroup ? p.groupId === activeGroup.id : !p.groupId)
       .filter(p => p.status !== 'closed')
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [applications, projects, user.id]);
+  }, [applications, projects, user.id, activeGroup]);
 
   const list = useMemo(() => {
     const myApps = applications.filter(a => a.userId === user.id);
@@ -43,7 +44,8 @@ function NewProjects() {
     let out = projects.filter(p =>
       p.status === 'open' &&
       p.ownerId !== user.id &&
-      !appliedIds.has(p.id)
+      !appliedIds.has(p.id) &&
+      (activeGroup ? p.groupId === activeGroup.id : !p.groupId)
     );
 
     const q = search.toLowerCase();
@@ -61,7 +63,7 @@ function NewProjects() {
       out = out.filter(p => (p.tech || []).some(tt => selectedTechFilters.includes(tt)));
     }
     return [...out].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [projects, applications, user, search, selectedCategories, selectedTechFilters, lang]);
+  }, [projects, applications, user, search, selectedCategories, selectedTechFilters, lang, activeGroup]);
 
   const catLabel = useMemo(() => {
     if (selectedCategories.length === 0) return t('filter.allCat');
@@ -95,8 +97,8 @@ function NewProjects() {
 
       <div className="section-block">
         <div className="section-header-row">
-          <h2 className="section-title">{t('proj.new')}</h2>
-          <button className="btn btn-primary" onClick={openCreate}>{t('proj.newBtn')}</button>
+          <div><h2 className="section-title">{activeGroup ? `Proyectos de ${activeGroup.name}` : t('proj.new')}</h2>{activeGroup && <p className="form-hint">Solo los administradores del grupo pueden crear proyectos aquí.</p>}</div>
+          {(!activeGroup || isActiveGroupAdmin) && <button className="btn btn-primary" onClick={openCreate}>{t('proj.newBtn')}</button>}
         </div>
 
         <div className="filters-bar">
@@ -127,20 +129,20 @@ function NewProjects() {
 // /proyectos/mis-proyectos
 // ==========================================================================
 function MyProjects() {
-  const { user, projects, t } = useApp();
+  const { user, projects, t, activeGroup, isActiveGroupAdmin } = useApp();
   const { openCreate } = useModals();
 
   const mine = useMemo(() => {
     return projects
-      .filter(p => p.ownerId === user.id)
+      .filter(p => p.ownerId === user.id && (activeGroup ? p.groupId === activeGroup.id : !p.groupId))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [projects, user.id]);
+  }, [projects, user.id, activeGroup]);
 
   return (
     <div className="section-block">
       <div className="section-header-row">
-        <h2 className="section-title">{t('myProjects.title')}</h2>
-        <button className="btn btn-primary" onClick={openCreate}>{t('proj.newBtn')}</button>
+        <h2 className="section-title">{activeGroup ? `Mis proyectos · ${activeGroup.name}` : t('myProjects.title')}</h2>
+        {(!activeGroup || isActiveGroupAdmin) && <button className="btn btn-primary" onClick={openCreate}>{t('proj.newBtn')}</button>}
       </div>
       {mine.length === 0 ? (
         <EmptyState icon="📂" title={t('empty.myProjects')} sub={t('empty.myProjectsSub')} />

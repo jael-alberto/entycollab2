@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { getUserAvgRating, avatarColorClass, escapeHTML } from '../lib/helpers.js';
 
 export function LoggedHeader() {
-  const { user, ratings, lang, theme, menuOpen, setMenuOpen, t, toggleLang, toggleTheme, logout } = useApp();
+  const { user, ratings, lang, theme, menuOpen, setMenuOpen, activeGroup, groups, t, toggleLang, toggleTheme, logout, selectGroup } = useApp();
   const { showToast } = useToast();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const wrapRef = useRef(null);
 
   useEffect(() => {
@@ -19,20 +20,33 @@ export function LoggedHeader() {
   }, [setMenuOpen]);
 
   const avg = user ? getUserAvgRating(user.id, ratings) : 0;
+  const myGroups = groups.filter(group => group.members?.some(member => member.userId === user?.id));
+  const changeGroup = (event) => {
+    const groupId = event.target.value;
+    selectGroup(groupId || null);
+    navigate(groupId ? `/grupos/${groupId}` : '/grupos');
+  };
 
   return (
     <header className="site-header logged-in-header">
       <div className="header-container header-compact">
         <div className="header-brand">
           <div className="header-brand-logo">
-            <img src="/img/logo-pg.png" alt="Logo ENTYCOLLAB" className="site-logo-small" />
+            <Link to="/dashboard" onClick={() => selectGroup(null)} title="Inicio general">
+              <img src="/img/logo-pg.png" alt="Logo ENTYCOLLAB" className="site-logo-small" />
+            </Link>
           </div>
+          <select className="group-switcher" value={activeGroup?.id || ''} onChange={changeGroup} aria-label="Cambiar grupo">
+            <option value="">Mis grupos</option>
+            {myGroups.map(group => <option value={group.id} key={group.id}>{group.name}</option>)}
+          </select>
         </div>
         <nav className="header-nav" aria-label="Navegación principal">
           <ul className="nav-list">
-            <li><NavLink to="/dashboard" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>{t('nav.home')}</NavLink></li>
+            <li><NavLink to="/dashboard" onClick={() => selectGroup(null)} className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>{t('nav.home')}</NavLink></li>
             <li><NavLink to="/proyectos" className={() => 'nav-link' + (isProjectsPath(pathname) ? ' active' : '')}>{t('nav.projects')}</NavLink></li>
             <li><NavLink to="/personas" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>{t('nav.people')}</NavLink></li>
+            <li><NavLink to="/grupos" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>Grupos</NavLink></li>
           </ul>
         </nav>
         <div className="header-right">

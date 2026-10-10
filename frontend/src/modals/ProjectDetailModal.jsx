@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
@@ -7,7 +8,7 @@ import {
 } from '../lib/helpers.js';
 
 export default function ProjectDetailModal() {
-  const { user, users, projects, applications, ratings, lang, t, l10n, changeProjectStatus, handleApplication } = useApp();
+  const { user, users, projects, applications, ratings, lang, t, l10n, changeProjectStatus, handleApplication, activeGroup, isActiveGroupAdmin } = useApp();
   const { showToast } = useToast();
   const { detailProjectId, closeDetail, openRate } = useModals();
 
@@ -16,8 +17,9 @@ export default function ProjectDetailModal() {
 
   const owner = users.find(u => u.id === project.ownerId);
   const apps = applications.filter(a => a.projectId === project.id);
-  const isOwner = project.ownerId === user.id;
+  const isOwner = project.ownerId === user.id || (project.groupId && activeGroup?.id === project.groupId && isActiveGroupAdmin);
   const accepted = apps.filter(a => a.status === 'accepted');
+  const [rolesByApplication, setRolesByApplication] = useState({});
 
   const onStatusChange = (newStatus) => {
     const res = changeProjectStatus(project.id, newStatus);
@@ -30,7 +32,7 @@ export default function ProjectDetailModal() {
   };
 
   const onApplication = (appId, newStatus) => {
-    const name = handleApplication(appId, newStatus, project.id);
+    const name = handleApplication(appId, newStatus, project.id, rolesByApplication[appId] || 'Colaborador');
     if (name === 'slotsFull') {
       showToast(t('invite.slotsFull'), 'error');
       return;
@@ -83,6 +85,7 @@ export default function ProjectDetailModal() {
               <div className="applicant-actions">
                 {a.status === 'pending' ? (
                   <>
+                    {(project.roles || []).length > 0 && <select className="project-role-select" value={rolesByApplication[a.id] || ''} onChange={e => setRolesByApplication(prev => ({ ...prev, [a.id]: e.target.value }))}><option value="">Asignar rol…</option>{project.roles.map(role => <option key={role} value={role}>{role}</option>)}</select>}
                     <button className="btn btn-success btn-sm" onClick={() => onApplication(a.id, 'accepted')}>{t('detail.accept')}</button>
                     <button className="btn btn-danger btn-sm" onClick={() => onApplication(a.id, 'rejected')}>{t('detail.reject')}</button>
                   </>
@@ -113,6 +116,7 @@ export default function ProjectDetailModal() {
               <div className="applicant-info">
                 <span className="applicant-name">{escapeHTML(participant.name)}</span>
                 <span className="applicant-skills">
+                  {a.projectRole && <><strong>{a.projectRole}</strong> · </>}
                   {participant.skills.map(s => escapeHTML(s)).join(', ')}
                   {rating ? (
                     <> · {t('detail.rated')}: {'★'.repeat(rating.stars)}{'☆'.repeat(5 - rating.stars)}</>
@@ -154,6 +158,8 @@ export default function ProjectDetailModal() {
         <h3>{t('detail.techs')}</h3>
         <SkillTags skills={project.tech} limit={999} />
       </div>
+
+      {(project.roles || []).length > 0 && <div className="detail-section"><h3>Roles buscados</h3><SkillTags skills={project.roles} limit={999} /></div>}
 
       <div className="detail-section">
         <h3>{t('detail.minRatingTitle')}</h3>

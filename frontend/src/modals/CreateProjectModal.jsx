@@ -6,7 +6,7 @@ import { Modal, StarInput } from '../components/common.jsx';
 import { escapeHTML, fileToDataURL, getCategoryLabel, starLabel, techsForCategory } from '../lib/helpers.js';
 
 export default function CreateProjectModal() {
-  const { user, lang, t, createProject } = useApp();
+  const { user, lang, t, createProject, activeGroup, isActiveGroupAdmin } = useApp();
   const { showToast } = useToast();
   const { closeCreate } = useModals();
   const fileRef = useRef(null);
@@ -21,8 +21,9 @@ export default function CreateProjectModal() {
   const [deadline, setDeadline] = useState('');
   const [repo, setRepo] = useState('');
   const [image, setImage] = useState(null);
+  const [rolesText, setRolesText] = useState('');
 
-  if (!user) return null;
+  if (!user || (activeGroup && !isActiveGroupAdmin)) return null;
 
   const toggleTech = (tech) => {
     setTechs(prev => prev.includes(tech) ? prev.filter(x => x !== tech) : [...prev, tech]);
@@ -64,7 +65,8 @@ export default function CreateProjectModal() {
       description: description.trim(),
       deadline: deadline || null,
       repo: repo.trim() || null,
-      image
+      image,
+      roles: rolesText.split(',').map(role => role.trim()).filter(Boolean)
     });
     closeCreate();
     showToast(t('toast.published'), 'success');
@@ -79,6 +81,7 @@ export default function CreateProjectModal() {
   return (
     <Modal open title={t('createProject.title')} onClose={closeCreate}>
       <form onSubmit={submit}>
+        {activeGroup && <div className="group-project-notice">👥 Este proyecto se publicará únicamente dentro de <strong>{activeGroup.name}</strong>.</div>}
         <div className="form-group">
           <label htmlFor="proj-title">{t('createProject.name')}</label>
           <input type="text" id="proj-title" required value={title} onChange={e => setTitle(e.target.value)} placeholder={t('createProject.namePh')} />
@@ -135,6 +138,11 @@ export default function CreateProjectModal() {
         <div className="form-group">
           <label>{t('createProject.desc')}</label>
           <textarea id="proj-description" rows="5" required value={description} onChange={e => setDescription(e.target.value)} placeholder={t('createProject.descPh')}></textarea>
+        </div>
+        <div className="form-group">
+          <label htmlFor="proj-roles">Roles del proyecto</label>
+          <p className="form-hint">Separa los roles con comas. Al aceptar a cada persona, el administrador le asignará uno de estos roles.</p>
+          <input id="proj-roles" value={rolesText} onChange={e => setRolesText(e.target.value)} placeholder="Ej. Diseñador UI, Frontend, Backend" />
         </div>
         <div className="form-group">
           <label>{t('createProject.image')}</label>
