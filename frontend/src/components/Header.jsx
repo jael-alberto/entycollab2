@@ -58,6 +58,7 @@ export function LoggedHeader() {
         <div className="header-left">
           <Link to="/dashboard" onClick={() => selectGroup(null)} className="header-logo-link" title="EntyTec">
             <img src="/img/logo-pg.png" alt="EntyTec" className="site-logo-small" />
+            <span className="header-brand-name">EntyTec</span>
           </Link>
         </div>
 
