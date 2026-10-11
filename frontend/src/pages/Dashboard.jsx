@@ -58,7 +58,6 @@ export default function Dashboard() {
     <div className="dashboard-layout">
       <aside className="dashboard-sidebar">
         <div className="sidebar-user-block">
-          <Avatar user={user} cls="sidebar-user-avatar" />
         </div>
 
         <div className="sidebar-search">
