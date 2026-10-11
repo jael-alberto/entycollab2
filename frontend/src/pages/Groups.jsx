@@ -159,6 +159,7 @@ function GroupWorkspace({ groupId }) {
   const [editDesc, setEditDesc] = useState(group?.description || '');
   const [savingInfo, setSavingInfo] = useState(false);
   const [prevGroupId, setPrevGroupId] = useState(groupId);
+  const [openMemberMenu, setOpenMemberMenu] = useState(null); // { memberId, x, y }
 
   if (prevGroupId !== groupId) {
     setPrevGroupId(groupId);
@@ -252,7 +253,19 @@ function GroupWorkspace({ groupId }) {
     if (ok) {
       showToast(`${memberName} ha sido removido del grupo`, 'info');
     }
+    setOpenMemberMenu(null);
   };
+
+  const toggleMemberMenu = (memberId, e) => {
+    e.stopPropagation();
+    setOpenMemberMenu(prev => prev?.memberId === memberId ? null : { memberId, x: e.clientX, y: e.clientY });
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMemberMenu(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const filteredMembers = (group.members || []).filter(member => {
     if (!memberSearch.trim()) return true;
@@ -632,14 +645,15 @@ function GroupWorkspace({ groupId }) {
               />
             </div>
 
-            <div style={{ marginTop: '1rem' }}>
+            <div style={{ marginTop: '1rem', position: 'relative' }}>
               {filteredMembers.map(member => {
                 const person = users.find(u => u.id === member.userId);
                 const canManageRoles = isOwner && member.role !== 'owner';
                 const canKick = isAdmin && member.role !== 'owner' && member.userId !== user.id;
+                const isMenuOpen = openMemberMenu?.memberId === member.userId;
 
                 return (
-                  <div className="group-member-card" key={member.userId}>
+                  <div className="group-member-card" key={member.userId} onClick={e => canManageRoles || canKick ? toggleMemberMenu(member.userId, e) : null} style={{ cursor: (canManageRoles || canKick) ? 'pointer' : 'default' }}>
                     <div className="group-member-info">
                       <Avatar user={person} />
                       <div>
@@ -654,41 +668,82 @@ function GroupWorkspace({ groupId }) {
                     </div>
 
                     <div className="group-member-actions">
-                      {canManageRoles ? (
-                        <select
-                          value={member.role}
-                          onChange={e => handleRoleChange(member.userId, e.target.value)}
-                          aria-label={`Cambiar rol de ${person?.name || 'usuario'}`}
-                          style={{
-                            padding: '0.35rem 0.65rem',
-                            borderRadius: '7px',
-                            border: '1px solid var(--color-border)',
-                            background: 'var(--color-surface)',
-                            fontWeight: 600,
-                            color: 'var(--color-text-main)'
-                          }}
-                        >
-                          <option value="member">Miembro</option>
-                          <option value="admin">Administrador</option>
-                        </select>
-                      ) : (
+                      {(!canManageRoles && !canKick) && (
                         <span className="member-role">
                           {member.role === 'owner' ? '👑 Creador' : member.role === 'admin' ? '🛡️ Administrador' : '👤 Miembro'}
                         </span>
                       )}
-
-                      {canKick && (
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          style={{ color: 'var(--color-danger)' }}
-                          onClick={() => handleRemoveMember(member.userId, person?.name || 'este miembro')}
-                          title="Expulsar del grupo"
-                        >
-                          ✕ Quitar
-                        </button>
-                      )}
                     </div>
+
+                    {isMenuOpen && (
+                      <div
+                        className="member-context-menu"
+                        style={{
+                          position: 'fixed',
+                          left: openMemberMenu.x,
+                          top: openMemberMenu.y,
+                          zIndex: 1000,
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          minWidth: '180px',
+                          padding: '0.25rem 0'
+                        }}
+                      >
+                        {canManageRoles && (
+                          <button
+                            className="menu-item"
+                            onClick={() => {
+                              handleRoleChange(member.userId, member.role === 'admin' ? 'member' : 'admin');
+                              setOpenMemberMenu(null);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 1rem',
+                              textAlign: 'left',
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--color-text-main)',
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = 'var(--color-bg-hover)'}
+                            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <span>{member.role === 'admin' ? '👤' : '🛡️'}</span>
+                            <span>{member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'}</span>
+                          </button>
+                        )}
+                        {canKick && (
+                          <button
+                            className="menu-item danger"
+                            onClick={() => handleRemoveMember(member.userId, person?.name || 'este miembro')}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 1rem',
+                              textAlign: 'left',
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--color-danger)',
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = 'var(--color-bg-hover)'}
+                            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <span>✕</span>
+                            <span>Eliminar del grupo</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
