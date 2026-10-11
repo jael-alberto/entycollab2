@@ -56,6 +56,9 @@ export function LoggedHeader() {
     <header className="site-header logged-in-header">
       <div className="header-container header-compact">
         <div className="header-left">
+          <Link to="/dashboard" onClick={() => selectGroup(null)} className="header-logo-link" title="EntyTec">
+            <img src="/img/logo-pg.png" alt="EntyTec" className="site-logo-small" />
+          </Link>
         </div>
 
         <div className="header-right">
