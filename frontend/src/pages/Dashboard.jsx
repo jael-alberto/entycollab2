@@ -12,26 +12,7 @@ export default function Dashboard() {
   const { user, projects, applications, users, ratings, groups, t, selectGroup, activeGroup } = useApp();
   const navigate = useNavigate();
   const [groupSearch, setGroupSearch] = useState('');
-
-  const featured = useMemo(() => {
-    return [...projects]
-      .sort((a, b) => scoreProject(b, projects, applications, users, ratings) - scoreProject(a, projects, applications, users, ratings))
-      .slice(0, 6);
-  }, [projects, applications, users, ratings]);
-
-  const recentProjects = useMemo(() => {
-    return projects
-      .filter(p => p.status === 'open' && !p.groupId)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 6);
-  }, [projects]);
-
-  const globalPeople = useMemo(() => {
-    return availableUsers(users)
-      .filter(u => u.id !== user.id)
-      .sort((a, b) => (b.skills?.length || 0) - (a.skills?.length || 0))
-      .slice(0, 6);
-  }, [users, user.id]);
+  const [view, setView] = useState('welcome');
 
   const myGroups = useMemo(() => {
     return groups.filter(g => g.members?.some(m => m.userId === user.id));
@@ -52,22 +33,48 @@ export default function Dashboard() {
     navigate(`/grupos/${groupId}`);
   };
 
+  const handleGlobalClick = () => {
+    selectGroup(null);
+    setView('global');
+  };
+
   const handleExploreClick = () => {
     selectGroup(null);
     navigate('/grupos');
   };
 
-  return (
-    <>
-      <div className="section-block home-hero">
-        <h2 className="home-hero-title">{t('dash.hello', { name: user.name.split(' ')[0] })}</h2>
-        <p className="home-hero-sub">{t('dash.sub')}</p>
-      </div>
+  if (view === 'global') {
+    const featured = useMemo(() => {
+      return [...projects]
+        .filter(p => !p.groupId)
+        .sort((a, b) => scoreProject(b, projects, applications, users, ratings) - scoreProject(a, projects, applications, users, ratings))
+        .slice(0, 6);
+    }, [projects, applications, users, ratings]);
 
-      <div className="section-block">
-        <div className="section-header-row">
-          <h2 className="section-title">{t('dash.global')}</h2>
-          <p className="form-hint" style={{ margin: 0 }}>{t('dash.globalDesc')}</p>
+    const recentProjects = useMemo(() => {
+      return projects
+        .filter(p => p.status === 'open' && !p.groupId)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 6);
+    }, [projects]);
+
+    const globalPeople = useMemo(() => {
+      return availableUsers(users)
+        .filter(u => u.id !== user.id)
+        .sort((a, b) => (b.skills?.length || 0) - (a.skills?.length || 0))
+        .slice(0, 6);
+    }, [users, user.id]);
+
+    return (
+      <div>
+        <div className="dashboard-header-with-back">
+          <button className="btn btn-ghost btn-sm" onClick={() => setView('welcome')}>
+            ← {t('dash.yourGroups')}
+          </button>
+          <div>
+            <h2 className="section-title">{t('dash.global')}</h2>
+            <p className="form-hint">{t('dash.globalDesc')}</p>
+          </div>
         </div>
 
         <div className="dashboard-global-section">
@@ -95,117 +102,161 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-      </div>
 
-      <div className="section-block">
-        <div className="section-header-row">
-          <h2 className="section-title">{t('dash.yourGroups')}</h2>
-          {filteredGroups.length > 0 && (
-            <input
-              type="text"
-              className="group-search-input"
-              placeholder={t('dash.searchGroups')}
-              value={groupSearch}
-              onChange={e => setGroupSearch(e.target.value)}
-              style={{ maxWidth: '280px' }}
-            />
+        <div className="section-block">
+          <div className="section-header-row">
+            <h2 className="section-title">{t('dash.recentActivity')}</h2>
+            <Link to="/proyectos" className="btn btn-primary">{t('dash.viewAll')}</Link>
+          </div>
+          {recentProjects.length === 0 ? (
+            <EmptyState icon="🕐" title={t('empty.recent')} />
+          ) : (
+            <div className="projects-grid">
+              {recentProjects.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
+            </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dashboard-layout">
+      <aside className="dashboard-sidebar">
+        <div className="sidebar-header">
+          <img src="/img/logo-pg.png" alt="ENTYCOLLAB" className="sidebar-logo" />
+          <h2>{t('dash.yourGroups')}</h2>
+        </div>
+
+        <div className="sidebar-search">
+          <input
+            type="text"
+            className="group-search-input"
+            placeholder={t('dash.searchGroups')}
+            value={groupSearch}
+            onChange={e => setGroupSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="sidebar-section">
+          <button
+            className={`sidebar-item global-item ${activeGroup ? '' : 'active'}`}
+            onClick={handleGlobalClick}
+          >
+            <span className="sidebar-item-icon">🌐</span>
+            <span>{t('dash.global')}</span>
+          </button>
         </div>
 
         {myGroups.length === 0 ? (
-          <div className="dashboard-empty-groups">
-            <EmptyState icon="👥" title={t('dash.noGroups')} sub={t('dash.exploreGroups')} />
-            <button className="btn btn-primary" onClick={handleExploreClick}>{t('dash.exploreGroups')}</button>
+          <div className="sidebar-empty">
+            <p>{t('dash.noGroups')}</p>
+            <button className="btn btn-primary btn-sm" onClick={handleExploreClick}>
+              {t('dash.exploreGroups')}
+            </button>
           </div>
         ) : (
-          <div className="groups-grid">
+          <div className="sidebar-groups">
             {filteredGroups.map(group => {
               const membership = group.members?.find(m => m.userId === user.id);
-              const roleLabel = membership?.role === 'owner' ? t('group.roleOwner') : membership?.role === 'admin' ? t('group.roleAdmin') : t('group.roleMember');
-              const roleClass = membership?.role === 'owner' ? 'role-owner' : membership?.role === 'admin' ? 'role-admin' : 'role-member';
-              const projectCount = projects.filter(p => p.groupId === group.id).length;
-              const memberCount = group.members?.length || 0;
-
+              const isActive = activeGroup?.id === group.id;
               return (
-                <article className="group-card dashboard-group-card" key={group.id} onClick={() => handleGroupClick(group.id)}>
-                  <div className="group-card-header">
-                    <div className="group-card-icon">👥</div>
-                    <div className="group-card-info">
-                      <h3>{group.name}</h3>
-                      <p>{group.description}</p>
+                <button
+                  key={group.id}
+                  className={`sidebar-item group-item ${isActive ? 'active' : ''}`}
+                  onClick={() => handleGroupClick(group.id)}
+                >
+                  <div className="sidebar-group-info">
+                    <span className="sidebar-item-icon">👥</span>
+                    <div>
+                      <strong>{group.name}</strong>
+                      <small>{group.members?.length || 0} miembros · {projects.filter(p => p.groupId === group.id).length} proyectos</small>
                     </div>
-                    <span className={`group-role-badge ${roleClass}`}>{roleLabel}</span>
                   </div>
-                  <div className="group-card-meta">
-                    <span>{projectCount} {projectCount === 1 ? 'proyecto' : 'proyectos'}</span>
-                    <span>{memberCount} {memberCount === 1 ? 'miembro' : 'miembros'}</span>
-                  </div>
-                  <button className="btn btn-primary btn-sm group-enter-btn" onClick={e => { e.stopPropagation(); handleGroupClick(group.id); }}>
-                    {t('dash.joinGroup')}
-                  </button>
-                </article>
+                  <span className={`sidebar-role ${membership?.role === 'owner' ? 'owner' : membership?.role === 'admin' ? 'admin' : 'member'}`}>
+                    {membership?.role === 'owner' ? t('group.roleOwner') : membership?.role === 'admin' ? t('group.roleAdmin') : t('group.roleMember')}
+                  </span>
+                </button>
               );
             })}
           </div>
         )}
 
         {otherGroups.length > 0 && (
-          <div className="dashboard-other-groups">
-            <h3 style={{ margin: '1.5rem 0 0.75rem', fontSize: '0.95rem', color: 'var(--color-text-dim)' }}>{t('dash.exploreGroups')}</h3>
-            <div className="groups-grid">
+          <div className="sidebar-section">
+            <h4 className="sidebar-section-title">{t('dash.exploreGroups')}</h4>
+            <div className="sidebar-other-groups">
               {otherGroups.slice(0, 4).map(group => {
-                const memberCount = group.members?.length || 0;
-                const projectCount = projects.filter(p => p.groupId === group.id).length;
                 const isPending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
                 const isMember = group.members?.some(m => m.userId === user.id);
-
                 return (
-                  <article className="group-card" key={group.id}>
-                    <div className="group-card-header">
-                      <div className="group-card-icon">👥</div>
-                      <div className="group-card-info">
-                        <h3>{group.name}</h3>
-                        <p>{group.description}</p>
+                  <button
+                    key={group.id}
+                    className="sidebar-item other-group-item"
+                    disabled={isPending || isMember}
+                    onClick={() => { selectGroup(group.id); navigate(`/grupos/${group.id}`); }}
+                  >
+                    <div className="sidebar-group-info">
+                      <span className="sidebar-item-icon">👥</span>
+                      <div>
+                        <strong>{group.name}</strong>
+                        <small>{group.members?.length || 0} miembros</small>
                       </div>
                     </div>
-                    <div className="group-card-meta">
-                      <span>{projectCount} {projectCount === 1 ? 'proyecto' : 'proyectos'}</span>
-                      <span>{memberCount} {memberCount === 1 ? 'miembro' : 'miembros'}</span>
-                    </div>
-                    <button
-                      className="btn btn-ghost btn-sm group-enter-btn"
-                      disabled={isPending || isMember}
-                      onClick={e => { e.stopPropagation(); selectGroup(group.id); navigate(`/grupos/${group.id}`); }}
-                    >
-                      {isPending ? 'Solicitud pendiente' : isMember ? 'Ya eres miembro' : t('dash.requestAccess')}
-                    </button>
-                  </article>
+                    <span className="sidebar-badge">
+                      {isPending ? 'Pendiente' : isMember ? 'Miembro' : t('dash.requestAccess')}
+                    </span>
+                  </button>
                 );
               })}
               {otherGroups.length > 4 && (
-                <button className="btn btn-outline group-enter-btn" style={{ gridColumn: '1 / -1' }} onClick={handleExploreClick}>
-                  {t('dash.exploreGroups')} ({otherGroups.length})
+                <button className="btn btn-outline btn-sm" style={{ width: '100%', marginTop: '0.5rem' }} onClick={handleExploreClick}>
+                  Ver todos ({otherGroups.length})
                 </button>
               )}
             </div>
           </div>
         )}
 
-      </div>
-
-      <div className="section-block">
-        <div className="section-header-row">
-          <h2 className="section-title">{t('dash.recentActivity')}</h2>
-          <Link to="/proyectos" className="btn btn-primary">{t('dash.viewAll')}</Link>
+        <div className="sidebar-footer">
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleExploreClick}>
+            + {t('dash.exploreGroups')}
+          </button>
         </div>
-        {recentProjects.length === 0 ? (
-          <EmptyState icon="🕐" title={t('empty.recent')} />
-        ) : (
-          <div className="projects-grid">
-            {recentProjects.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
+      </aside>
+
+      <main className="dashboard-main">
+        <div className="welcome-content">
+          <div className="welcome-hero">
+            <h1>{t('dash.hello', { name: user.name.split(' ')[0] })}</h1>
+            <p>{t('dash.sub')}</p>
           </div>
-        )}
-      </div>
-    </>
+
+          <div className="welcome-stats">
+            <div className="stat-card">
+              <span className="stat-value">{myGroups.length}</span>
+              <span className="stat-label">Grupos</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{projects.filter(p => p.ownerId === user.id).length}</span>
+              <span className="stat-label">Proyectos creados</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{applications.filter(a => a.userId === user.id && a.status === 'accepted').length}</span>
+              <span className="stat-label">Colaboraciones</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{availableUsers(users).length}</span>
+              <span className="stat-label">Disponibles</span>
+            </div>
+          </div>
+
+          <div className="welcome-recent">
+            <h3>Proyectos recientes</h3>
+            <p className="form-hint">Selecciona un grupo o "Global" en la barra lateral para ver proyectos y personas.</p>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
