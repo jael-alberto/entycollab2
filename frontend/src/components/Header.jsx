@@ -62,37 +62,6 @@ export function LoggedHeader() {
           </Link>
         </div>
 
-        <div className="header-center">
-          <form className="header-search-form" onSubmit={handleSearch} role="search">
-            <label htmlFor="global-search" className="sr-only">
-              {isDashboard && !activeGroup ? 'Buscar grupos' : isGroupWorkspace ? `Buscar en ${activeGroup?.name}` : 'Buscar proyectos'}
-            </label>
-            <div className="search-input-wrapper">
-              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                id="global-search"
-                type="search"
-                className="header-search-input"
-                placeholder={isDashboard && !activeGroup ? 'Buscar grupos...' : isGroupWorkspace ? `Buscar en ${activeGroup?.name}...` : 'Buscar proyectos, personas...'}
-                value={searchQuery}
-                onChange={handleGlobalSearchChange}
-                autoComplete="off"
-              />
-              {searchQuery && (
-                <button type="button" className="search-clear" onClick={clearSearch} aria-label="Limpiar búsqueda">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
-
         <div className="header-right">
           <button className={'theme-toggle lang-toggle' + (theme ? ' active' : '')} onClick={toggleLang} title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'} aria-label="Cambiar idioma">
             {lang === 'es' ? 'ES' : 'EN'}
