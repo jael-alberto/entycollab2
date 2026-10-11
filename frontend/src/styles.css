@@ -321,7 +321,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 .header-brand-name {
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   letter-spacing: -0.02em;
   color: var(--color-text-main);
 }
@@ -2695,10 +2695,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     font-size: 0.8rem;
   }
 
-  .site-logo-small {
-    height: 20px;
-    width: auto;
-  }
+.header-logo-link .site-logo-small {
+  height: 18px;
+  width: auto;
+}
 
   .user-bubble-name {
     max-width: 90px;
