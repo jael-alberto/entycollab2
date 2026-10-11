@@ -1,6 +1,7 @@
 import { useApp } from '../context/AppContext.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { Avatar, SkillTags, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
+import PeekRating from '../components/PeekRating.jsx';
 import {
   getUserAvgRating, getUserRatingCount, escapeHTML,
   userCategories, getCategoryLabel
@@ -123,7 +124,7 @@ export default function Profile() {
                       {rater ? escapeHTML(rater.name) : t('profile.anonymous')} · {project ? escapeHTML(l10n(project.title)) : t('profile.deletedProject')}
                     </span>
                   </div>
-                  <span className="rating-stars-display">{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</span>
+                  <PeekRating value={r.stars} readOnly size={18} lift={4} magnify={1.08} riseDuration={260} />
                 </div>
               );
             })

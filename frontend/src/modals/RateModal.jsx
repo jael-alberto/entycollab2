@@ -3,7 +3,8 @@ import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Modal, EmptyState } from '../components/common.jsx';
-import { escapeHTML, starLabel } from '../lib/helpers.js';
+import PeekRating from '../components/PeekRating.jsx';
+import { escapeHTML } from '../lib/helpers.js';
 
 export default function RateModal() {
   const { user, users, applications, ratings, lang, t, saveRatings } = useApp();
@@ -49,21 +50,17 @@ export default function RateModal() {
                   {participant.skills.map(s => escapeHTML(s)).join(', ')}
                 </div>
               </div>
-              <div className="star-rating">
-                {[5, 4, 3, 2, 1].map(s => (
-                  <span key={s} style={{ display: 'contents' }}>
-                    <input
-                      type="radio"
-                      id={`star-${a.userId}-${s}`}
-                      name={`rating-${a.userId}`}
-                      value={s}
-                      checked={selected[a.userId] === s}
-                      onChange={() => setStars(a.userId, s)}
-                    />
-                    <label htmlFor={`star-${a.userId}-${s}`} title={starLabel(lang, s)}>★</label>
-                  </span>
-                ))}
-              </div>
+              <PeekRating
+                value={selected[a.userId] || 0}
+                onChange={(s) => setStars(a.userId, s)}
+                ariaLabel={`Rating for ${escapeHTML(participant.name)}`}
+                size={28}
+                lift={9}
+                magnify={1.25}
+                riseDuration={300}
+                popScale={1.4}
+                allowClear={true}
+              />
             </div>
           );
         })

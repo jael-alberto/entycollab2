@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Modal, StatusPill, ProjectBanner, Stars, SkillTags } from '../components/common.jsx';
+import PeekRating from '../components/PeekRating.jsx';
 import {
   getUserAvgRating, getCategoryLabel, getStatusLabel, escapeHTML
 } from '../lib/helpers.js';
@@ -119,7 +120,7 @@ export default function ProjectDetailModal() {
                   {a.projectRole && <><strong>{a.projectRole}</strong> · </>}
                   {participant.skills.map(s => escapeHTML(s)).join(', ')}
                   {rating ? (
-                    <> · {t('detail.rated')}: {'★'.repeat(rating.stars)}{'☆'.repeat(5 - rating.stars)}</>
+                    <> · {t('detail.rated')}: <PeekRating value={rating.stars} readOnly size={16} lift={4} magnify={1.05} riseDuration={250} /></>
                   ) : (isOwner && project.status === 'completed' ? <> · {t('detail.unrated')}</> : '')}
                 </span>
               </div>
@@ -164,7 +165,14 @@ export default function ProjectDetailModal() {
       <div className="detail-section">
         <h3>{t('detail.minRatingTitle')}</h3>
         <div className="min-rating-detail">
-          <span className="min-rating-stars big">{'★'.repeat(project.minRating || 1)}{'☆'.repeat(5 - (project.minRating || 1))}</span>
+          <PeekRating
+            value={project.minRating || 1}
+            readOnly
+            size={22}
+            lift={5}
+            magnify={1.1}
+            riseDuration={280}
+          />
           <span className="min-rating-desc">{t('detail.minRatingDesc', { stars: project.minRating || 1 })}</span>
         </div>
       </div>
