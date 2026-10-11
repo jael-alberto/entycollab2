@@ -597,112 +597,57 @@ function GroupWorkspace({ groupId }) {
 
       {activeTab === 'people' && (
         <div className="group-tab-content">
-          {isAdmin && (
+          {isAdmin && requests.length > 0 && (
             <div className="group-panel" style={{ marginBottom: '1.25rem' }}>
               <div className="group-panel-heading">
                 <div>
                   <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     Solicitudes de acceso
-                    {requests.length > 0 && <span className="tab-badge">{requests.length}</span>}
+                    <span className="tab-badge">{requests.length}</span>
                   </h3>
                   <p>Aspirantes que desean unirse a este espacio de trabajo privado.</p>
                 </div>
               </div>
-
-              {requests.length === 0 ? (
-                <p className="form-hint" style={{ marginTop: '0.5rem' }}>No hay solicitudes pendientes. Tu equipo está al día.</p>
-              ) : (
-                <div style={{ marginTop: '1rem' }}>
-                  {requests.map(request => {
-                    const applicant = users.find(u => u.id === request.userId);
-                    return (
-                      <div className="group-member-card" key={request.id}>
-                        <div className="group-member-info">
-                          <Avatar user={applicant} />
-                          <div>
-                            <strong>{applicant?.name || 'Usuario'}</strong>
-                            <span style={{ color: 'var(--color-text-dim)', marginLeft: '0.35rem', fontSize: '0.85rem' }}>@{applicant?.username || ''}</span>
-                            <small style={{ display: 'block', color: 'var(--color-text-dim)', fontSize: '0.78rem' }}>
-                              Solicitado el {request.requestedAt ? new Date(request.requestedAt).toLocaleDateString() : 'Reciente'}
-                            </small>
-                          </div>
-                        </div>
-                        <div className="group-member-actions">
-                          <button className="btn btn-primary btn-sm" onClick={() => handleRequestDecision(request.id, true)}>Aceptar</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => handleRequestDecision(request.id, false)}>Rechazar</button>
+              <div style={{ marginTop: '1rem' }}>
+                {requests.map(request => {
+                  const applicant = users.find(u => u.id === request.userId);
+                  return (
+                    <div className="group-member-card" key={request.id}>
+                      <div className="group-member-info">
+                        <Avatar user={applicant} />
+                        <div>
+                          <strong>{applicant?.name || 'Usuario'}</strong>
+                          <span style={{ color: 'var(--color-text-dim)', marginLeft: '0.35rem', fontSize: '0.85rem' }}>@{applicant?.username || ''}</span>
+                          <small style={{ display: 'block', color: 'var(--color-text-dim)', fontSize: '0.78rem' }}>
+                            Solicitado el {request.requestedAt ? new Date(request.requestedAt).toLocaleDateString() : 'Reciente'}
+                          </small>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className="group-member-actions">
+                        <button className="btn btn-primary btn-sm" onClick={() => handleRequestDecision(request.id, true)}>Aceptar</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleRequestDecision(request.id, false)}>Rechazar</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          <div className="group-panel">
-            <div className="group-panel-heading">
-              <div>
-                <h3>Miembros del Grupo ({groupMembers.length})</h3>
-                <p>Colaboradores que forman parte de este equipo.</p>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <input type="text" className="group-search-input" placeholder="Filtrar miembros..." value={memberSearch} onChange={e => setMemberSearch(e.target.value)} style={{ maxWidth: '200px' }} />
-                <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="group-filter-select" style={{ padding: '0.35rem 0.65rem', borderRadius: '7px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontWeight: 600 }}>
-                  <option value="all">{t('group.allRoles')}</option>
-                  <option value="owner">{t('group.roleOwner')}</option>
-                  <option value="admin">{t('group.roleAdmin')}</option>
-                  <option value="member">{t('group.roleMember')}</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '1rem', position: 'relative' }}>
-              {filteredMembers.length === 0 ? (
-                <EmptyState icon="👥" title={t('group.noMembers')} sub="Intenta cambiando los filtros." />
-              ) : (
-                filteredMembers.map(member => {
-                  const person = users.find(u => u.id === member.userId);
-                  const canManageRoles = isOwner && member.role !== 'owner';
-                  const canKick = isAdmin && member.role !== 'owner' && member.userId !== user.id;
-                  const isMenuOpen = openMemberMenu?.memberId === member.userId;
-
-                  return (
-                    <div className="group-member-card" key={member.userId} onClick={e => (canManageRoles || canKick) ? toggleMemberMenu(member.userId, e) : null} style={{ cursor: (canManageRoles || canKick) ? 'pointer' : 'default' }}>
-                      <div className="group-member-info">
-                        <Avatar user={person} />
-                        <div>
-                          <strong>{person?.name || 'Usuario'}</strong>
-                          <span style={{ color: 'var(--color-text-dim)', marginLeft: '0.35rem', fontSize: '0.85rem' }}>@{person?.username || ''}</span>
-                          <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--color-text-dim)' }}>
-                            Miembro desde {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : 'Reciente'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="group-member-actions">
-                        <span className={`member-role ${roleBadgeClass(member.role)}`}>{roleLabel(member.role)}</span>
-                      </div>
-
-                      {isMenuOpen && (
-                        <div className="member-context-menu" style={{ position: 'fixed', left: openMemberMenu.x, top: openMemberMenu.y, zIndex: 1000, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: '180px', padding: '0.25rem 0' }}>
-                          {canManageRoles && (
-                            <button className="menu-item" onClick={() => { handleRoleChange(member.userId, member.role === 'admin' ? 'member' : 'admin'); setOpenMemberMenu(null); }} style={{ width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', color: 'var(--color-text-main)', fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onMouseOver={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
-                              <span>{member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'}</span>
-                            </button>
-                          )}
-                          {canKick && (
-                            <button className="menu-item danger" onClick={() => handleRemoveMember(member.userId, person?.name || 'este miembro')} style={{ width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', color: 'var(--color-danger)', fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onMouseOver={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
-                              <span>Eliminar del grupo</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <GroupPeopleInGroup
+            group={group}
+            users={users}
+            groupMembers={groupMembers}
+            isOwner={isOwner}
+            isAdmin={isAdmin}
+            currentUser={user}
+            t={t}
+            onRoleChange={handleRoleChange}
+            onRemoveMember={handleRemoveMember}
+            openMemberMenu={openMemberMenu}
+            setOpenMemberMenu={setOpenMemberMenu}
+            toggleMemberMenu={toggleMemberMenu}
+          />
         </div>
       )}
 
