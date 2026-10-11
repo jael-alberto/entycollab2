@@ -11,8 +11,8 @@ export default function Footer() {
         </div>
         <div className="footer-contact">
           <h3>{t('footer.contact')}</h3>
-          <p>info@entycollab.com</p>
-          <p>github.com/entycollab</p>
+          <a href="mailto:info@entycollab.com">info@entycollab.com</a>
+          <a href="https://github.com/entycollab" target="_blank" rel="noreferrer">github.com/entycollab</a>
         </div>
       </div>
       <div className="footer-bottom">

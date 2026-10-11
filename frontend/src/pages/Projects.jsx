@@ -159,11 +159,24 @@ function MyProjects() {
 // /proyectos/postulaciones
 // ==========================================================================
 function MyApplications() {
-  const { user, users, projects, applications, lang, t, l10n, respondInvite } = useApp();
+  const { user, users, projects, applications, groups, lang, t, l10n, respondInvite, activeGroup, selectGroup } = useApp();
   const { showToast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const apps = useMemo(() => applications.filter(a => a.userId === user.id), [applications, user.id]);
+  const myGroups = useMemo(
+    () => groups.filter(g => g.members?.some(m => m.userId === user.id)),
+    [groups, user.id]
+  );
+
+  const apps = useMemo(() => {
+    return applications
+      .filter(a => a.userId === user.id)
+      .filter(a => {
+        const project = projects.find(p => p.id === a.projectId);
+        if (!project) return false;
+        return activeGroup ? project.groupId === activeGroup.id : !project.groupId;
+      });
+  }, [applications, projects, user.id, activeGroup]);
 
   const handleInvite = (appId, action) => {
     const res = respondInvite(appId, action);
@@ -180,7 +193,34 @@ function MyApplications() {
 
   return (
     <div className="section-block">
-      <h2 className="section-title">{t('myApps.title')}</h2>
+      <div className="section-header-row">
+        <h2 className="section-title">
+          {activeGroup ? `${t('myApps.group')}: ${activeGroup.name}` : t('dash.global')}
+        </h2>
+        <div className="group-filter-pills" role="tablist" aria-label={t('myApps.title')}>
+          <button
+            type="button"
+            className={`group-filter-pill${!activeGroup ? ' active' : ''}`}
+            role="tab"
+            aria-selected={!activeGroup}
+            onClick={() => selectGroup(null)}
+          >
+            {t('dash.global')}
+          </button>
+          {myGroups.map(g => (
+            <button
+              key={g.id}
+              type="button"
+              className={`group-filter-pill${activeGroup?.id === g.id ? ' active' : ''}`}
+              role="tab"
+              aria-selected={activeGroup?.id === g.id}
+              onClick={() => selectGroup(g.id)}
+            >
+              {escapeHTML(g.name)}
+            </button>
+          ))}
+        </div>
+      </div>
       {apps.length === 0 ? (
         <EmptyState icon="📋" title={t('empty.myApps')} sub={t('empty.myAppsSub')} />
       ) : (

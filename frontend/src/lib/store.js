@@ -753,7 +753,13 @@ export function seedDemoExtraData() {
     { id: 'app-ref-6', projectId: 'proj4', userId: 'demo8', status: 'accepted', appliedAt: '2026-09-03T10:00:00Z' },
     { id: 'app-ref-7', projectId: 'proj3', userId: 'demo8', status: 'accepted', appliedAt: '2026-08-27T10:00:00Z' },
     { id: 'app-ref-8', projectId: 'proj8', userId: 'demo10', status: 'accepted', appliedAt: '2026-09-16T10:00:00Z' },
-    { id: 'app-ref-9', projectId: 'proj9', userId: 'demo9', status: 'accepted', appliedAt: '2026-09-18T10:00:00Z' }
+    { id: 'app-ref-9', projectId: 'proj9', userId: 'demo9', status: 'accepted', appliedAt: '2026-09-18T10:00:00Z' },
+    { id: 'app-carlos-global-1', projectId: 'proj1', userId: 'demo2', status: 'pending', appliedAt: '2026-09-20T10:00:00Z' },
+    { id: 'app-carlos-global-2', projectId: 'proj3', userId: 'demo2', status: 'pending', appliedAt: '2026-09-22T10:00:00Z' },
+    { id: 'app-carlos-global-3', projectId: 'proj4', userId: 'demo2', status: 'accepted', appliedAt: '2026-09-14T10:00:00Z' },
+    { id: 'app-carlos-global-4', projectId: 'proj6', userId: 'demo2', status: 'pending', appliedAt: '2026-09-25T10:00:00Z' },
+    { id: 'app-carlos-global-5', projectId: 'proj7', userId: 'demo2', status: 'pending', appliedAt: '2026-09-26T10:00:00Z' },
+    { id: 'app-carlos-global-6', projectId: 'proj8', userId: 'demo2', status: 'accepted', appliedAt: '2026-09-18T10:00:00Z' }
   ].concat(doneApps);
 
   const extraRatings = [
@@ -811,6 +817,333 @@ export function seedDemoExtraData() {
   }
 }
 
+// ==========================================================================
+// SEED: Grupos completos para carlos@demo.com (demo2)
+// Owner, Admin, Member con proyectos, aplicaciones y ratings
+// ==========================================================================
+export function seedCarlosGroups() {
+  const users = getUsers();
+  const carlos = users.find(u => u.email === 'carlos@demo.com');
+  if (!carlos) return;
+
+  const groups = getGroups();
+  const projects = getProjects();
+  const applications = getApplications();
+  const ratings = getRatings();
+
+  const carlosGroupsExist = groups.some(g =>
+    g.members?.some(m => m.userId === carlos.id && ['owner', 'admin', 'member'].includes(m.role))
+  );
+  if (carlosGroupsExist) return;
+
+  const otherUsers = users.filter(u => u.id !== carlos.id);
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+
+  const genId = generateId;
+
+  // Helper to create group with projects, apps, ratings
+  function createGroup({ name, description, ownerId, memberRoles, projectData, requests = [] }) {
+    const groupId = genId();
+    const createdAt = new Date(now - 60 * day).toISOString();
+
+    const members = memberRoles.map((role, idx) => ({
+      userId: role.userId,
+      role: role.role,
+      joinedAt: new Date(now - (55 - idx * 5) * day).toISOString()
+    }));
+
+    const group = {
+      id: groupId,
+      name,
+      description,
+      ownerId,
+      createdAt,
+      members,
+      requests: requests.map((req, idx) => ({
+        id: genId(),
+        userId: req.userId,
+        status: 'pending',
+        requestedAt: new Date(now - (2 - idx) * day).toISOString()
+      }))
+    };
+
+    const groupProjects = projectData.map((p, pIdx) => {
+      const projId = genId();
+      const proj = {
+        id: projId,
+        ownerId: p.ownerId,
+        title: p.title,
+        category: p.category,
+        slots: p.slots,
+        tech: p.tech,
+        description: p.description,
+        minRating: p.minRating,
+        deadline: p.deadline,
+        repo: p.repo || null,
+        image: p.image || null,
+        groupId,
+        roles: p.roles,
+        status: p.status,
+        createdAt: new Date(now - (30 - pIdx * 10) * day).toISOString()
+      };
+
+      const memberIds = members.map(m => m.userId).filter(id => id !== p.ownerId);
+      const projApps = memberIds.slice(0, p.slots).map((memberId, aIdx) => ({
+        id: genId(),
+        projectId: projId,
+        userId: memberId,
+        status: aIdx < 2 ? 'accepted' : 'pending',
+        projectRole: p.roles[aIdx] || 'Developer',
+        appliedAt: new Date(now - (15 - aIdx * 5) * day).toISOString()
+      }));
+
+      if (p.ownerId !== carlos.id) {
+        projApps.push({
+          id: genId(),
+          projectId: projId,
+          userId: carlos.id,
+          status: 'accepted',
+          projectRole: 'Lead Developer',
+          appliedAt: new Date(now - 18 * day).toISOString()
+        });
+      }
+
+      return { project: proj, apps: projApps };
+    });
+
+    const groupRatings = [];
+    groupProjects.forEach(({ project, apps }) => {
+      const acceptedApps = apps.filter(a => a.status === 'accepted');
+      acceptedApps.forEach(app => {
+        if (app.userId !== project.ownerId) {
+          groupRatings.push({
+            id: genId(),
+            projectId: project.id,
+            ratedUserId: app.userId,
+            ratedBy: project.ownerId,
+            stars: 4 + (Math.random() > 0.5 ? 1 : 0),
+            createdAt: new Date(now - 5 * day).toISOString()
+          });
+          groupRatings.push({
+            id: genId(),
+            projectId: project.id,
+            ratedUserId: project.ownerId,
+            ratedBy: app.userId,
+            stars: 4 + (Math.random() > 0.5 ? 1 : 0),
+            createdAt: new Date(now - 5 * day).toISOString()
+          });
+        }
+      });
+    });
+
+    return { group, projects: groupProjects.map(p => p.project), apps: groupProjects.flatMap(p => p.apps), ratings: groupRatings };
+  }
+
+  // GROUP 1: Carlos = OWNER
+  const g1 = createGroup({
+    name: 'Estudio Indie Carlos',
+    description: 'Mi estudio personal donde lidero proyectos propios',
+    ownerId: carlos.id,
+    memberRoles: [
+      { userId: carlos.id, role: 'owner' },
+      { userId: otherUsers[0]?.id, role: 'admin' },
+      { userId: otherUsers[1]?.id, role: 'member' },
+      { userId: otherUsers[2]?.id, role: 'member' }
+    ].filter(r => r.userId),
+    projectData: [
+      {
+        ownerId: carlos.id,
+        title: { es: 'Plataforma Colaborativa Indie', en: 'Indie Collaborative Platform' },
+        category: 'web',
+        slots: 4,
+        tech: ['React', 'Node.js', 'Socket.io', 'MongoDB'],
+        description: { es: 'Plataforma para que desarrolladores indie colaboren en tiempo real', en: 'Platform for indie devs to collaborate in real-time' },
+        minRating: 2,
+        deadline: '2026-12-31',
+        repo: 'https://github.com/carlos/indie-platform',
+        image: '/img/projects/taskboard.jpg',
+        roles: ['Frontend', 'Backend', 'DevOps'],
+        status: 'in-progress'
+      },
+      {
+        ownerId: carlos.id,
+        title: { es: 'Game Engine Tools', en: 'Game Engine Tools' },
+        category: 'game',
+        slots: 3,
+        tech: ['Unity', 'C#', 'Editor Scripting'],
+        description: { es: 'Herramientas internas para acelerar desarrollo en Unity', en: 'Internal tools to speed up Unity development' },
+        minRating: 3,
+        deadline: '2027-01-15',
+        repo: null,
+        image: '/img/projects/dashboard.jpg',
+        roles: ['Tools Programmer', 'Technical Artist'],
+        status: 'open'
+      },
+      {
+        ownerId: otherUsers[0]?.id,
+        title: { es: 'Sistema de Builds Automatizado', en: 'Automated Build System' },
+        category: 'web',
+        slots: 2,
+        tech: ['GitHub Actions', 'Docker', 'Unity Cloud Build'],
+        description: { es: 'Pipeline CI/CD para builds automáticos de todos los proyectos', en: 'CI/CD pipeline for automated builds of all projects' },
+        minRating: 1,
+        deadline: '2026-11-30',
+        repo: 'https://github.com/carlos/build-system',
+        image: null,
+        roles: ['DevOps'],
+        status: 'completed'
+      }
+    ].filter(p => p.ownerId)
+  });
+
+  // GROUP 2: Carlos = ADMIN
+  const g2 = createGroup({
+    name: 'Equipo Producto Principal',
+    description: 'Equipo principal de producto de la empresa',
+    ownerId: otherUsers[0]?.id,
+    memberRoles: [
+      { userId: otherUsers[0]?.id, role: 'owner' },
+      { userId: carlos.id, role: 'admin' },
+      { userId: otherUsers[1]?.id, role: 'member' },
+      { userId: otherUsers[2]?.id, role: 'member' },
+      { userId: otherUsers[3]?.id, role: 'member' }
+    ].filter(r => r.userId),
+    projectData: [
+      {
+        ownerId: otherUsers[0]?.id,
+        title: { es: 'Dashboard Analytics Empresarial', en: 'Enterprise Analytics Dashboard' },
+        category: 'web',
+        slots: 5,
+        tech: ['React', 'TypeScript', 'Node.js', 'PostgreSQL', 'Redis'],
+        description: { es: 'Dashboard interno para métricas de negocio en tiempo real', en: 'Internal dashboard for real-time business metrics' },
+        minRating: 3,
+        deadline: '2026-12-20',
+        repo: 'https://github.com/empresa/analytics-dashboard',
+        image: '/img/projects/dashboard.jpg',
+        roles: ['Frontend Lead', 'Backend', 'Data Engineer', 'DevOps', 'QA'],
+        status: 'in-progress'
+      },
+      {
+        ownerId: carlos.id,
+        title: { es: 'API Gateway Microservicios', en: 'Microservices API Gateway' },
+        category: 'web',
+        slots: 3,
+        tech: ['Go', 'Docker', 'Kubernetes', 'gRPC'],
+        description: { es: 'Gateway para orquestar microservicios con auth centralizada', en: 'Gateway to orchestrate microservices with centralized auth' },
+        minRating: 4,
+        deadline: '2027-01-10',
+        repo: 'https://github.com/empresa/api-gateway',
+        image: '/img/projects/apiserver.jpg',
+        roles: ['Backend', 'DevOps', 'Platform'],
+        status: 'open'
+      },
+      {
+        ownerId: otherUsers[1]?.id,
+        title: { es: 'Sistema de Notificaciones Push', en: 'Push Notification System' },
+        category: 'web',
+        slots: 2,
+        tech: ['Node.js', 'Firebase', 'Redis', 'WebSocket'],
+        description: { es: 'Sistema unificado de notificaciones para web y móvil', en: 'Unified notification system for web and mobile' },
+        minRating: 2,
+        deadline: '2026-12-01',
+        repo: null,
+        image: null,
+        roles: ['Backend', 'Mobile'],
+        status: 'completed'
+      }
+    ].filter(p => p.ownerId),
+    requests: [{ userId: otherUsers[4]?.id }].filter(r => r.userId)
+  });
+
+  // GROUP 3: Carlos = MEMBER
+  const g3 = createGroup({
+    name: 'Comunidad Game Dev',
+    description: 'Grupo abierto para desarrolladores de videojuegos',
+    ownerId: otherUsers[1]?.id,
+    memberRoles: [
+      { userId: otherUsers[1]?.id, role: 'owner' },
+      { userId: otherUsers[2]?.id, role: 'admin' },
+      { userId: carlos.id, role: 'member' },
+      { userId: otherUsers[3]?.id, role: 'member' },
+      { userId: otherUsers[4]?.id, role: 'member' },
+      { userId: otherUsers[5]?.id, role: 'member' },
+      { userId: otherUsers[6]?.id, role: 'member' }
+    ].filter(r => r.userId),
+    projectData: [
+      {
+        ownerId: otherUsers[1]?.id,
+        title: { es: 'RPG 2D Colaborativo', en: 'Collaborative 2D RPG' },
+        category: 'game',
+        slots: 6,
+        tech: ['Godot', 'GDScript', 'Aseprite', 'Tiled'],
+        description: { es: 'RPG 2D hecho por la comunidad, todos aportan', en: 'Community-made 2D RPG, everyone contributes' },
+        minRating: 1,
+        deadline: '2027-06-01',
+        repo: 'https://github.com/comunidad/rpg-2d',
+        image: '/img/projects/recipes.jpg',
+        roles: ['Programmer', 'Pixel Artist', 'Level Designer', 'Writer', 'Composer', 'QA'],
+        status: 'open'
+      },
+      {
+        ownerId: otherUsers[2]?.id,
+        title: { es: 'Game Jam Toolkit', en: 'Game Jam Toolkit' },
+        category: 'game',
+        slots: 4,
+        tech: ['Unity', 'C#', 'Git', 'Itch.io API'],
+        description: { es: 'Kit de inicio rápido para game jams semanales', en: 'Quick starter kit for weekly game jams' },
+        minRating: 2,
+        deadline: '2026-12-15',
+        repo: 'https://github.com/comunidad/jam-toolkit',
+        image: '/img/projects/community.jpg',
+        roles: ['Core Dev', 'UI/UX', 'Documentation'],
+        status: 'in-progress'
+      },
+      {
+        ownerId: carlos.id,
+        title: { es: 'Multiplayer Networking Lib', en: 'Multiplayer Networking Library' },
+        category: 'game',
+        slots: 3,
+        tech: ['C#', 'Mirror', 'WebRTC', 'Steamworks'],
+        description: { es: 'Librería para networking fácil en juegos indie', en: 'Easy networking library for indie games' },
+        minRating: 3,
+        deadline: '2027-02-01',
+        repo: 'https://github.com/carlos/net-lib',
+        image: null,
+        roles: ['Network Programmer', 'Backend', 'Testing'],
+        status: 'open'
+      },
+      {
+        ownerId: otherUsers[3]?.id,
+        title: { es: 'Shader Graph Library', en: 'Shader Graph Library' },
+        category: 'game',
+        slots: 2,
+        tech: ['Unity', 'HLSL', 'Shader Graph', 'URP'],
+        description: { es: 'Colección de shaders reutilizables para efectos visuales', en: 'Collection of reusable shaders for visual effects' },
+        minRating: 2,
+        deadline: '2027-01-20',
+        repo: null,
+        image: '/img/projects/restaurant.jpg',
+        roles: ['Technical Artist', 'Graphics Programmer'],
+        status: 'completed'
+      }
+    ].filter(p => p.ownerId),
+    requests: [{ userId: otherUsers[7]?.id }, { userId: otherUsers[8]?.id }].filter(r => r.userId)
+  });
+
+  const allGroups = [...groups, g1.group, g2.group, g3.group];
+  const allProjects = [...projects, ...g1.projects, ...g2.projects, ...g3.projects];
+  const allApps = [...applications, ...g1.apps, ...g2.apps, ...g3.apps];
+  const allRatings = [...ratings, ...g1.ratings, ...g2.ratings, ...g3.ratings];
+
+  saveGroups(allGroups);
+  saveProjects(allProjects);
+  saveApplications(allApps);
+  saveRatingsData(allRatings);
+
+  console.log('[seedCarlosGroups] Created 3 groups for Carlos with projects, apps, ratings');
+}
+
 // Inicialización idempotente (seed + migraciones) llamada una vez al arrancar
 export function bootstrap() {
   if (getUsers().length === 0) {
@@ -818,4 +1151,5 @@ export function bootstrap() {
   }
   migrateLegacyData();
   seedDemoExtraData();
+  seedCarlosGroups();
 }
