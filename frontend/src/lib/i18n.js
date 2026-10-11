@@ -85,6 +85,7 @@ export const I18N = {
     'disc.animation': 'Animación', 'disc.sound': 'Sonido', 'disc.modeling': 'Modelado',
     
     'myProjects.title': 'Mis Proyectos', 'myApps.title': 'Mis Postulaciones',
+    'myApps.group': 'Grupo',
     'profile.title': 'Mi Perfil', 'profile.availableToggle': 'Colaborar',
     'profile.changePhoto': '📷 Cambiar Foto', 'profile.removePhoto': 'Quitar Foto',
     'profile.editBtn': '✏️ Editar Perfil',
@@ -415,6 +416,7 @@ export const I18N = {
     'disc.animation': 'Animation', 'disc.sound': 'Sound', 'disc.modeling': 'Modeling',
     
     'myProjects.title': 'My Projects', 'myApps.title': 'My Applications',
+    'myApps.group': 'Group',
     'profile.title': 'My Profile', 'profile.availableToggle': 'Collaborate',
     'profile.changePhoto': '📷 Change Photo', 'profile.removePhoto': 'Remove Photo',
     'profile.editBtn': '✏️ Edit Profile',

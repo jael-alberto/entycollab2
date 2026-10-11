@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
-import { useToast } from '../context/ToastContext.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import PersonCard from '../components/PersonCard.jsx';
 import PeopleDirectory from '../components/PeopleDirectory.jsx';
@@ -14,7 +13,6 @@ const projectsOfGroup = (projects, groupId) => projects.filter(p => p.groupId ==
 
 export default function Dashboard() {
   const { user, projects, applications, users, ratings, groups, lang, t, selectGroup, activeGroup } = useApp();
-  const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [groupSearch, setGroupSearch] = useState('');
@@ -59,9 +57,6 @@ export default function Dashboard() {
     navigate('/grupos');
   };
 
-  const myProjectsCount = projects.filter(p => p.ownerId === user.id).length;
-  const collabsCount = applications.filter(a => a.userId === user.id && a.status === 'accepted').length;
-
   return (
     <div className="dashboard-layout">
       {view !== 'global' && (
@@ -98,7 +93,6 @@ export default function Dashboard() {
             <p className="sidebar-empty-text">{t('dash.noMatch')}</p>
           ) : (
             filteredMine.map(group => {
-              const membership = group.members?.find(m => m.userId === user.id);
               const isActive = activeGroup?.id === group.id;
               return (
                 <button
@@ -112,9 +106,6 @@ export default function Dashboard() {
                     <span className="group-item-meta">
                       {group.members?.length || 0} {t('dash.membersShort')} · {projectsOfGroup(projects, group.id).length} {t('dash.projectsShort')}
                     </span>
-                  </span>
-                  <span className={`sidebar-role ${membership?.role || 'member'}`}>
-                    {membership?.role === 'owner' ? t('group.roleOwner') : membership?.role === 'admin' ? t('group.roleAdmin') : t('group.roleMember')}
                   </span>
                 </button>
               );
@@ -179,134 +170,11 @@ export default function Dashboard() {
                 <h1>{t('dash.welcome', { name: user.name.split(' ')[0] })}</h1>
                 <p>{t('dash.sub')}</p>
               </div>
-              <div className="dash-hero-search">
-                <Icon name="search" size={18} />
-                <input
-                  type="text"
-                  placeholder={t('dash.searchGroups')}
-                  value={groupSearch}
-                  onChange={e => setGroupSearch(e.target.value)}
-                />
-              </div>
             </section>
-
-            <section className="dash-stats">
-              <div className="stat-card">
-                <Icon name="users" size={20} />
-                <span className="stat-value">{myGroups.length}</span>
-                <span className="stat-label">{t('dash.statGroups')}</span>
-              </div>
-              <div className="stat-card">
-                <Icon name="box" size={20} />
-                <span className="stat-value">{myProjectsCount}</span>
-                <span className="stat-label">{t('dash.statProjects')}</span>
-              </div>
-              <div className="stat-card">
-                <Icon name="sparkles" size={20} />
-                <span className="stat-value">{collabsCount}</span>
-                <span className="stat-label">{t('dash.statCollabs')}</span>
-              </div>
-              <div className="stat-card">
-                <Icon name="star" size={20} />
-                <span className="stat-value">{availableUsers(users).length}</span>
-                <span className="stat-label">{t('dash.statAvailable')}</span>
-              </div>
-            </section>
-
-            <section className="dash-section">
-              <header className="dash-section-head">
-                <h2>
-                  {t('dash.yourGroups')}
-                  <span className="dash-count">{myGroups.length}</span>
-                </h2>
-                <button className="btn btn-outline btn-sm" onClick={explore}>{t('dash.viewAll')}</button>
-              </header>
-
-              {myGroups.length === 0 ? (
-                <EmptyState title={t('dash.noGroups')} sub={t('dash.noGroupsSub')} icon={null} />
-              ) : filteredMine.length === 0 ? (
-                <EmptyState title={t('dash.noMatch')} icon={null} />
-              ) : (
-                <div className="dash-group-grid">
-                  {filteredMine.map(group => (
-                    <GroupCard
-                      key={group.id}
-                      group={group}
-                      projects={projects}
-                      role={group.members?.find(m => m.userId === user.id)?.role}
-                      t={t}
-                      onClick={() => openGroup(group.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {otherGroups.length > 0 && (
-              <section className="dash-section">
-                <header className="dash-section-head">
-                  <h2>{t('dash.discoverGroups')}<span className="dash-count">{otherGroups.length}</span></h2>
-                </header>
-                {filteredOther.length === 0 ? (
-                  <EmptyState title={t('dash.noMatch')} icon={null} />
-                ) : (
-                  <div className="dash-group-grid">
-                    {filteredOther.map(group => {
-                      const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
-                      return (
-                        <GroupCard
-                          key={group.id}
-                          group={group}
-                          projects={projects}
-                          t={t}
-                          pending={pending}
-                          onClick={() => {
-                            if (pending) { showToast(t('dash.pendingToast'), 'info'); return; }
-                            openGroup(group.id);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            )}
           </>
         )}
       </main>
     </div>
-  );
-}
-
-function GroupCard({ group, projects, role, pending, t, onClick }) {
-  const memberCount = group.members?.length || 0;
-  const projectCount = projectsOfGroup(projects, group.id).length;
-  return (
-    <article className="dash-group-card" onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter') && onClick()}>
-      <div className="dash-group-card-head">
-        <GroupAvatar group={group} size="lg" />
-        <div className="dash-group-card-title">
-          <h3>{escapeHTML(group.name)}</h3>
-          {role ? (
-            <span className={`group-role-badge role-${role}`}>
-              {role === 'owner' ? t('group.roleOwner') : role === 'admin' ? t('group.roleAdmin') : t('group.roleMember')}
-            </span>
-          ) : pending ? (
-            <span className="group-role-badge pending">{t('dash.pending')}</span>
-          ) : (
-            <span className="group-role-badge private">{t('dash.private')}</span>
-          )}
-        </div>
-      </div>
-      <p className="dash-group-card-desc">{escapeHTML(group.description || '')}</p>
-      <div className="dash-group-card-foot">
-        <span className="dash-group-meta"><Icon name="users" size={14} />{memberCount}</span>
-        <span className="dash-group-meta"><Icon name="box" size={14} />{projectCount}</span>
-        <span className="dash-group-card-cta">
-          {role ? t('dash.enter') : pending ? t('dash.pending') : t('dash.requestAccess')}
-        </span>
-      </div>
-    </article>
   );
 }
 

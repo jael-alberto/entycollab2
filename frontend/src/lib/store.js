@@ -753,7 +753,13 @@ export function seedDemoExtraData() {
     { id: 'app-ref-6', projectId: 'proj4', userId: 'demo8', status: 'accepted', appliedAt: '2026-09-03T10:00:00Z' },
     { id: 'app-ref-7', projectId: 'proj3', userId: 'demo8', status: 'accepted', appliedAt: '2026-08-27T10:00:00Z' },
     { id: 'app-ref-8', projectId: 'proj8', userId: 'demo10', status: 'accepted', appliedAt: '2026-09-16T10:00:00Z' },
-    { id: 'app-ref-9', projectId: 'proj9', userId: 'demo9', status: 'accepted', appliedAt: '2026-09-18T10:00:00Z' }
+    { id: 'app-ref-9', projectId: 'proj9', userId: 'demo9', status: 'accepted', appliedAt: '2026-09-18T10:00:00Z' },
+    { id: 'app-carlos-global-1', projectId: 'proj1', userId: 'demo2', status: 'pending', appliedAt: '2026-09-20T10:00:00Z' },
+    { id: 'app-carlos-global-2', projectId: 'proj3', userId: 'demo2', status: 'pending', appliedAt: '2026-09-22T10:00:00Z' },
+    { id: 'app-carlos-global-3', projectId: 'proj4', userId: 'demo2', status: 'accepted', appliedAt: '2026-09-14T10:00:00Z' },
+    { id: 'app-carlos-global-4', projectId: 'proj6', userId: 'demo2', status: 'pending', appliedAt: '2026-09-25T10:00:00Z' },
+    { id: 'app-carlos-global-5', projectId: 'proj7', userId: 'demo2', status: 'pending', appliedAt: '2026-09-26T10:00:00Z' },
+    { id: 'app-carlos-global-6', projectId: 'proj8', userId: 'demo2', status: 'accepted', appliedAt: '2026-09-18T10:00:00Z' }
   ].concat(doneApps);
 
   const extraRatings = [

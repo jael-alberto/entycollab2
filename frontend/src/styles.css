@@ -2764,26 +2764,28 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .site-footer {
   background-color: var(--color-bg);
   color: var(--color-text-muted);
-  /* Sin aire lateral para que el pie quede al mismo ancho que el contenido. */
-  padding: 3rem 0 2rem;
+  /* Mismo aire lateral que el contenido de las páginas para quedar alineado. */
+  padding: 3rem 2rem 1.75rem;
   margin-top: auto;
   border-top: 1px solid var(--color-border);
 }
 
 .footer-container {
-  /* Alineado con el contenido: también a ancho completo. */
   width: 100%;
-  margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 2rem;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 2rem 2.5rem;
   align-items: start;
 }
 
+.footer-brand {
+  max-width: 520px;
+}
+
 .footer-brand h2 {
-  color: var(--color-text-main);
-  font-size: 1.3rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.6rem;
   background: linear-gradient(135deg, var(--color-primary-light), var(--color-accent));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2792,7 +2794,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 .footer-brand p {
   font-size: 0.85rem;
-  line-height: 1.6;
+  line-height: 1.65;
+  color: var(--color-text-muted);
+}
+
+.footer-contact {
+  justify-self: end;
+  text-align: right;
 }
 
 .footer-contact h3 {
@@ -2801,19 +2809,21 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   margin-bottom: 0.75rem;
 }
 
-.footer-brand p {
+.footer-contact a {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
   color: var(--color-text-muted);
+  transition: var(--transition);
 }
 
-.footer-contact p {
-  font-size: 0.9rem;
-  margin-bottom: 0.3rem;
-  color: var(--color-text-muted);
+.footer-contact a:hover {
+  color: var(--color-primary);
 }
 
 .footer-bottom {
   width: 100%;
-  margin: 2rem auto 0;
+  margin: 2.5rem auto 0;
   padding-top: 1.5rem;
   border-top: 1px solid var(--color-border);
   text-align: center;
@@ -2952,6 +2962,20 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     align-items: flex-start;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .site-footer {
+    padding: 2.25rem 1.25rem 1.5rem;
+  }
+
+  .footer-container {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+
+  .footer-contact {
+    justify-self: start;
+    text-align: left;
   }
 }
 
