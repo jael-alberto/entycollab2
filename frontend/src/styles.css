@@ -298,9 +298,21 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   gap: 1.5rem;
 }
 
-/* Header layout: left (logo) | center (search) | right (user) */
+/* Header layout: left (logo + site switcher) | center (search) | right (user) */
 .header-left {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+/* Logo del header: enlace que siempre lleva al inicio */
+.header-logo-img {
+  height: 30px;
+  width: auto;
+  display: block;
+  object-fit: contain;
 }
 
 .header-logo-link {
@@ -324,6 +336,149 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   font-size: 0.9rem;
   letter-spacing: -0.02em;
   color: var(--color-text-main);
+}
+
+/* Selector de "sitios" (Global + tus grupos), estilo GitHub */
+.site-switcher {
+  position: relative;
+  min-width: 0;
+}
+
+.site-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 260px;
+  padding: 0.42rem 0.7rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-main);
+  font-family: var(--font-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.site-switcher-btn:hover {
+  border-color: var(--color-primary-light);
+  background: var(--color-accent-soft);
+  color: var(--color-primary);
+}
+
+.site-switcher-btn .group-avatar {
+  flex-shrink: 0;
+}
+
+.site-switcher-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-switcher-caret {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+}
+
+.site-switcher-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 500;
+  min-width: 260px;
+  max-width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0.4rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.site-switcher-heading {
+  padding: 0.5rem 0.6rem 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-dim);
+}
+
+.site-switcher-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-main);
+  font-family: var(--font-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.site-switcher-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.site-switcher-item.active {
+  background: var(--color-accent-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.site-switcher-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-switcher-item-check {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+.site-switcher-sep {
+  height: 1px;
+  margin: 0.35rem 0.3rem;
+  background: var(--color-border);
+}
+
+.site-switcher-empty {
+  padding: 0.4rem 0.6rem 0.6rem;
+  color: var(--color-text-dim);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .site-switcher-btn {
+    max-width: 150px;
+  }
+
+  .site-switcher-label {
+    max-width: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .site-switcher-label {
+    display: none;
+  }
+
+  .site-switcher-menu {
+    left: auto;
+    right: 0;
+  }
 }
 
 .header-center {
@@ -2960,13 +3115,6 @@ button.nav-link {
   background: linear-gradient(135deg, rgba(124, 45, 18, 0.2) 0%, rgba(30, 27, 26, 0.7) 100%);
 }
 
-.group-admin-hero-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
 .group-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -2990,11 +3138,6 @@ button.nav-link {
   box-shadow: var(--shadow-sm);
 }
 
-.group-kpi-card.urgent {
-  border-color: #f97316;
-  background: rgba(249, 115, 22, 0.05);
-}
-
 .group-kpi-value {
   font-size: 1.75rem;
   font-weight: 800;
@@ -3006,30 +3149,6 @@ button.nav-link {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--color-text-dim);
-}
-
-/* Quick actions */
-.group-quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-}
-
-.group-urgent-card {
-  border: 2px solid #f97316;
-  border-radius: 14px;
-  background: rgba(249, 115, 22, 0.06);
-  padding: 1.25rem;
-  margin-bottom: 1.25rem;
-}
-
-.group-urgent-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
 }
 
 .group-projects-toolbar {
@@ -4033,14 +4152,6 @@ button.nav-link {
   margin-bottom: 1.5rem;
 }
 
-.group-admin-hero-top h3 {
-  color: var(--color-text-main);
-}
-
-.group-admin-hero-top p {
-  color: var(--color-text-muted);
-}
-
 .group-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -4062,10 +4173,6 @@ button.nav-link {
   box-shadow: var(--shadow-md);
 }
 
-.group-kpi-card.urgent {
-  border-color: #ea580c;
-}
-
 .group-kpi-value {
   font-size: 2rem;
   font-weight: 800;
@@ -4079,38 +4186,6 @@ button.nav-link {
   color: var(--color-text-muted);
   font-weight: 500;
   display: block;
-}
-
-.group-quick-actions {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-top: 1rem;
-}
-
-.group-urgent-card {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: var(--radius-lg);
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.group-urgent-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-}
-
-.group-urgent-header h4 {
-  font-size: 0.95rem;
-  font-weight: 700;
-  margin: 0 0 0.25rem;
-}
-
-.group-urgent-header small {
-  color: var(--color-text-dim);
 }
 
 .group-member-card {
@@ -4276,6 +4351,196 @@ button.nav-link {
 .danger-zone {
   border-color: var(--color-danger) !important;
   background: rgba(239, 68, 68, 0.05);
+}
+
+/* ==========================================================================
+   PERSONAS DEL GRUPO — layout tipo Upwork (sidebar + tarjetas de miembros)
+   Reutiliza .people-layout / .people-sidebar y añade búsqueda + filtro de rol.
+   ========================================================================== */
+.group-people-count {
+  min-width: 26px;
+  text-align: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-primary-deep);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* El encabezado del rol es un rótulo, no un acordeón. */
+.group-people-role-head {
+  cursor: default;
+}
+
+.group-people-role-head:hover {
+  color: var(--color-text-main);
+}
+
+.group-people-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.9rem 0;
+  padding: 0.55rem 0.7rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-dim);
+  transition: var(--transition);
+}
+
+.group-people-search:focus-within {
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.group-people-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: var(--font-primary);
+  font-size: 0.88rem;
+  color: var(--color-text-main);
+}
+
+.group-people-search-clear {
+  border: none;
+  background: none;
+  color: var(--color-text-dim);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.15rem;
+}
+
+.group-people-search-clear:hover {
+  color: var(--color-primary-deep);
+}
+
+.group-people-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.group-people-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-main);
+  font-family: var(--font-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.group-people-option:hover {
+  background: var(--color-surface-hover);
+}
+
+.group-people-option.active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary-deep);
+}
+
+.group-people-option-count {
+  font-size: 0.74rem;
+  color: var(--color-text-dim);
+}
+
+.group-people-results-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.group-people-results-count {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+}
+
+.group-people-results-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-text-dim);
+}
+
+.group-people-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.group-person-card {
+  gap: 0.85rem;
+}
+
+.group-person-you {
+  color: var(--color-primary-deep);
+  font-weight: 700;
+}
+
+.group-person-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.group-person-role-select {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-main);
+  font-family: var(--font-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group-person-role-select:focus {
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+  outline: none;
+}
+
+.group-person-remove {
+  color: var(--color-danger);
+}
+
+@media (max-width: 1024px) {
+  .group-people-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .group-people-sidebar {
+    position: static;
+    max-height: none;
+  }
 }
 
 .modal-overlay {

@@ -2,19 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { Icon, GroupAvatar } from './common.jsx';
 import { getUserAvgRating, avatarColorClass, escapeHTML } from '../lib/helpers.js';
 
 export function LoggedHeader() {
   const { user, ratings, lang, theme, menuOpen, setMenuOpen, activeGroup, groups, t, toggleLang, toggleTheme, logout, selectGroup } = useApp();
   const { showToast } = useToast();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const wrapRef = useRef(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const siteRef = useRef(null);
+  const [siteOpen, setSiteOpen] = useState(false);
 
   useEffect(() => {
     function onDocClick(e) {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setMenuOpen(false);
+      if (siteRef.current && !siteRef.current.contains(e.target)) setSiteOpen(false);
     }
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
@@ -22,40 +25,99 @@ export function LoggedHeader() {
 
   const avg = user ? getUserAvgRating(user.id, ratings) : 0;
   const myGroups = groups.filter(group => group.members?.some(member => member.userId === user?.id));
-  const isDashboard = pathname === '/dashboard';
   const isGroupWorkspace = pathname.startsWith('/grupos/');
+  const isGlobal = pathname === '/dashboard' && new URLSearchParams(search).get('view') === 'global';
+  const showSiteSwitcher = isGlobal || isGroupWorkspace;
+  const siteLabel = isGroupWorkspace && activeGroup
+    ? activeGroup.name
+    : isGlobal
+      ? t('dash.global')
+      : 'ENTYCOLLAB';
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    if (isDashboard && !activeGroup) {
-      // En dashboard sin grupo: buscar grupos
-      // El filtrado se hace en el sidebar del dashboard
-    } else if (isGroupWorkspace) {
-      // En workspace de grupo: navegar a la tab correspondiente con filtro
-      const groupId = activeGroup?.id;
-      if (groupId) {
-        navigate(`/grupos/${groupId}?tab=projects&q=${encodeURIComponent(searchQuery)}`);
-      }
-    } else {
-      // En otras páginas: buscar globalmente en proyectos
-      navigate(`/proyectos?q=${encodeURIComponent(searchQuery)}`);
-    }
+  const goGlobal = () => {
+    selectGroup(null);
+    setSiteOpen(false);
+    navigate('/dashboard?view=global');
   };
 
-  const handleGlobalSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
+  const goGroup = (groupId) => {
+    selectGroup(groupId);
+    setSiteOpen(false);
+    navigate(`/grupos/${groupId}`);
   };
 
   return (
     <header className="site-header logged-in-header">
       <div className="header-container header-compact">
         <div className="header-left">
+          <Link
+            to="/dashboard"
+            className="header-logo-link"
+            title={t('dash.backHome')}
+            aria-label={t('dash.backHome')}
+            onClick={() => { selectGroup(null); setSiteOpen(false); }}
+          >
+            <img src="/img/logo-pg.png" alt="EntyTec" className="header-logo-img" />
+          </Link>
+
+          {showSiteSwitcher && (
+          <div className="site-switcher" ref={siteRef}>
+            <button
+              type="button"
+              className="site-switcher-btn"
+              onClick={e => { e.stopPropagation(); setSiteOpen(open => !open); }}
+              aria-haspopup="menu"
+              aria-expanded={siteOpen}
+            >
+              {isGroupWorkspace && activeGroup
+                ? <GroupAvatar group={activeGroup} size="sm" />
+                : <Icon name={isGlobal ? 'globe' : 'home'} size={16} />}
+              <span className="site-switcher-label">{escapeHTML(siteLabel)}</span>
+              <span className="site-switcher-caret">▾</span>
+            </button>
+
+            {siteOpen && (
+              <div className="site-switcher-menu" role="menu">
+                <button
+                  type="button"
+                  className={`site-switcher-item${isGlobal ? ' active' : ''}`}
+                  role="menuitem"
+                  onClick={goGlobal}
+                >
+                  <Icon name="globe" size={16} />
+                  <span className="site-switcher-item-name">{t('dash.global')}</span>
+                  {isGlobal && <span className="site-switcher-item-check">✓</span>}
+                </button>
+
+                <div className="site-switcher-sep" />
+                <div className="site-switcher-heading">
+                  {t('dash.yourGroups')} · {myGroups.length}
+                </div>
+
+                {myGroups.length === 0 ? (
+                  <p className="site-switcher-empty">{t('dash.noGroups')}</p>
+                ) : (
+                  myGroups.map(group => {
+                    const isActive = isGroupWorkspace && activeGroup?.id === group.id;
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        className={`site-switcher-item${isActive ? ' active' : ''}`}
+                        role="menuitem"
+                        onClick={() => goGroup(group.id)}
+                      >
+                        <GroupAvatar group={group} size="sm" />
+                        <span className="site-switcher-item-name">{escapeHTML(group.name)}</span>
+                        {isActive && <span className="site-switcher-item-check">✓</span>}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+          )}
         </div>
 
         <div className="header-right">

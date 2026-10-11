@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { EmptyState, Avatar, GroupAvatar, Icon } from '../components/common.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
-import PersonCard from '../components/PersonCard.jsx';
+import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
 import { getGroups, saveGroups } from '../lib/store.js';
 
@@ -149,18 +149,16 @@ function GroupWorkspace({ groupId }) {
   const isOwner = group?.ownerId === user?.id;
   const isAdmin = membership?.role === 'owner' || membership?.role === 'admin';
 
-  const activeTab = searchParams.get('tab') || 'overview';
+  const requestedTab = searchParams.get('tab') || (isOwner ? 'overview' : 'projects');
+  const activeTab = requestedTab === 'overview' && !isOwner ? 'projects' : requestedTab;
   const setTab = (tab) => setSearchParams({ tab });
 
   const [projectFilter, setProjectFilter] = useState('all');
   const [projectSearch, setProjectSearch] = useState('');
-  const [memberSearch, setMemberSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
   const [editName, setEditName] = useState(group?.name || '');
   const [editDesc, setEditDesc] = useState(group?.description || '');
   const [savingInfo, setSavingInfo] = useState(false);
   const [prevGroupId, setPrevGroupId] = useState(groupId);
-  const [openMemberMenu, setOpenMemberMenu] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviteProjectId, setInviteProjectId] = useState('');
@@ -179,12 +177,6 @@ function GroupWorkspace({ groupId }) {
       selectGroup(groupId);
     }
   }, [group, activeGroup, groupId, user.id, selectGroup]);
-
-  useEffect(() => {
-    const handleClickOutside = () => setOpenMemberMenu(null);
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
 
   const groupProjects = useMemo(() => projects.filter(p => p.groupId === groupId), [projects, groupId]);
   const openProjects = groupProjects.filter(p => p.status === 'open');
@@ -205,20 +197,6 @@ function GroupWorkspace({ groupId }) {
   }, [groupProjects, projectFilter, projectSearch, lang]);
 
   const groupMembers = group?.members || [];
-  const filteredMembers = useMemo(() => {
-    let list = groupMembers;
-    if (memberSearch.trim()) {
-      const q = memberSearch.toLowerCase();
-      list = list.filter(m => {
-        const person = users.find(u => u.id === m.userId);
-        return person?.name?.toLowerCase().includes(q) || person?.username?.toLowerCase().includes(q);
-      });
-    }
-    if (roleFilter !== 'all') {
-      list = list.filter(m => m.role === roleFilter);
-    }
-    return list;
-  }, [groupMembers, memberSearch, roleFilter, users]);
 
   const requests = (group?.requests || []).filter(r => r.status === 'pending');
 
@@ -261,17 +239,13 @@ function GroupWorkspace({ groupId }) {
 
   const handleRoleChange = (memberId, newRole) => {
     const ok = setGroupMemberRole(group.id, memberId, newRole);
-    if (ok) {
-      showToast('Rol de miembro actualizado', 'success');
-      setOpenMemberMenu(null);
-    }
+    if (ok) showToast('Rol de miembro actualizado', 'success');
   };
 
   const handleRemoveMember = (memberId, memberName) => {
     if (!window.confirm(`¿Estás seguro de expulsar a ${memberName} del grupo?`)) return;
     const ok = removeGroupMember(group.id, memberId);
     if (ok) showToast(`${memberName} ha sido removido del grupo`, 'info');
-    setOpenMemberMenu(null);
   };
 
   const handleLeaveGroup = () => {
@@ -295,11 +269,6 @@ function GroupWorkspace({ groupId }) {
       selectGroup(null);
       navigate('/grupos');
     }
-  };
-
-  const toggleMemberMenu = (memberId, e) => {
-    e.stopPropagation();
-    setOpenMemberMenu(prev => prev?.memberId === memberId ? null : { memberId, x: e.clientX, y: e.clientY });
   };
 
   const handleInviteSubmit = (e) => {
@@ -345,11 +314,6 @@ function GroupWorkspace({ groupId }) {
   return (
     <div className="section-block groups-page group-workspace">
       <header className="repo-header">
-        <button className="repo-back" onClick={() => { selectGroup(null); navigate('/dashboard'); }}>
-          <Icon name="arrow-left" size={16} />
-          {t('dash.backHome')}
-        </button>
-
         <div className="repo-title-row">
           <GroupAvatar group={group} size="xl" />
           <div className="repo-title-info">
@@ -375,28 +339,21 @@ function GroupWorkspace({ groupId }) {
             )}
           </div>
         </div>
-
-        <div className="repo-meta">
-          <span className="repo-meta-item"><Icon name="users" size={15} />{groupMembers.length} {t('group.statMembers')}</span>
-          <span className="repo-meta-item"><Icon name="box" size={15} />{groupProjects.length} {t('group.statProjects')}</span>
-          <span className="repo-meta-item"><Icon name="star" size={15} />{openProjects.length} {t('group.statOpen')}</span>
-          {requests.length > 0 && (
-            <span className="repo-meta-item urgent"><Icon name="mail" size={15} />{requests.length} {t('group.statRequests')}</span>
-          )}
-        </div>
       </header>
 
       <nav className="repo-tabs" role="tablist" aria-label="Navegación del grupo">
-        <button
-          type="button"
-          className={`repo-tab ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setTab('overview')}
-          role="tab"
-          aria-selected={activeTab === 'overview'}
-        >
-          <Icon name="home" size={16} />
-          {t('group.overview')}
-        </button>
+        {isOwner && (
+          <button
+            type="button"
+            className={`repo-tab ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setTab('overview')}
+            role="tab"
+            aria-selected={activeTab === 'overview'}
+          >
+            <Icon name="home" size={16} />
+            {t('group.overview')}
+          </button>
+        )}
         <button
           type="button"
           className={`repo-tab ${activeTab === 'projects' ? 'active' : ''}`}
@@ -434,22 +391,9 @@ function GroupWorkspace({ groupId }) {
         )}
       </nav>
 
-      {activeTab === 'overview' && (
+      {activeTab === 'overview' && isOwner && (
         <div className="group-tab-content">
           <div className="group-admin-hero">
-            <div className="group-admin-hero-top">
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-                  {isAdmin ? 'Panel de Control' : 'Espacio de Trabajo del Grupo'}
-                </h3>
-                <p style={{ margin: '0.35rem 0 0', color: 'var(--color-text-dim)', fontSize: '0.9rem' }}>
-                  {isAdmin
-                    ? `Gestiona cómodamente los proyectos, colaboradores y solicitudes del grupo ${group.name}.`
-                    : `Bienvenido al espacio de ${group.name}. Colabora en proyectos con tu equipo.`}
-                </p>
-              </div>
-            </div>
-
             <div className="group-kpi-grid">
               <div className="group-kpi-card" onClick={() => setTab('projects')} style={{ cursor: 'pointer' }}>
                 <span className="group-kpi-value">{groupProjects.length}</span>
@@ -461,72 +405,7 @@ function GroupWorkspace({ groupId }) {
                 <span className="group-kpi-label">Miembros activos</span>
                 <small style={{ color: 'var(--color-text-dim)' }}>Equipo del grupo</small>
               </div>
-              <div className={`group-kpi-card ${requests.length > 0 ? 'urgent' : ''}`} onClick={() => setTab('people')} style={{ cursor: 'pointer' }}>
-                <span className="group-kpi-value" style={{ color: requests.length > 0 ? '#ea580c' : undefined }}>
-                  {requests.length}
-                </span>
-                <span className="group-kpi-label">Solicitudes de acceso</span>
-                <small style={{ color: requests.length > 0 ? '#ea580c' : 'var(--color-text-dim)', fontWeight: requests.length > 0 ? 700 : 400 }}>
-                  {requests.length > 0 ? 'Requiere revisión' : 'Al día'}
-                </small>
-              </div>
-              <div className="group-kpi-card">
-                <span className="group-kpi-value">
-                  {groupMembers.filter(m => m.role === 'admin' || m.role === 'owner').length}
-                </span>
-                <span className="group-kpi-label">Administradores</span>
-                <small style={{ color: 'var(--color-text-dim)' }}>Gestores del espacio</small>
-              </div>
             </div>
-
-            {isAdmin && (
-              <div className="group-quick-actions">
-                <button className="btn btn-primary btn-sm" onClick={openCreate}>
-                  Crear proyecto nuevo
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setTab('people')}>
-                  Gestionar miembros
-                </button>
-                {requests.length > 0 && (
-                  <button className="btn btn-outline btn-sm" onClick={() => setTab('people')}>
-                    Revisar {requests.length} solicitudes pendientes
-                  </button>
-                )}
-                <button className="btn btn-ghost btn-sm" onClick={() => setTab('settings')}>
-                  Configuración del grupo
-                </button>
-              </div>
-            )}
-
-            {isAdmin && requests.length > 0 && (
-              <div className="group-urgent-card">
-                <div className="group-urgent-header">
-                  <div>
-                    <h4 style={{ margin: 0, color: '#c2410c' }}>Solicitudes de acceso pendientes ({requests.length})</h4>
-                    <small style={{ color: 'var(--color-text-dim)' }}>Nuevos desarrolladores que quieren unirse a tu equipo:</small>
-                  </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setTab('people')}>Ver todas</button>
-                </div>
-                {requests.slice(0, 3).map(request => {
-                  const applicant = users.find(u => u.id === request.userId);
-                  return (
-                    <div className="group-member-card" key={request.id}>
-                      <div className="group-member-info">
-                        <Avatar user={applicant} />
-                        <div>
-                          <strong>{applicant?.name || 'Usuario'}</strong>
-                          <small style={{ display: 'block', color: 'var(--color-text-dim)' }}>@{applicant?.username || ''}</small>
-                        </div>
-                      </div>
-                      <div className="group-member-actions">
-                        <button className="btn btn-primary btn-sm" onClick={() => handleRequestDecision(request.id, true)}>Aceptar</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => handleRequestDecision(request.id, false)}>Rechazar</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
 
             <div className="group-panel">
               <div className="group-panel-heading">
@@ -644,9 +523,6 @@ function GroupWorkspace({ groupId }) {
             t={t}
             onRoleChange={handleRoleChange}
             onRemoveMember={handleRemoveMember}
-            openMemberMenu={openMemberMenu}
-            setOpenMemberMenu={setOpenMemberMenu}
-            toggleMemberMenu={toggleMemberMenu}
           />
         </div>
       )}
@@ -701,46 +577,6 @@ function GroupWorkspace({ groupId }) {
             <h3>{t('group.invite')}</h3>
             <p style={{ color: 'var(--color-text-dim)', margin: '0 0 1rem' }}>Invita a alguien a un proyecto del grupo por nombre de usuario o email.</p>
             <button className="btn btn-primary btn-sm" onClick={() => setShowInviteModal(true)}>Invitar miembro</button>
-          </div>
-
-          <div className="group-panel" style={{ marginBottom: '1.25rem' }}>
-            <h3>{t('group.members')}</h3>
-            <p style={{ color: 'var(--color-text-dim)', margin: '0 0 1rem' }}>Gestiona roles y miembros del grupo.</p>
-            <div style={{ marginTop: '1rem' }}>
-              {groupMembers.map(member => {
-                const person = users.find(u => u.id === member.userId);
-                const canManageRoles = isOwner && member.role !== 'owner';
-                const canKick = isAdmin && member.role !== 'owner' && member.userId !== user.id;
-
-                return (
-                  <div className="group-member-card" key={member.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
-                    <div className="group-member-info">
-                      <Avatar user={person} />
-                      <div>
-                        <strong>{person?.name || 'Usuario'}</strong>
-                        <span style={{ color: 'var(--color-text-dim)', marginLeft: '0.35rem', fontSize: '0.85rem' }}>@{person?.username || ''}</span>
-                      </div>
-                    </div>
-                    <div className="group-member-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      {canManageRoles && (
-                        <select value={member.role} onChange={e => handleRoleChange(member.userId, e.target.value)} style={{ padding: '0.35rem 0.65rem', borderRadius: '7px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontWeight: 600 }}>
-                          <option value="member">{t('group.roleMember')}</option>
-                          <option value="admin">{t('group.roleAdmin')}</option>
-                        </select>
-                      )}
-                      {(canManageRoles || canKick) ? (
-                        <span className={`member-role ${roleBadgeClass(member.role)}`}>{roleLabel(member.role)}</span>
-                      ) : (
-                        <span className={`member-role ${roleBadgeClass(member.role)}`}>{roleLabel(member.role)}</span>
-                      )}
-                      {canKick && (
-                        <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => handleRemoveMember(member.userId, person?.name || 'este miembro')}>Eliminar</button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
           {isOwner && (

@@ -73,7 +73,9 @@ function OptionList({ options, selected, counts, onToggle, renderLabel }) {
   );
 }
 
-export default function PeopleSidebar({ filters, counts, shown, total, onChange }) {
+// Facetas de talento reutilizables: tipos de juego, lenguajes, juegos
+// favoritos, habilidades, proyectos completados y valoración.
+export function TalentFacets({ filters, counts, onChange }) {
   const { t } = useApp();
 
   const toggle = (key, value) => {
@@ -88,19 +90,8 @@ export default function PeopleSidebar({ filters, counts, shown, total, onChange 
     onChange(updated);
   };
 
-  const activeCount = activeFilterCount(filters);
-
   return (
-    <aside className="people-sidebar">
-      <div className="people-sidebar-head">
-        <h3 className="people-sidebar-title">{t('people.filters')}</h3>
-        {activeCount > 0 && (
-          <button type="button" className="people-sidebar-clear" onClick={() => onChange(emptyFilters())}>
-            {t('people.clearAll')}
-          </button>
-        )}
-      </div>
-
+    <>
       <Facet title={t('filters.gameTypes')}>
         <OptionList
           options={GAME_TYPES}
@@ -170,6 +161,27 @@ export default function PeopleSidebar({ filters, counts, shown, total, onChange 
           ))}
         </div>
       </Facet>
+    </>
+  );
+}
+
+export default function PeopleSidebar({ filters, counts, shown, total, onChange }) {
+  const { t } = useApp();
+
+  const activeCount = activeFilterCount(filters);
+
+  return (
+    <aside className="people-sidebar">
+      <div className="people-sidebar-head">
+        <h3 className="people-sidebar-title">{t('people.filters')}</h3>
+        {activeCount > 0 && (
+          <button type="button" className="people-sidebar-clear" onClick={() => onChange(emptyFilters())}>
+            {t('people.clearAll')}
+          </button>
+        )}
+      </div>
+
+      <TalentFacets filters={filters} counts={counts} onChange={onChange} />
 
       {activeCount > 0 && (
         <button type="button" className="btn btn-ghost btn-sm people-sidebar-reset" onClick={() => onChange(emptyFilters())}>
