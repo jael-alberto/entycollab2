@@ -4392,6 +4392,521 @@ button.nav-link {
 }
 
 /* ==========================================================================
+   GITHUB 2.0 — AVATARES DE GRUPO, SIDEBAR, DASHBOARD Y PÁGINA DE REPO
+   ========================================================================== */
+
+/* Avatar cuadrado de grupo (estilo organización de GitHub) */
+.group-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+}
+
+.group-avatar-sm { width: 26px; height: 26px; font-size: 0.8rem; border-radius: 8px; }
+.group-avatar-md { width: 36px; height: 36px; font-size: 1rem; }
+.group-avatar-lg { width: 48px; height: 48px; font-size: 1.35rem; border-radius: 12px; }
+.group-avatar-xl { width: 62px; height: 62px; font-size: 1.8rem; border-radius: 16px; }
+
+/* Usuario en la cabecera del sidebar */
+.sidebar-user-block {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.4rem 1.1rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 1rem;
+}
+
+.sidebar-user-avatar { width: 38px; height: 38px; font-size: 1rem; }
+
+.sidebar-user-meta { display: flex; flex-direction: column; min-width: 0; }
+
+.sidebar-user-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--color-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-handle { font-size: 0.78rem; color: var(--color-text-dim); }
+
+/* Buscador de grupos en el sidebar */
+.sidebar-search { margin-bottom: 1rem; }
+
+.sidebar-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-dim);
+  transition: var(--transition);
+}
+
+.sidebar-search-field:focus-within {
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.sidebar-search-field svg { flex-shrink: 0; }
+
+.sidebar-search-field input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--color-text-main);
+  font-family: var(--font-primary);
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+/* Navegación del sidebar */
+.sidebar-nav { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-main);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition);
+}
+
+.sidebar-nav-item svg { flex-shrink: 0; color: var(--color-text-muted); }
+
+.sidebar-nav-item:hover:not(:disabled) { background: var(--color-surface-hover); }
+
+.sidebar-nav-item.active { background: var(--color-accent-soft); color: var(--color-primary); }
+.sidebar-nav-item.active svg { color: var(--color-primary); }
+
+.sidebar-nav-item:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.sidebar-nav-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0.7rem 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+}
+
+.sidebar-count {
+  background: var(--color-accent-soft);
+  color: var(--color-primary-deep);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.68rem;
+}
+
+.sidebar-empty-text {
+  padding: 0.25rem 0.7rem 0.5rem;
+  font-size: 0.82rem;
+  color: var(--color-text-dim);
+}
+
+.sidebar-nav-item.group-item { gap: 0.6rem; }
+
+.sidebar-nav-item.group-item .group-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.group-item-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-item-meta {
+  font-size: 0.72rem;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.sidebar-nav-item.group-item .sidebar-role {
+  margin-left: auto;
+  font-size: 0.62rem;
+  padding: 0.15rem 0.45rem;
+}
+
+.btn-block { width: 100%; }
+
+/* Hero de bienvenida del dashboard */
+.dash-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  padding: 2.25rem 2rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-deep) 100%);
+  color: #fff;
+}
+
+.dash-hero::after {
+  content: '';
+  position: absolute;
+  right: -60px;
+  top: -60px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dash-hero-text { position: relative; z-index: 1; }
+
+.dash-hero-text h1 {
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  font-weight: 800;
+  margin: 0 0 0.4rem;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.dash-hero-text p {
+  margin: 0;
+  max-width: 560px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
+}
+
+.dash-hero-search {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.65rem 1.1rem;
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-dim);
+}
+
+.dash-hero-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-primary);
+  font-size: 0.95rem;
+  color: var(--color-text-main);
+  min-width: 0;
+}
+
+/* Stats del dashboard */
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.dash-stats .stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 1.25rem;
+}
+
+.dash-stats .stat-card svg { color: var(--color-primary); }
+
+/* Secciones del dashboard */
+.dash-section { margin-bottom: 2.25rem; }
+
+.dash-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dash-section-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text-main);
+}
+
+.dash-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--color-accent-soft);
+  color: var(--color-primary-deep);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+
+/* Tarjetas de grupo del dashboard */
+.dash-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.dash-group-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.dash-group-card:hover {
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.dash-group-card-head { display: flex; align-items: center; gap: 0.85rem; }
+
+.dash-group-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.dash-group-card-title h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-group-card-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  min-height: 2.4em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dash-group-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.dash-group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-text-dim);
+  font-weight: 600;
+}
+
+.dash-group-card-cta { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: var(--color-primary); }
+
+.group-role-badge.pending { background: #fef3c7; color: #92400e; }
+.group-role-badge.private { background: var(--color-surface-hover); color: var(--color-text-dim); }
+
+/* Cabecera de la vista Global */
+.dash-repo-head { margin-bottom: 1.75rem; }
+
+.dash-repo-title { display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; }
+
+.dash-globe-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-md);
+}
+
+.dash-repo-title h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text-main);
+}
+
+.dash-repo-title p { margin: 0.25rem 0 0; color: var(--color-text-muted); }
+
+/* Página de repo (workspace de grupo) */
+.repo-header {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 1.25rem;
+}
+
+.repo-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.85rem;
+  transition: var(--transition);
+}
+
+.repo-back:hover { color: var(--color-primary); background: var(--color-accent-soft); }
+
+.repo-title-row { display: flex; align-items: flex-start; gap: 1rem; }
+
+.repo-title-info { flex: 1; min-width: 0; }
+
+.repo-name-line { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+
+.repo-name {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text-main);
+}
+
+.repo-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.repo-desc {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  max-width: 720px;
+}
+
+.repo-actions { display: flex; gap: 0.5rem; flex-shrink: 0; flex-wrap: wrap; }
+
+.repo-meta { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 1rem; }
+
+.repo-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.repo-meta-item.urgent { color: #ea580c; }
+
+/* Mini-nav horizontal de la página de repo (estilo GitHub) */
+.repo-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.repo-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.7rem 0.9rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+  margin-bottom: -1px;
+}
+
+.repo-tab:hover { color: var(--color-text-main); }
+
+.repo-tab.active { color: var(--color-text-main); border-bottom-color: var(--color-primary); }
+
+.repo-tab-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+}
+
+.repo-tab.active .repo-tab-count { background: var(--color-accent-soft); color: var(--color-primary-deep); }
+
+@media (max-width: 768px) {
+  .dash-hero { padding: 1.75rem 1.25rem; }
+  .dash-group-grid { grid-template-columns: 1fr; }
+  .repo-title-row { flex-direction: column; }
+  .repo-actions { width: 100%; }
+  .dash-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .dash-stats { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
    MODO OSCURO
    ========================================================================== */
 :root.dark {

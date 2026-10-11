@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { EmptyState, Avatar } from '../components/common.jsx';
+import { EmptyState, Avatar, GroupAvatar, Icon } from '../components/common.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import PersonCard from '../components/PersonCard.jsx';
 import { l10nValue } from '../lib/i18n.js';
@@ -344,56 +344,91 @@ function GroupWorkspace({ groupId }) {
 
   return (
     <div className="section-block groups-page group-workspace">
-      <div className="group-workspace-header">
-        <div className="group-workspace-brand">
-          <button className="back-link" onClick={() => { selectGroup(null); navigate('/grupos'); }}>
-            ← Volver a grupos
-          </button>
-          <div>
-            <h2 className="section-title">{group.name}</h2>
-            <p className="groups-intro">{group.description}</p>
+      <header className="repo-header">
+        <button className="repo-back" onClick={() => { selectGroup(null); navigate('/dashboard'); }}>
+          <Icon name="arrow-left" size={16} />
+          {t('dash.backHome')}
+        </button>
+
+        <div className="repo-title-row">
+          <GroupAvatar group={group} size="xl" />
+          <div className="repo-title-info">
+            <div className="repo-name-line">
+              <h1 className="repo-name">{group.name}</h1>
+              <span className="repo-visibility"><Icon name="lock" size={13} />{t('group.private')}</span>
+              <span className={`group-role-badge ${roleBadgeClass(membership.role)}`}>{roleLabel(membership.role)}</span>
+            </div>
+            <p className="repo-desc">{group.description}</p>
+          </div>
+          <div className="repo-actions">
+            {isAdmin && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowInviteModal(true)}>
+                <Icon name="user-plus" size={15} />
+                {t('group.inviteMember')}
+              </button>
+            )}
+            {isAdmin && (
+              <button className="btn btn-primary btn-sm" onClick={openCreate}>
+                <Icon name="plus" size={15} />
+                {t('group.newProject')}
+              </button>
+            )}
           </div>
         </div>
-        <span className={`group-role-badge ${roleBadgeClass(membership.role)}`}>{roleLabel(membership.role)}</span>
-      </div>
 
-      <nav className="group-nav-tabs" role="tablist" aria-label="Navegación del grupo">
+        <div className="repo-meta">
+          <span className="repo-meta-item"><Icon name="users" size={15} />{groupMembers.length} {t('group.statMembers')}</span>
+          <span className="repo-meta-item"><Icon name="box" size={15} />{groupProjects.length} {t('group.statProjects')}</span>
+          <span className="repo-meta-item"><Icon name="star" size={15} />{openProjects.length} {t('group.statOpen')}</span>
+          {requests.length > 0 && (
+            <span className="repo-meta-item urgent"><Icon name="mail" size={15} />{requests.length} {t('group.statRequests')}</span>
+          )}
+        </div>
+      </header>
+
+      <nav className="repo-tabs" role="tablist" aria-label="Navegación del grupo">
         <button
           type="button"
-          className={`group-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+          className={`repo-tab ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setTab('overview')}
           role="tab"
           aria-selected={activeTab === 'overview'}
         >
+          <Icon name="home" size={16} />
           {t('group.overview')}
         </button>
         <button
           type="button"
-          className={`group-tab-btn ${activeTab === 'projects' ? 'active' : ''}`}
+          className={`repo-tab ${activeTab === 'projects' ? 'active' : ''}`}
           onClick={() => setTab('projects')}
           role="tab"
           aria-selected={activeTab === 'projects'}
         >
-          {t('group.projects')} ({groupProjects.length})
+          <Icon name="box" size={16} />
+          {t('group.projects')}
+          <span className="repo-tab-count">{groupProjects.length}</span>
         </button>
         <button
           type="button"
-          className={`group-tab-btn ${activeTab === 'people' ? 'active' : ''}`}
+          className={`repo-tab ${activeTab === 'people' ? 'active' : ''}`}
           onClick={() => setTab('people')}
           role="tab"
           aria-selected={activeTab === 'people'}
         >
-          {t('group.people')} ({groupMembers.length})
+          <Icon name="users" size={16} />
+          {t('group.people')}
+          <span className="repo-tab-count">{groupMembers.length}</span>
           {requests.length > 0 && <span className="tab-badge">{requests.length}</span>}
         </button>
         {(isOwner || isAdmin) && (
           <button
             type="button"
-            className={`group-tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
+            className={`repo-tab ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setTab('settings')}
             role="tab"
             aria-selected={activeTab === 'settings'}
           >
+            <Icon name="settings" size={16} />
             {t('group.settings')}
           </button>
         )}
