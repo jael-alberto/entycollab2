@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -10,6 +10,7 @@ export function LoggedHeader() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const wrapRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     function onDocClick(e) {
@@ -21,43 +22,90 @@ export function LoggedHeader() {
 
   const avg = user ? getUserAvgRating(user.id, ratings) : 0;
   const myGroups = groups.filter(group => group.members?.some(member => member.userId === user?.id));
-  const changeGroup = (event) => {
-    const groupId = event.target.value;
-    selectGroup(groupId || null);
-    navigate(groupId ? `/grupos/${groupId}` : '/grupos');
+  const isDashboard = pathname === '/dashboard';
+  const isGroupWorkspace = pathname.startsWith('/grupos/');
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    if (isDashboard && !activeGroup) {
+      // En dashboard sin grupo: buscar grupos
+      // El filtrado se hace en el sidebar del dashboard
+    } else if (isGroupWorkspace) {
+      // En workspace de grupo: navegar a la tab correspondiente con filtro
+      const groupId = activeGroup?.id;
+      if (groupId) {
+        navigate(`/grupos/${groupId}?tab=projects&q=${encodeURIComponent(searchQuery)}`);
+      }
+    } else {
+      // En otras páginas: buscar globalmente en proyectos
+      navigate(`/proyectos?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
+  const handleGlobalSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
   };
 
   return (
     <header className="site-header logged-in-header">
       <div className="header-container header-compact">
-        <div className="header-brand">
-          <div className="header-brand-logo">
-            <Link to="/dashboard" onClick={() => selectGroup(null)} title="Inicio general">
-              <img src="/img/logo-pg.png" alt="Logo ENTYCOLLAB" className="site-logo-small" />
-            </Link>
-          </div>
-          <select className="group-switcher" value={activeGroup?.id || ''} onChange={changeGroup} aria-label="Cambiar grupo">
-            <option value="">Mis grupos</option>
-            {myGroups.map(group => <option value={group.id} key={group.id}>{group.name}</option>)}
-          </select>
+        <div className="header-left">
+          <Link to="/dashboard" onClick={() => selectGroup(null)} className="header-logo-link" title="EntyTec">
+            <img src="/img/logo-pg.png" alt="EntyTec" className="site-logo-small" />
+            <span className="header-brand-name">EntyTec</span>
+          </Link>
         </div>
-        <nav className="header-nav" aria-label="Navegación principal">
-          <ul className="nav-list">
-            <li><NavLink to="/dashboard" onClick={() => selectGroup(null)} className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>{t('nav.home')}</NavLink></li>
-            <li><NavLink to="/proyectos" className={() => 'nav-link' + (isProjectsPath(pathname) ? ' active' : '')}>{t('nav.projects')}</NavLink></li>
-            <li><NavLink to="/personas" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>{t('nav.people')}</NavLink></li>
-            <li><NavLink to="/grupos" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>Grupos</NavLink></li>
-          </ul>
-        </nav>
+
+        <div className="header-center">
+          <form className="header-search-form" onSubmit={handleSearch} role="search">
+            <label htmlFor="global-search" className="sr-only">
+              {isDashboard && !activeGroup ? 'Buscar grupos' : isGroupWorkspace ? `Buscar en ${activeGroup?.name}` : 'Buscar proyectos'}
+            </label>
+            <div className="search-input-wrapper">
+              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                id="global-search"
+                type="search"
+                className="header-search-input"
+                placeholder={isDashboard && !activeGroup ? 'Buscar grupos...' : isGroupWorkspace ? `Buscar en ${activeGroup?.name}...` : 'Buscar proyectos, personas...'}
+                value={searchQuery}
+                onChange={handleGlobalSearchChange}
+                autoComplete="off"
+              />
+              {searchQuery && (
+                <button type="button" className="search-clear" onClick={clearSearch} aria-label="Limpiar búsqueda">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
         <div className="header-right">
-          <button className={'theme-toggle lang-toggle' + (theme ? ' active' : '')} onClick={toggleLang} title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'} aria-label="Cambiar idioma">{lang === 'es' ? 'ES' : 'EN'}</button>
-          <button className={'theme-toggle' + (theme ? ' active' : '')} onClick={toggleTheme} title="Cambiar modo claro/oscuro" aria-label="Cambiar modo claro/oscuro">{theme ? '☀️' : '🌙'}</button>
+          <button className={'theme-toggle lang-toggle' + (theme ? ' active' : '')} onClick={toggleLang} title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'} aria-label="Cambiar idioma">
+            {lang === 'es' ? 'ES' : 'EN'}
+          </button>
+          <button className={'theme-toggle' + (theme ? ' active' : '')} onClick={toggleTheme} title="Cambiar modo claro/oscuro" aria-label="Cambiar modo claro/oscuro">
+            {theme ? '☀️' : '🌙'}
+          </button>
           <div className="user-bubble-wrap" id="user-bubble-wrap" ref={wrapRef}>
             <button className="user-bubble" onClick={e => { e.stopPropagation(); setMenuOpen(!menuOpen); }}>
               <UserBubbleAvatar user={user} />
               <span className="user-bubble-name">{user ? user.name.split(' ')[0] : ''}</span>
               <span className="user-bubble-rating">
-                {user ? (avg > 0 ? `★ ${avg.toFixed(1)} ${'☆'.repeat(Math.max(0, 5 - Math.round(avg)))}` : '☆ 0.0') : '☆ 0.0'}
+                {user ? (avg > 0 ? `★ ${avg.toFixed(1)}` : '☆ 0.0') : '☆ 0.0'}
               </span>
             </button>
             {menuOpen && user && (
@@ -66,6 +114,7 @@ export function LoggedHeader() {
                 <Link to="/proyectos/mis-proyectos" onClick={() => setMenuOpen(false)}>{t('menu.myProjects')}</Link>
                 <Link to="/proyectos/postulaciones" onClick={() => setMenuOpen(false)}>{t('menu.myApps')}</Link>
                 <Link to="/ajustes" onClick={() => setMenuOpen(false)}>{t('menu.settings')}</Link>
+                <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.5rem 0' }} />
                 <a href="#" className="user-bubble-menu-danger" onClick={e => { e.preventDefault(); setMenuOpen(false); logout(); showToast(t('toast.logout'), 'info'); }}>{t('menu.logout')}</a>
               </div>
             )}
@@ -74,13 +123,6 @@ export function LoggedHeader() {
       </div>
     </header>
   );
-
-}
-
-function isProjectsPath(pathname) {
-  return pathname.startsWith('/proyectos')
-    && !pathname.endsWith('/mis-proyectos')
-    && !pathname.endsWith('/postulaciones');
 }
 
 function UserBubbleAvatar({ user }) {

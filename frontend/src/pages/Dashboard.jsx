@@ -66,7 +66,7 @@ export default function Dashboard() {
     }, [users, user.id]);
 
     return (
-      <div>
+      <div className="dashboard-main global-view">
         <div className="dashboard-header-with-back">
           <button className="btn btn-ghost btn-sm" onClick={() => setView('welcome')}>
             ← {t('dash.yourGroups')}
@@ -124,23 +124,16 @@ export default function Dashboard() {
     <div className="dashboard-layout">
       <aside className="dashboard-sidebar">
         <div className="sidebar-header">
-          <img src="/img/logo-pg.png" alt="ENTYCOLLAB" className="sidebar-logo" />
-          <h2>{t('dash.yourGroups')}</h2>
-        </div>
-
-        <div className="sidebar-search">
-          <input
-            type="text"
-            className="group-search-input"
-            placeholder={t('dash.searchGroups')}
-            value={groupSearch}
-            onChange={e => setGroupSearch(e.target.value)}
-          />
+          <img src="/img/logo-pg.png" alt="EntyTec" className="sidebar-logo" />
+          <div className="sidebar-user">
+            <span className="sidebar-user-name">{user.name}</span>
+            <span className="sidebar-user-handle">@{user.username}</span>
+          </div>
         </div>
 
         <div className="sidebar-section">
           <button
-            className={`sidebar-item global-item ${activeGroup ? '' : 'active'}`}
+            className={`sidebar-item global-item ${!activeGroup ? 'active' : ''}`}
             onClick={handleGlobalClick}
           >
             <span className="sidebar-item-icon">🌐</span>
@@ -148,39 +141,52 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {myGroups.length === 0 ? (
-          <div className="sidebar-empty">
-            <p>{t('dash.noGroups')}</p>
-            <button className="btn btn-primary btn-sm" onClick={handleExploreClick}>
-              {t('dash.exploreGroups')}
-            </button>
+        <div className="sidebar-section">
+          <h4 className="sidebar-section-title">{t('dash.yourGroups')}</h4>
+          <div className="sidebar-search">
+            <input
+              type="text"
+              className="group-search-input"
+              placeholder={t('dash.searchGroups')}
+              value={groupSearch}
+              onChange={e => setGroupSearch(e.target.value)}
+            />
           </div>
-        ) : (
-          <div className="sidebar-groups">
-            {filteredGroups.map(group => {
-              const membership = group.members?.find(m => m.userId === user.id);
-              const isActive = activeGroup?.id === group.id;
-              return (
-                <button
-                  key={group.id}
-                  className={`sidebar-item group-item ${isActive ? 'active' : ''}`}
-                  onClick={() => handleGroupClick(group.id)}
-                >
-                  <div className="sidebar-group-info">
-                    <span className="sidebar-item-icon">👥</span>
-                    <div>
-                      <strong>{group.name}</strong>
-                      <small>{group.members?.length || 0} miembros · {projects.filter(p => p.groupId === group.id).length} proyectos</small>
+
+          {myGroups.length === 0 ? (
+            <div className="sidebar-empty">
+              <p>{t('dash.noGroups')}</p>
+              <button className="btn btn-primary btn-sm" onClick={handleExploreClick}>
+                {t('dash.exploreGroups')}
+              </button>
+            </div>
+          ) : (
+            <div className="sidebar-groups">
+              {filteredGroups.map(group => {
+                const membership = group.members?.find(m => m.userId === user.id);
+                const isActive = activeGroup?.id === group.id;
+                return (
+                  <button
+                    key={group.id}
+                    className={`sidebar-item group-item ${isActive ? 'active' : ''}`}
+                    onClick={() => handleGroupClick(group.id)}
+                  >
+                    <div className="sidebar-group-info">
+                      <span className="sidebar-item-icon">👥</span>
+                      <div>
+                        <strong>{group.name}</strong>
+                        <small>{group.members?.length || 0} miembros · {projects.filter(p => p.groupId === group.id).length} proyectos</small>
+                      </div>
                     </div>
-                  </div>
-                  <span className={`sidebar-role ${membership?.role === 'owner' ? 'owner' : membership?.role === 'admin' ? 'admin' : 'member'}`}>
-                    {membership?.role === 'owner' ? t('group.roleOwner') : membership?.role === 'admin' ? t('group.roleAdmin') : t('group.roleMember')}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+                    <span className={`sidebar-role ${membership?.role === 'owner' ? 'owner' : membership?.role === 'admin' ? 'admin' : 'member'}`}>
+                      {membership?.role === 'owner' ? t('group.roleOwner') : membership?.role === 'admin' ? t('group.roleAdmin') : t('group.roleMember')}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {otherGroups.length > 0 && (
           <div className="sidebar-section">
@@ -253,7 +259,7 @@ export default function Dashboard() {
 
           <div className="welcome-recent">
             <h3>Proyectos recientes</h3>
-            <p className="form-hint">Selecciona un grupo o "Global" en la barra lateral para ver proyectos y personas.</p>
+            <p className="form-hint">Selecciona "Global" o un grupo en la barra lateral para ver proyectos y personas.</p>
           </div>
         </div>
       </main>
