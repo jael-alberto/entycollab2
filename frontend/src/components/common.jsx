@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profileLinks } from '../lib/helpers.js';
 
@@ -5,15 +6,116 @@ import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profil
 // COMPONENTES UI PEQUEÑOS REUTILIZABLES
 // ==========================================================================
 
+let activeModalCount = 0;
+
+/**
+ * Detecta si el puntero se encuentra sobre la barra de desplazamiento nativa (scrollbar)
+ * del elemento contenedor al interactuar con el ratón.
+ */
+export function isClickOnScrollbar(e) {
+  const el = e.currentTarget;
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  const isRtl = typeof getComputedStyle === 'function' && getComputedStyle(el).direction === 'rtl';
+
+  // Barra de desplazamiento vertical (derecha en LTR, izquierda en RTL)
+  if (el.offsetWidth > el.clientWidth) {
+    if (!isRtl && e.clientX >= rect.left + el.clientLeft + el.clientWidth) {
+      return true;
+    }
+    if (isRtl && e.clientX <= rect.left + el.clientLeft + (el.offsetWidth - el.clientWidth)) {
+      return true;
+    }
+  }
+
+  // Barra de desplazamiento horizontal (al fondo)
+  if (el.offsetHeight > el.clientHeight) {
+    if (e.clientY >= rect.top + el.clientTop + el.clientHeight) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // `layer` apila un modal sobre otro (detalle de proyecto encima del detalle de
 // usuario, por ejemplo). Todos los overlays comparten el mismo z-index, así que
 // sin esto el que se monte después en el DOM acaba tapando al anterior.
 export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, children }) {
+  const isMouseDownOnOverlayRef = useRef(false);
+  const isMouseDownOnScrollbarRef = useRef(false);
+
+  // Bloquea el scroll del fondo (body) mientras haya al menos un modal abierto
+  useEffect(() => {
+    if (!open) return;
+    activeModalCount++;
+    if (activeModalCount === 1) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      activeModalCount = Math.max(0, activeModalCount - 1);
+      if (activeModalCount === 0) {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [open]);
+
+  // Cerrar al pulsar la tecla Escape
+  useEffect(() => {
+    if (!open || !onClose) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
+  const handleMouseDown = (e) => {
+    if (e.target === e.currentTarget) {
+      if (isClickOnScrollbar(e)) {
+        isMouseDownOnScrollbarRef.current = true;
+        isMouseDownOnOverlayRef.current = false;
+      } else {
+        isMouseDownOnScrollbarRef.current = false;
+        isMouseDownOnOverlayRef.current = true;
+      }
+    } else {
+      isMouseDownOnScrollbarRef.current = false;
+      isMouseDownOnOverlayRef.current = false;
+    }
+  };
+
+  const handleClick = (e) => {
+    // Si la interacción o arrastre comenzó en la barra de scroll, no cerramos
+    if (isMouseDownOnScrollbarRef.current) {
+      isMouseDownOnScrollbarRef.current = false;
+      isMouseDownOnOverlayRef.current = false;
+      return;
+    }
+
+    // Solo cerramos si el mousedown inició en el fondo exterior (backdrop)
+    // y el clic terminó también en el fondo exterior, fuera de la barra de scroll
+    if (
+      isMouseDownOnOverlayRef.current &&
+      e.target === e.currentTarget &&
+      !isClickOnScrollbar(e)
+    ) {
+      if (onClose) onClose();
+    }
+
+    isMouseDownOnOverlayRef.current = false;
+  };
+
+  if (!open) return null;
+
   return (
     <div
       className="modal-overlay"
-      style={{ display: open ? 'flex' : 'none', zIndex: 1000 + layer * 10 }}
-      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ display: 'flex', zIndex: 1000 + layer * 10 }}
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
     >
       <div className={`modal-card${size ? ' ' + size : ''}`}>
         {onClose && <button className="modal-close" onClick={onClose}>&times;</button>}

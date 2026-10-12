@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { EmptyState, Avatar, GroupAvatar, Icon } from '../components/common.jsx';
+import { EmptyState, Avatar, GroupAvatar, Icon, Modal } from '../components/common.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
@@ -615,34 +615,31 @@ function GroupWorkspace({ groupId }) {
       )}
 
       {showInviteModal && (
-        <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3>Invitar a miembro</h3>
-            <form onSubmit={handleInviteSubmit}>
-              <div className="form-group">
-                <label>Usuario o email</label>
-                <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario o email" required />
-              </div>
-              <div className="form-group">
-                <label>Proyecto (opcional)</label>
-                <select value={inviteProjectId} onChange={e => setInviteProjectId(e.target.value)}>
-                  <option value="">Sin proyecto específico</option>
-                  {groupProjects.filter(p => p.status === 'open').map(p => (
-                    <option key={p.id} value={p.id}>{l10nValue(lang, p.title)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Mensaje (opcional)</label>
-                <textarea value={inviteMessage} onChange={e => setInviteMessage(e.target.value)} rows="3" placeholder="Por qué te gustaría que se uniera..." />
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowInviteModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">Enviar invitación</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <Modal open onClose={() => setShowInviteModal(false)} title="Invitar a miembro">
+          <form onSubmit={handleInviteSubmit}>
+            <div className="form-group">
+              <label>Usuario o email</label>
+              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario o email" required />
+            </div>
+            <div className="form-group">
+              <label>Proyecto (opcional)</label>
+              <select value={inviteProjectId} onChange={e => setInviteProjectId(e.target.value)}>
+                <option value="">Sin proyecto específico</option>
+                {groupProjects.filter(p => p.status === 'open').map(p => (
+                  <option key={p.id} value={p.id}>{l10nValue(lang, p.title)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Mensaje (opcional)</label>
+              <textarea value={inviteMessage} onChange={e => setInviteMessage(e.target.value)} rows="3" placeholder="Por qué te gustaría que se uniera..." />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowInviteModal(false)}>Cancelar</button>
+              <button type="submit" className="btn btn-primary">Enviar invitación</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );
