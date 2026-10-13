@@ -62,7 +62,7 @@ function App() {
           <Route path="/grupos/:groupId?" element={<RequireAuth><Groups /></RequireAuth>} />
           <Route path="/perfil" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/ajustes" element={<RequireAuth><Settings /></RequireAuth>} />
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={<RedirectIfAuthed><Landing /></RedirectIfAuthed>} />
           <Route path="*" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
         </Routes>
       </main>
