@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
+import { useModals } from '../context/ModalManager.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import PersonCard from '../components/PersonCard.jsx';
 import PeopleDirectory from '../components/PeopleDirectory.jsx';
@@ -12,7 +13,8 @@ const availableUsers = (users) => users.filter(u => u.available === true);
 const projectsOfGroup = (projects, groupId) => projects.filter(p => p.groupId === groupId);
 
 export default function Dashboard() {
-  const { user, projects, applications, users, ratings, groups, lang, t, selectGroup, activeGroup } = useApp();
+  const { user, projects, applications, users, ratings, groups, lang, t, l10n, selectGroup, activeGroup } = useApp();
+  const { openCreate } = useModals();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [groupSearch, setGroupSearch] = useState('');
@@ -55,6 +57,10 @@ export default function Dashboard() {
   const explore = () => {
     selectGroup(null);
     navigate('/grupos');
+  };
+
+  const exploreProjects = () => {
+    navigate('/proyectos');
   };
 
   return (
@@ -171,10 +177,162 @@ export default function Dashboard() {
                 <p>{t('dash.sub')}</p>
               </div>
             </section>
+            <MyActivity
+              user={user}
+              projects={projects}
+              applications={applications}
+              users={users}
+              ratings={ratings}
+              activeGroup={activeGroup}
+              t={t}
+              l10n={l10n}
+              onCreate={openCreate}
+              onExplore={exploreProjects}
+            />
           </>
         )}
       </main>
     </div>
+  );
+}
+
+// ==========================================================================
+// Mi actividad: KPIs reales del store + secciones con EmptyState y CTA.
+// Sin cifras decorativas: todo sale de projects / applications / ratings.
+// ==========================================================================
+function MyActivity({ user, projects, applications, users, ratings, activeGroup, t, l10n, onCreate, onExplore }) {
+  const scopeGroupId = activeGroup?.id || null;
+
+  const myProjects = useMemo(
+    () => projects
+      .filter(p => p.ownerId === user.id && (scopeGroupId ? p.groupId === scopeGroupId : !p.groupId))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    [projects, user.id, scopeGroupId]
+  );
+  const myProjectIds = useMemo(() => new Set(myProjects.map(p => p.id)), [myProjects]);
+
+  const sentApps = useMemo(
+    () => applications.filter(a => {
+      if (a.userId !== user.id) return false;
+      const p = projects.find(pp => pp.id === a.projectId);
+      return p && (scopeGroupId ? p.groupId === scopeGroupId : !p.groupId);
+    }).sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0)),
+    [applications, projects, user.id, scopeGroupId]
+  );
+  const pendingSent = useMemo(() => sentApps.filter(a => a.status === 'pending'), [sentApps]);
+
+  const receivedPending = useMemo(
+    () => applications.filter(a => a.status === 'pending' && myProjectIds.has(a.projectId)),
+    [applications, myProjectIds]
+  );
+
+  // Por calificar: aceptados en mis proyectos en curso/finalizados sin rating.
+  const toRate = useMemo(() => {
+    const ratedKeys = new Set(ratings.map(r => `${r.projectId}|${r.ratedUserId}`));
+    return applications.filter(a => {
+      if (a.status !== 'accepted' || !myProjectIds.has(a.projectId)) return false;
+      const p = projects.find(pp => pp.id === a.projectId);
+      if (!p || (p.status !== 'in-progress' && p.status !== 'completed')) return false;
+      return !ratedKeys.has(`${a.projectId}|${a.userId}`);
+    });
+  }, [applications, myProjectIds, projects, ratings]);
+
+  const sentProjects = useMemo(
+    () => sentApps
+      .map(a => projects.find(p => p.id === a.projectId))
+      .filter(Boolean)
+      .filter((p, i, arr) => arr.findIndex(x => x.id === p.id) === i)
+      .slice(0, 3),
+    [sentApps, projects]
+  );
+
+  return (
+    <>
+      <section className="dash-kpis" aria-label={t('dash.summarySub')}>
+        <div className="dash-kpi">
+          <span className="dash-kpi-value">{myProjects.length}</span>
+          <span className="dash-kpi-label">{t('dash.kpiMyProjects')}</span>
+        </div>
+        <div className="dash-kpi">
+          <span className="dash-kpi-value">{pendingSent.length}</span>
+          <span className="dash-kpi-label">{t('dash.kpiPendingApps')}</span>
+        </div>
+        <div className="dash-kpi">
+          <span className="dash-kpi-value">{toRate.length}</span>
+          <span className="dash-kpi-label">{t('dash.kpiToRate')}</span>
+        </div>
+      </section>
+
+      <section className="dash-section">
+        <header className="dash-section-head">
+          <h2>{t('dash.myProjectsSec')}<span className="dash-count">{myProjects.length}</span></h2>
+          <Link className="btn btn-outline btn-sm" to="/proyectos/mis-proyectos">{t('dash.viewAll')}</Link>
+        </header>
+        {myProjects.length === 0 ? (
+          <EmptyState
+            icon="folder"
+            title={t('empty.myProjects')}
+            sub={t('empty.myProjectsSub')}
+            action={<button className="btn btn-primary btn-sm" onClick={onCreate}>{t('dash.publishCta')}</button>}
+          />
+        ) : (
+          <div className="projects-grid projects-grid-dense">
+            {myProjects.slice(0, 3).map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="dash-section">
+        <header className="dash-section-head">
+          <h2>{t('dash.sentSec')}<span className="dash-count">{sentApps.length}</span></h2>
+          <Link className="btn btn-outline btn-sm" to="/proyectos/postulaciones">{t('dash.viewAll')}</Link>
+        </header>
+        {sentApps.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title={t('empty.myApps')}
+            sub={t('empty.myAppsSub')}
+            action={<button className="btn btn-outline btn-sm" onClick={onExplore}>{t('dash.exploreProjects')}</button>}
+          />
+        ) : (
+          <div className="projects-grid projects-grid-dense">
+            {sentProjects.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="dash-section">
+        <header className="dash-section-head">
+          <h2>{t('dash.receivedSec')}<span className="dash-count">{receivedPending.length}</span></h2>
+          <Link className="btn btn-outline btn-sm" to="/proyectos/mis-proyectos">{t('dash.viewAll')}</Link>
+        </header>
+        {receivedPending.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title={t('empty.applicantsNone')}
+            sub={t('empty.applicantsNoneSub')}
+          />
+        ) : (
+          <ul className="dash-received-list">
+            {receivedPending.slice(0, 5).map(a => {
+              const p = projects.find(pp => pp.id === a.projectId);
+              const applicant = users.find(u => u.id === a.userId);
+              if (!p) return null;
+              return (
+                <li key={a.id} className="dash-received-row">
+                  <Avatar user={applicant} cls="person-avatar-card" />
+                  <span className="dash-received-info">
+                    <strong>{applicant ? escapeHTML(applicant.name) : '—'}</strong>
+                    <small>{escapeHTML(l10n(p.title))}</small>
+                  </span>
+                  <Link className="btn btn-ghost btn-sm" to={`/proyectos/${p.id}/gestionar`}>{t('card.manageBtn')}</Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }
 
@@ -328,7 +486,7 @@ function GlobalView({ user, projects, applications, users, ratings, groups, lang
             {featured.length === 0 ? (
               <EmptyState title={t('empty.globalProjects')} sub={t('empty.dashboardSub')} icon={null} />
             ) : (
-              <div className="projects-grid">
+              <div className="projects-grid projects-grid-dense">
                 {featured.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
               </div>
             )}
@@ -388,12 +546,12 @@ function GlobalView({ user, projects, applications, users, ratings, groups, lang
 
             {filteredProjects.length === 0 ? (
               <EmptyState
-                icon="📁"
+                icon="folder"
                 title={t('empty.globalProjects')}
                 sub={publicProjects.length === 0 ? t('empty.dashboardSub') : t('empty.projectsSub')}
               />
             ) : (
-              <div className="projects-grid">
+              <div className="projects-grid projects-grid-dense">
                 {filteredProjects.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
               </div>
             )}

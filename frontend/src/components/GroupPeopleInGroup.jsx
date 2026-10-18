@@ -185,7 +185,7 @@ export default function GroupPeopleInGroup({
         </div>
 
         {results.length === 0 ? (
-          <EmptyState icon="🔍" title={t('group.noMembers')} />
+          <EmptyState icon="users" title={t('group.noMembers')} />
         ) : (
           <div className="group-people-grid">
             {results.map(person => {
@@ -235,7 +235,6 @@ export default function GroupPeopleInGroup({
                     <div className="person-tags">
                       {shownTags.map(o => (
                         <span key={`${o.key}:${o.value}`} className="person-chip">
-                          {o.icon && <span className="person-chip-icon" aria-hidden="true">{o.icon}</span>}
                           {escapeHTML(o.text)}
                         </span>
                       ))}

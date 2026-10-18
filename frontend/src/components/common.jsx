@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Children, cloneElement, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profileLinks } from '../lib/helpers.js';
 
@@ -41,9 +41,12 @@ export function isClickOnScrollbar(e) {
 // `layer` apila un modal sobre otro (detalle de proyecto encima del detalle de
 // usuario, por ejemplo). Todos los overlays comparten el mismo z-index, así que
 // sin esto el que se monte después en el DOM acaba tapando al anterior.
-export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, children }) {
+export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, children, label }) {
+  const { t } = useApp();
   const isMouseDownOnOverlayRef = useRef(false);
   const isMouseDownOnScrollbarRef = useRef(false);
+  const cardRef = useRef(null);
+  const prevFocusRef = useRef(null);
 
   // Bloquea el scroll del fondo (body) mientras haya al menos un modal abierto
   useEffect(() => {
@@ -60,17 +63,57 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
     };
   }, [open]);
 
-  // Cerrar al pulsar la tecla Escape
+  // Cerrar al pulsar la tecla Escape + trampa de foco (Tab cíclico dentro del modal)
   useEffect(() => {
     if (!open || !onClose) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+      if (e.key === 'Tab' && cardRef.current) {
+        const nodes = cardRef.current.querySelectorAll(
+          'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        const list = Array.from(nodes).filter(el => el.offsetParent !== null);
+        if (list.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const first = list[0];
+        const last = list[list.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
+
+  // Guarda el foco previo, mueve el foco al abrir y lo restaura al cerrar
+  useEffect(() => {
+    if (!open) return;
+    prevFocusRef.current = document.activeElement;
+    const timer = setTimeout(() => {
+      const card = cardRef.current;
+      if (!card) return;
+      const firstFocusable = card.querySelector(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      (firstFocusable || card).focus();
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      if (prevFocusRef.current && typeof prevFocusRef.current.focus === 'function') {
+        prevFocusRef.current.focus();
+      }
+    };
+  }, [open ]);
 
   const handleMouseDown = (e) => {
     if (e.target === e.currentTarget) {
@@ -117,8 +160,15 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
       onMouseDown={handleMouseDown}
       onClick={handleClick}
     >
-      <div className={`modal-card${size ? ' ' + size : ''}`}>
-        {onClose && <button className="modal-close" onClick={onClose}>&times;</button>}
+      <div
+        ref={cardRef}
+        className={`modal-card${size ? ' ' + size : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label || title || 'Diálogo'}
+        tabIndex={-1}
+      >
+        {onClose && <button type="button" className="modal-close" onClick={onClose} aria-label={t('common.close')}><span aria-hidden="true">&times;</span></button>}
         {title && <h2 className="auth-title">{title}</h2>}
         {subtitle && <p className="auth-subtitle">{subtitle}</p>}
         {children}
@@ -127,12 +177,18 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
   );
 }
 
-export function EmptyState({ icon = '📦', title, sub }) {
+export function EmptyState({ icon = 'folder', title, sub, action, actionLabel, onAction }) {
   return (
     <div className="empty-state">
-      {icon && <div className="empty-state-icon">{icon}</div>}
+      {icon && <div className="empty-state-icon" aria-hidden="true"><Icon name={icon} size={28} /></div>}
       {title && <h3>{title}</h3>}
       {sub && <p>{sub}</p>}
+      {action && <div className="empty-state-action">{action}</div>}
+      {!action && actionLabel && onAction && (
+        <div className="empty-state-action">
+          <button type="button" className="btn btn-primary btn-sm" onClick={onAction}>{actionLabel}</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -167,8 +223,8 @@ export function ProjectBanner({ project, mode = 'card' }) {
   const meta = getCategoryMeta(project.category);
   const label = getCategoryLabel(lang, project.category);
   return (
-    <div className={`${cssClass} ${cssClass}-default`} style={{ background: meta.gradient }}>
-      <span className={`${cssClass}-icon`}>{meta.icon}</span>
+    <div className={`${cssClass} ${cssClass}-default`} style={{ background: meta.color }}>
+      <span className={`${cssClass}-icon`}><Icon name={meta.icon || 'gamepad'} size={36} /></span>
       <span className={`${cssClass}-label`}>{label}</span>
     </div>
   );
@@ -188,8 +244,9 @@ export function Stars({ rating }) {
 }
 
 // Set de iconos SVG en línea (sin dependencias). Reutilizable en toda la app.
-export function Icon({ name, size = 18 }) {
-  const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+// Sin `label` el icono es decorativo (aria-hidden); con `label` se anuncia.
+export function Icon({ name, size = 18, label }) {
+  const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', ...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true }) };
   switch (name) {
     case 'globe':
       return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>;
@@ -219,6 +276,34 @@ export function Icon({ name, size = 18 }) {
       return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>;
     case 'user-plus':
       return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>;
+    case 'folder':
+      return <svg {...common}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
+    case 'inbox':
+      return <svg {...common}><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>;
+    case 'check':
+      return <svg {...common}><path d="M20 6 9 17l-5-5" /></svg>;
+    case 'alert':
+      return <svg {...common}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z" /><path d="M12 9v4M12 17h.01" /></svg>;
+    case 'sun':
+      return <svg {...common}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>;
+    case 'moon':
+      return <svg {...common}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg>;
+    case 'gamepad':
+      return <svg {...common}><path d="M6 12h4M8 10v4M15 13h.01M18 11h.01" /><path d="M17.32 5H6.68a4 4 0 0 0-3.98 3.59C2.6 9.42 2 14.46 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.41-1.41A2 2 0 0 1 9.83 16h4.34a2 2 0 0 1 1.41.59L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.54-.6-6.58-.68-7.26A4 4 0 0 0 17.32 5z" /></svg>;
+    case 'image':
+      return <svg {...common}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.08-3.08a2 2 0 0 0-2.83 0L6 21" /></svg>;
+    case 'logout':
+      return <svg {...common}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></svg>;
+    case 'x':
+      return <svg {...common}><path d="M18 6 6 18M6 6l12 12" /></svg>;
+    case 'send':
+      return <svg {...common}><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>;
+    case 'code':
+      return <svg {...common}><path d="m16 18 6-6-6-6M8 6l-6 6 6 6" /></svg>;
+    case 'smartphone':
+      return <svg {...common}><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M12 18h.01" /></svg>;
+    case 'tag':
+      return <svg {...common}><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z" /><circle cx="7" cy="7" r="1.5" /></svg>;
     default:
       return null;
   }
@@ -296,21 +381,124 @@ export function SkillTags({ skills, limit = 3 }) {
   );
 }
 
-// Selector de estrellas interactivo (min rating, rate, etc.)
-export function StarInput({ value, onChange, title }) {
+// Selector de estrellas accesible: radiogroup real con teclado
+// (flechas / 1-5 / Enter-Espacio). Misma API que antes: { value, onChange, title }.
+export function StarInput({ value, onChange, title, label }) {
+  const { t } = useApp();
+  const current = Number(value) || 0;
+  const groupLabel = label || title || t('createProject.minRating');
+  const starRefs = useRef([]);
+  const focusStar = (s) => {
+    const el = starRefs.current[s];
+    if (el && typeof el.focus === 'function') el.focus();
+  };
+  const starAriaLabel = (s) => (s === 1 ? t('star.one') : t('star.many', { n: s }));
+  const handleKeyDown = (e) => {
+    let next = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next = Math.min(5, (current || 0) + 1) || 1;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next = Math.max(1, (current || 1) - 1);
+    else if (e.key >= '1' && e.key <= '5') next = Number(e.key);
+    else if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.dataset && e.target.dataset.star) {
+      next = Number(e.target.dataset.star);
+    }
+    if (next == null) return;
+    e.preventDefault();
+    if (onChange) onChange(next);
+    focusStar(next);
+  };
   return (
-    <span className="star-input-icon" style={{ cursor: 'pointer' }}>
+    <span className="star-input-icon star-group" role="radiogroup" aria-label={groupLabel} onKeyDown={handleKeyDown}>
       {[1, 2, 3, 4, 5].map(s => (
         <span
           key={s}
-          className={s <= value ? 'active' : ''}
+          ref={el => { starRefs.current[s] = el; }}
+          data-star={s}
+          role="radio"
+          aria-checked={s === current}
+          aria-label={starAriaLabel(s)}
+          title={title || starAriaLabel(s)}
+          tabIndex={s === (current || 1) ? 0 : -1}
+          className={s <= current ? 'active' : ''}
           onClick={() => onChange && onChange(s)}
-          title={title}
-          style={{ cursor: 'pointer' }}
         >
-          ★
+          <span aria-hidden="true">★</span>
         </span>
       ))}
     </span>
+  );
+}
+
+// ==========================================================================
+// AGENTE E — Field, Spinner, Skeleton, ErrorState, SkipLink
+// ==========================================================================
+
+/** Enlace "saltar al contenido" (visible solo con teclado). */
+export function SkipLink({ targetId = 'main-content', label }) {
+  const { t } = useApp();
+  return <a className="skip-link" href={`#${targetId}`}>{label || t('a11y.skipToContent')}</a>;
+}
+
+/**
+ * Campo de formulario accesible: <label> real + hint + error con
+ * aria-describedby y aria-invalid. Clona el control hijo para inyectarlos.
+ */
+export function Field({ label, htmlFor, hint, error, required, children }) {
+  const hintId = hint ? `${htmlFor}-hint` : undefined;
+  const errorId = error ? `${htmlFor}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+  const control = Children.map(children, child => {
+    if (!child || typeof child !== 'object' || !('type' in child)) return child;
+    return cloneElement(child, {
+      id: child.props.id || htmlFor,
+      'aria-describedby': describedBy,
+      'aria-invalid': error ? true : undefined,
+    });
+  });
+  return (
+    <div className={'form-group field' + (error ? ' field-invalid' : '')}>
+      <label htmlFor={htmlFor}>
+        {label}
+        {required && <span aria-hidden="true"> *</span>}
+      </label>
+      {hint && <p className="form-hint field-hint" id={hintId}>{hint}</p>}
+      {control}
+      {error && <p className="field-error" id={errorId} role="alert">{error}</p>}
+    </div>
+  );
+}
+
+/** Indicador de carga en línea (el botón padre lleva aria-busy + disabled). */
+export function Spinner() {
+  return <span className="spinner" aria-hidden="true" />;
+}
+
+/** Marcador de posición mientras cargan datos (respeta reduced-motion). */
+export function Skeleton({ lines = 3, label }) {
+  const { t } = useApp();
+  const text = label || t('common.loading');
+  return (
+    <div className="skeleton-block" role="status" aria-label={text}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <span key={i} className="skeleton skeleton-line skeleton-block-line" aria-hidden="true" />
+      ))}
+      <span className="sr-only">{text}</span>
+    </div>
+  );
+}
+
+/** Error de carga de datos con acción de reintento. */
+export function ErrorState({ title, sub, onRetry, retryLabel }) {
+  const { t } = useApp();
+  return (
+    <div className="error-state" role="alert">
+      <div className="error-state-icon" aria-hidden="true"><Icon name="alert" size={28} /></div>
+      <h3>{title || t('common.loadError')}</h3>
+      {sub && <p>{sub}</p>}
+      {onRetry && (
+        <button type="button" className="btn btn-primary btn-sm" onClick={onRetry}>
+          {retryLabel || t('common.retry')}
+        </button>
+      )}
+    </div>
   );
 }

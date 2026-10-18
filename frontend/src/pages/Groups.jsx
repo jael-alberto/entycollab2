@@ -94,7 +94,7 @@ function GroupsDirectory() {
       )}
 
       {groups.length === 0 ? (
-        <EmptyState icon="👥" title="Aún no hay grupos" sub="Crea el primero para empezar a colaborar con tu equipo." />
+        <EmptyState icon="users" title="Aún no hay grupos" sub="Crea el primero para empezar a colaborar con tu equipo." />
       ) : (
         <div className="groups-grid">
           {groups.map(group => {
@@ -102,7 +102,7 @@ function GroupsDirectory() {
             const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
             return (
               <article className="group-card" key={group.id}>
-                <div className="group-card-icon">👥</div>
+                <div className="group-card-icon" aria-hidden="true"><Icon name="users" size={22} /></div>
                 <div>
                   <h3>{group.name}</h3>
                   <p>{group.description}</p>
@@ -203,7 +203,7 @@ function GroupWorkspace({ groupId }) {
   if (!group) {
     return (
       <div className="section-block">
-        <EmptyState icon="🔎" title="Grupo no encontrado" />
+        <EmptyState icon="search" title="Grupo no encontrado" />
         <button className="btn btn-ghost" onClick={() => navigate('/grupos')}>Volver a grupos</button>
       </div>
     );
@@ -213,7 +213,7 @@ function GroupWorkspace({ groupId }) {
     return (
       <div className="section-block">
         <EmptyState
-          icon="🔒"
+          icon="lock"
           title="Este grupo es privado"
           sub="Solicita acceso desde el directorio. Un administrador debe aprobar tu solicitud para ingresar."
         />
@@ -464,7 +464,7 @@ function GroupWorkspace({ groupId }) {
             </div>
 
             {filteredProjects.length === 0 ? (
-              <EmptyState icon="📁" title="No se encontraron proyectos" sub={groupProjects.length === 0 ? 'Este grupo aún no tiene proyectos publicados.' : 'Prueba cambiando los filtros de búsqueda.'} />
+              <EmptyState icon="folder" title="No se encontraron proyectos" sub={groupProjects.length === 0 ? 'Este grupo aún no tiene proyectos publicados.' : 'Prueba cambiando los filtros de búsqueda.'} />
             ) : (
               <div className="groups-grid">
                 {filteredProjects.map(p => <ProjectCard project={p} currentUser={user} key={p.id} />)}

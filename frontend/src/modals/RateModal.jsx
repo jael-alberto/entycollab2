@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Modal, EmptyState } from '../components/common.jsx';
-import { escapeHTML, starLabel } from '../lib/helpers.js';
+import { EmptyState, Field, Modal, Spinner, StarInput } from '../components/common.jsx';
+import { escapeHTML } from '../lib/helpers.js';
+import { starsKey } from '../lib/validation.js';
 
 export default function RateModal() {
-  const { user, users, applications, ratings, lang, t, saveRatings } = useApp();
+  const { user, users, applications, ratings, t, saveRatings } = useApp();
   const { showToast } = useToast();
   const { rateProjectId, closeRate } = useModals();
 
@@ -19,15 +20,25 @@ export default function RateModal() {
     });
     return map;
   });
+  const [formError, setFormError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!user) return null;
 
   const setStars = (userId, stars) => {
     setSelected(prev => ({ ...prev, [userId]: stars }));
+    if (formError) setFormError('');
   };
 
   const save = () => {
+    const key = starsKey(selected);
+    if (key) {
+      setFormError(t(key));
+      return;
+    }
+    setLoading(true);
     const saved = saveRatings(rateProjectId, selected);
+    setLoading(false);
     showToast(saved ? t('toast.ratingsSaved') : t('toast.noRatingsAssigned'), saved ? 'success' : 'info');
     closeRate();
   };
@@ -38,38 +49,38 @@ export default function RateModal() {
       {apps.length === 0 ? (
         <EmptyState title={t('rate.noParticipants')} icon={null} />
       ) : (
-        apps.map(a => {
-          const participant = users.find(u => u.id === a.userId);
-          if (!participant) return null;
-          return (
-            <div className="rate-participant" key={a.id}>
-              <div>
-                <span className="rate-participant-name">{escapeHTML(participant.name)}</span>
-                <div className="applicant-skills" style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)' }}>
-                  {participant.skills.map(s => escapeHTML(s)).join(', ')}
+        <>
+          <p className="form-hint">{t('rate.hint')}</p>
+          {apps.map(a => {
+            const participant = users.find(u => u.id === a.userId);
+            if (!participant) return null;
+            const current = selected[a.userId] || 0;
+            return (
+              <div className="rate-participant" key={a.id}>
+                <div>
+                  <span className="rate-participant-name">{escapeHTML(participant.name)}</span>
+                  <div className="applicant-skills" style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)' }}>
+                    {participant.skills.map(s => escapeHTML(s)).join(', ')}
+                  </div>
                 </div>
+                <Field
+                  label={escapeHTML(participant.name)}
+                  htmlFor={`rate-${a.userId}`}
+                  hint={current > 0 ? (current === 1 ? t('star.one') : t('star.many', { n: current })) : t('rate.unrated')}
+                >
+                  <StarInput value={current} onChange={(stars) => setStars(a.userId, stars)} label={`${t('rate.title')}: ${participant.name}`} />
+                </Field>
               </div>
-              <div className="star-rating">
-                {[5, 4, 3, 2, 1].map(s => (
-                  <span key={s} style={{ display: 'contents' }}>
-                    <input
-                      type="radio"
-                      id={`star-${a.userId}-${s}`}
-                      name={`rating-${a.userId}`}
-                      value={s}
-                      checked={selected[a.userId] === s}
-                      onChange={() => setStars(a.userId, s)}
-                    />
-                    <label htmlFor={`star-${a.userId}-${s}`} title={starLabel(lang, s)}>★</label>
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </>
       )}
+      {formError && <p className="field-error" role="alert">{formError}</p>}
       {apps.length > 0 && (
-        <button className="btn btn-primary btn-full" onClick={save} style={{ marginTop: '1rem' }}>{t('rate.saveBtn')}</button>
+        <button className="btn btn-primary btn-full" onClick={save} disabled={loading} aria-busy={loading} style={{ marginTop: '1rem' }}>
+          {loading && <Spinner />}
+          {loading ? t('rate.saving') : t('rate.saveBtn')}
+        </button>
       )}
     </Modal>
   );
