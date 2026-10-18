@@ -7,11 +7,15 @@
     "doc": "docs"
   },
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
     "build": "npm run setup && npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
     "preview": "npm --prefix frontend run preview",
-    "lint": "npm --prefix frontend run lint",
-    "setup": "npm --prefix frontend install",
+    "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
+    "setup": "npm --prefix frontend install && npm --prefix backend install",
+    "start:backend": "npm --prefix backend start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -25,5 +29,12 @@
   "bugs": {
     "url": "https://github.com/jael-alberto/entycollab2/issues"
   },
-  "homepage": "https://github.com/jael-alberto/entycollab2#readme"
+  "homepage": "https://github.com/jael-alberto/entycollab2#readme",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@supabase/server": "^1.9.2",
+    "@supabase/supabase-js": "^2.118.0"
+  }
 }
