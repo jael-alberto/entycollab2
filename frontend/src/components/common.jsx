@@ -1,6 +1,7 @@
 import { Children, cloneElement, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profileLinks } from '../lib/helpers.js';
+import PeekRating from './PeekRating.jsx';
 
 // ==========================================================================
 // COMPONENTES UI PEQUEÑOS REUTILIZABLES
@@ -232,12 +233,11 @@ export function ProjectBanner({ project, mode = 'card' }) {
 
 export function Stars({ rating }) {
   if (rating <= 0) return null;
-  const full = Math.floor(rating);
-  const half = rating % 1 >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
+  const rounded = Math.round(rating);
   return (
     <span className="stars-inline">
-      {'★'.repeat(full)}{half ? '½' : ''}{'☆'.repeat(empty)}{' '}
+      <PeekRating value={rounded} readOnly size={18} lift={5} magnify={1.1} riseDuration={280} />
+      {' '}
       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-dim)' }}>({rating.toFixed(1)})</span>
     </span>
   );

@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Modal, StatusPill, ProjectBanner, Stars, SkillTags } from '../components/common.jsx';
 import { formatDeadline } from '../components/ProjectCard.jsx';
+import PeekRating from '../components/PeekRating.jsx';
 import {
   getUserAvgRating, getCategoryLabel, escapeHTML
 } from '../lib/helpers.js';
@@ -158,7 +159,7 @@ export default function ProjectDetailModal() {
                   {a.projectRole && <><strong>{a.projectRole}</strong> · </>}
                   {participant.skills.map(s => escapeHTML(s)).join(', ')}
                   {rating ? (
-                    <> · {t('detail.rated')}: {'★'.repeat(rating.stars)}{'☆'.repeat(5 - rating.stars)}</>
+                    <> · {t('detail.rated')}: <PeekRating value={rating.stars} readOnly size={16} lift={4} magnify={1.05} riseDuration={250} /></>
                   ) : (isOwner && project.status === 'completed' ? <> · {t('detail.unrated')}</> : '')}
                 </span>
               </div>

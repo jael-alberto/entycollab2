@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { primaryRoleLabel } from '../components/PersonCard.jsx';
 import { Avatar, SkillTags, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
+import PeekRating from '../components/PeekRating.jsx';
 import {
   getUserAvgRating, getUserRatingCount, escapeHTML,
   userCategories, getCategoryLabel
