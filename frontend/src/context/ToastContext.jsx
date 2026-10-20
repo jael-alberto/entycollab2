@@ -16,9 +16,15 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ showToast, toasts }}>
       {children}
-      <div id="toast-container">
+      <div id="toast-container" aria-live="polite" aria-atomic="false">
         {toasts.map(t => (
-          <div key={t.id} className={`toast toast-${t.type}`}>{t.message}</div>
+          <div
+            key={t.id}
+            className={`toast toast-${t.type}`}
+            {...(t.type === 'error'
+              ? { role: 'alert' }
+              : { role: 'status' })}
+          >{t.message}</div>
         ))}
       </div>
     </ToastContext.Provider>

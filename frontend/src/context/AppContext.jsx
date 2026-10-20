@@ -329,7 +329,7 @@ export function AppProvider({ children }) {
   // ========================================================================
   // APPLICATIONS
   // ========================================================================
-  const applyToProject = useCallback((projectId) => {
+  const applyToProject = useCallback((projectId, pitch = '') => {
     const current = getApplications();
     if (current.find(a => a.projectId === projectId && a.userId === userId)) return 'alreadyApplied';
 
@@ -344,6 +344,7 @@ export function AppProvider({ children }) {
       projectId,
       userId,
       status: 'pending',
+      pitch: String(pitch || ''),
       appliedAt: new Date().toISOString()
     });
     saveApplications(current);

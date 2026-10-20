@@ -21,7 +21,7 @@ export default function ProjectManage() {
         <div className="manage-head">
           <button className="manage-back" onClick={() => navigate('/proyectos/mis-proyectos')}>← {t('manage.back')}</button>
         </div>
-        <EmptyState icon="🗂️" title={t('manage.notFound')} sub={t('manage.notFoundSub')} />
+        <EmptyState icon="folder" title={t('manage.notFound')} sub={t('manage.notFoundSub')} />
       </div>
     );
   }

@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext.jsx';
+import { Icon } from './common.jsx';
 
 /**
  * AuthLayout — Split-screen wrapper for Login / Register pages.
@@ -30,8 +31,9 @@ export default function AuthLayout({ children }) {
             onClick={toggleTheme}
             title={theme ? t('auth.themeToggleLight') : t('auth.themeToggleDark')}
             aria-label={theme ? t('auth.themeToggleLight') : t('auth.themeToggleDark')}
+            aria-pressed={!!theme}
           >
-            {theme ? '☀️' : '🌙'}
+            <Icon name={theme ? 'sun' : 'moon'} size={16} />
           </button>
         </div>
 

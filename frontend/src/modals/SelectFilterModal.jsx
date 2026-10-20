@@ -53,7 +53,7 @@ export default function SelectFilterModal({ kind }) {
   return (
     <Modal open onClose={onClose} title={title()} subtitle={subtitle()}>
       {techNeedsCategory ? (
-        <EmptyState icon="🗂️" title={t('techFilter.requireCat')} sub={t('techFilter.requireCatSub')} />
+        <EmptyState icon="folder" title={t('techFilter.requireCat')} sub={t('techFilter.requireCatSub')} />
       ) : (
         <>
           <div className="featured-counter">{t('catFilter.counterSelected', { n: draft.length, total: options.length })}</div>

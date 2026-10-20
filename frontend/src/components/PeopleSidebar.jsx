@@ -14,29 +14,46 @@ import { activeFilterCount, emptyFilters, toggleValue } from '../lib/talentSearc
 const PREVIEW = 8;
 
 // Un renglón del sidebar: título + cantidad de personas que devolvería.
-function Facet({ title, children, defaultOpen = true }) {
+// Solo presentación y accesibilidad: el plegado usa aria-expanded y
+// aria-controls para que el teclado y el lector sepan qué pasa.
+function Facet({ id, title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
+  const bodyId = `${id}-body`;
   return (
-    <section className="facet">
-      <button type="button" className="facet-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+    <section className="facet" aria-labelledby={`${id}-title`}>
+      <button
+        type="button"
+        className="facet-head"
+        id={`${id}-title`}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => setOpen(o => !o)}
+      >
         <span className="facet-title">{title}</span>
         <span className="facet-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
       </button>
-      {open && <div className="facet-body">{children}</div>}
+      {open && (
+        <div className="facet-body" id={bodyId} role="group" aria-label={title}>
+          {children}
+        </div>
+      )}
     </section>
   );
 }
 
-// Una opción con su conteo. Las que darían 0 se atenúan para no invites a
+// Una opción con su conteo. Las que darían 0 se atenúan para no invitar a
 // marcar filtros que no van a mostrar nada.
 function FacetOption({ label, icon, count, checked, onChange }) {
   const empty = count === 0 && !checked;
   return (
-    <label className={'facet-option' + (checked ? ' is-checked' : '') + (empty ? ' is-empty' : '')}>
+    <label
+      className={'facet-option' + (checked ? ' is-checked' : '') + (empty ? ' is-empty' : '')}
+      title={`${label} (${count})`}
+    >
       <input type="checkbox" checked={checked} onChange={onChange} />
       {icon && <span className="facet-option-icon" aria-hidden="true">{icon}</span>}
       <span className="facet-option-label">{label}</span>
-      <span className="facet-option-count">{count}</span>
+      <span className="facet-option-count" aria-hidden="true">{count}</span>
     </label>
   );
 }
@@ -55,7 +72,7 @@ function OptionList({ options, selected, counts, onToggle, renderLabel }) {
           return (
             <FacetOption
               key={value}
-              icon={typeof opt === 'string' ? null : opt.icon}
+              icon={null}
               label={renderLabel ? renderLabel(opt) : value}
               count={counts[value] || 0}
               checked={selected.includes(value)}
@@ -65,7 +82,12 @@ function OptionList({ options, selected, counts, onToggle, renderLabel }) {
         })}
       </div>
       {options.length > PREVIEW && (
-        <button type="button" className="facet-more" onClick={() => setExpanded(e => !e)}>
+        <button
+          type="button"
+          className="facet-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(e => !e)}
+        >
           {expanded ? t('filters.showLess') : `${t('filters.showMore')} (${options.length - PREVIEW})`}
         </button>
       )}
@@ -75,6 +97,8 @@ function OptionList({ options, selected, counts, onToggle, renderLabel }) {
 
 // Facetas de talento reutilizables: tipos de juego, lenguajes, juegos
 // favoritos, habilidades, proyectos completados y valoración.
+// La lógica de conteos y toggles no se toca: solo se añaden ids estables
+// para la accesibilidad del acordeón.
 export function TalentFacets({ filters, counts, onChange }) {
   const { t } = useApp();
 
@@ -92,7 +116,7 @@ export function TalentFacets({ filters, counts, onChange }) {
 
   return (
     <>
-      <Facet title={t('filters.gameTypes')}>
+      <Facet id="facet-gametypes" title={t('filters.gameTypes')}>
         <OptionList
           options={GAME_TYPES}
           selected={filters.gameTypes}
@@ -102,7 +126,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet title={t('filters.languages')}>
+      <Facet id="facet-languages" title={t('filters.languages')}>
         {filters.gameTypes.length === 0 && (
           <p className="facet-hint">{t('filters.languagesHint')}</p>
         )}
@@ -114,7 +138,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet title={t('filters.favoriteGenres')}>
+      <Facet id="facet-genres" title={t('filters.favoriteGenres')}>
         <OptionList
           options={FAVORITE_GENRES}
           selected={filters.favoriteGenres}
@@ -124,7 +148,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet title={t('filters.disciplines')}>
+      <Facet id="facet-disciplines" title={t('filters.disciplines')}>
         <OptionList
           options={DISCIPLINES}
           selected={filters.disciplines}
@@ -134,7 +158,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet title={t('filters.completed')}>
+      <Facet id="facet-completed" title={t('filters.completed')}>
         <div className="facet-options">
           {COMPLETED_BUCKETS.map(min => (
             <FacetOption
@@ -148,7 +172,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         </div>
       </Facet>
 
-      <Facet title={t('filters.rating')}>
+      <Facet id="facet-rating" title={t('filters.rating')} defaultOpen={false}>
         <div className="facet-options">
           {RATING_BUCKETS.map(min => (
             <FacetOption
@@ -171,11 +195,16 @@ export default function PeopleSidebar({ filters, counts, shown, total, onChange 
   const activeCount = activeFilterCount(filters);
 
   return (
-    <aside className="people-sidebar">
+    <aside className="people-sidebar" aria-label={t('people.filters')}>
       <div className="people-sidebar-head">
         <h3 className="people-sidebar-title">{t('people.filters')}</h3>
         {activeCount > 0 && (
-          <button type="button" className="people-sidebar-clear" onClick={() => onChange(emptyFilters())}>
+          <button
+            type="button"
+            className="people-sidebar-clear"
+            onClick={() => onChange(emptyFilters())}
+            aria-label={`${t('people.clearAll')} (${activeCount})`}
+          >
             {t('people.clearAll')}
           </button>
         )}
@@ -189,7 +218,9 @@ export default function PeopleSidebar({ filters, counts, shown, total, onChange 
         </button>
       )}
 
-      <p className="people-sidebar-total">{t('people.showing', { n: shown, total })}</p>
+      <p className="people-sidebar-total" aria-live="polite">
+        {t('people.showing', { n: shown, total })}
+      </p>
     </aside>
   );
 }

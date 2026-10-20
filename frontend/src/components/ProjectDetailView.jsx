@@ -1,24 +1,44 @@
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { StatusPill, ProjectBanner, Stars, SkillTags } from './common.jsx';
+import { formatDeadline } from './ProjectCard.jsx';
 import {
-  getUserAvgRating, getCategoryLabel, getStatusLabel, escapeHTML,
-  projectRatingProgress
+  getUserAvgRating, getCategoryLabel, escapeHTML
 } from '../lib/helpers.js';
 
 const APP_ORDER = { pending: 0, accepted: 1, rejected: 2 };
+
+function statusLabelKey(status) {
+  if (status === 'open') return 'status.recruiting';
+  if (status === 'in-progress') return 'status.developing';
+  if (status === 'completed') return 'status.finished';
+  return 'status.closed';
+}
+
+// Progreso de calificación calculado localmente: aceptados ya calificados
+// en este proyecto frente al total de aceptados.
+function ratingProgress(projectId, accepted, ratings) {
+  const ratedIds = new Set(
+    ratings.filter(r => r.projectId === projectId).map(r => r.ratedUserId)
+  );
+  const rated = accepted.filter(a => ratedIds.has(a.userId)).length;
+  return { rated, total: accepted.length, pending: accepted.length - rated };
+}
 
 // ==========================================================================
 // Contenido de un proyecto: banner, datos, acciones del dueño, postulaciones
 // y acceso al formulario de integrantes.
 // Se usa en el modal de detalle (tarjetas) y en la página de gestión
 // (/proyectos/:id/gestionar), que es la misma vista pero como página.
+// Layout estilo Steam: columna principal + sidebar sticky con el CTA.
 // ==========================================================================
 export default function ProjectDetailView({ project, onStatusChanged }) {
-  const { user, users, applications, ratings, lang, t, l10n, changeProjectStatus, handleApplication } = useApp();
+  const { user, users, applications, ratings, lang, t, l10n, changeProjectStatus, handleApplication, applyToProject } = useApp();
   const { showToast } = useToast();
   const { openRate, openUserDetail } = useModals();
+  const navigate = useNavigate();
 
   const owner = users.find(u => u.id === project.ownerId);
   const apps = applications
@@ -26,11 +46,14 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
     .sort((a, b) => APP_ORDER[a.status] - APP_ORDER[b.status]);
   const isOwner = project.ownerId === user.id;
   const accepted = apps.filter(a => a.status === 'accepted');
+  const myApp = apps.find(a => a.userId === user.id);
+  const slotsFull = accepted.length >= project.slots;
   // La sección "Postulaciones" es la cola de decisión: solo los pendientes.
   // Los aceptados se ven en "Integrantes" y los rechazados dejan de listarse.
   const pendingApps = apps.filter(a => a.status === 'pending');
-  const progress = projectRatingProgress(project.id, accepted, ratings);
+  const progress = ratingProgress(project.id, accepted, ratings);
   const projectFinished = project.status === 'completed' || project.status === 'closed';
+  const ownerRating = owner ? getUserAvgRating(owner.id, ratings) : 0;
 
   const onStatusChange = (newStatus) => {
     const res = changeProjectStatus(project.id, newStatus);
@@ -41,7 +64,7 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
       return;
     }
     if (!res) return;
-    showToast(t('toast.projectUpdated', { status: getStatusLabel(lang, newStatus) }), 'success');
+    showToast(t('toast.projectUpdated', { status: t(statusLabelKey(newStatus)) }), 'success');
     if (onStatusChanged) onStatusChanged(newStatus);
   };
 
@@ -59,6 +82,40 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
       showToast(newStatus === 'accepted' ? t('toast.acceptedUser', { name }) : t('toast.rejectedUser', { name }), newStatus === 'accepted' ? 'success' : 'info');
     }
   };
+
+  const onApply = () => {
+    const res = applyToProject(project.id);
+    if (res === 'alreadyApplied') {
+      showToast(t('toast.alreadyApplied'), 'error');
+    } else if (res === 'minRating') {
+      const userRating = getUserAvgRating(user.id, ratings);
+      showToast(t('toast.minRating', { stars: project.minRating, user: userRating.toFixed(1) }), 'error');
+    } else if (res === 'ok') {
+      showToast(t('toast.applicationSent'), 'success');
+    }
+  };
+
+  // CTA principal del sidebar: Gestionar (dueño) o Postularse / estado.
+  let sidebarCta;
+  if (isOwner) {
+    sidebarCta = (
+      <button className="btn btn-primary btn-full" onClick={() => navigate(`/proyectos/${project.id}/gestionar`)}>
+        {t('detail.manageBtn')}
+      </button>
+    );
+  } else if (myApp) {
+    if (myApp.status === 'pending') {
+      sidebarCta = <span className="project-status status-in-progress">{t('card.pending')}</span>;
+    } else if (myApp.status === 'accepted') {
+      sidebarCta = <span className="project-status status-in-progress">{t('myApps.accepted')}</span>;
+    } else {
+      sidebarCta = <span className="project-status status-closed">{t('card.rejected')}</span>;
+    }
+  } else if (project.status === 'open' && !slotsFull) {
+    sidebarCta = <button className="btn btn-primary btn-full" onClick={onApply}>{t('card.postulate')}</button>;
+  } else {
+    sidebarCta = <span className="project-status status-closed">{slotsFull ? t('card.slotsFull') : t(statusLabelKey(project.status))}</span>;
+  }
 
   let ownerActions = null;
   if (isOwner && project.status === 'open') {
@@ -165,43 +222,81 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
   }
 
   return (
-    <>
+    <div className="steam-detail">
       <ProjectBanner project={project} mode="detail" />
-      <div className="detail-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div className="steam-detail-head">
+        <div className="steam-title-row">
           <h2>{escapeHTML(l10n(project.title))}</h2>
-          <StatusPill status={project.status} label={getStatusLabel(lang, project.status)} />
+          <StatusPill status={project.status} label={t(statusLabelKey(project.status))} />
         </div>
         <span className="project-category-badge">{getCategoryLabel(lang, project.category)}</span>
-        <div className="detail-meta">
-          <span><strong>{t('detail.createdBy')}</strong> {owner ? escapeHTML(owner.name) : t('card.unknown')}</span>
-          <span><strong>{t('detail.slots')}</strong> {accepted.length}/{project.slots}</span>
-          {project.deadline && <span><strong>{t('detail.deadline')}</strong> {new Date(project.deadline).toLocaleDateString(lang)}</span>}
-          {project.repo && <span><a href={escapeHTML(project.repo)} target="_blank" rel="noopener noreferrer">{t('detail.repo')}</a></span>}
+      </div>
+
+      <div className="steam-detail-grid">
+        <div className="steam-main">
+          <div className="detail-section">
+            <h3>{t('detail.description')}</h3>
+            <p>{escapeHTML(l10n(project.description))}</p>
+          </div>
+
+          <div className="detail-section">
+            <h3>{t('detail.techs')}</h3>
+            <SkillTags skills={project.tech} limit={999} />
+          </div>
+
+          {project.repo && (
+            <div className="detail-section">
+              <h3>{t('detail.repo')}</h3>
+              <p>
+                <a href={escapeHTML(project.repo)} target="_blank" rel="noopener noreferrer">
+                  {escapeHTML(project.repo)}
+                </a>
+              </p>
+            </div>
+          )}
+
+          {ownerActions}
+          {applicantsHTML}
+          {membersHTML}
         </div>
-      </div>
 
-      <div className="detail-section">
-        <h3>{t('detail.description')}</h3>
-        <p>{escapeHTML(l10n(project.description))}</p>
+        <aside className="steam-side" aria-label={t('detail.manageBtn')}>
+          <dl className="steam-facts">
+            <div className="steam-fact">
+              <dt>{t('detail.stateLabel')}</dt>
+              <dd><StatusPill status={project.status} label={t(statusLabelKey(project.status))} /></dd>
+            </div>
+            <div className="steam-fact">
+              <dt>{t('detail.cuposLabel')}</dt>
+              <dd>
+                <strong>{accepted.length}/{project.slots}</strong>
+                <span className="steam-cupos-bar" aria-hidden="true">
+                  <span style={{ width: `${project.slots ? Math.min(100, Math.round((accepted.length / project.slots) * 100)) : 0}%` }} />
+                </span>
+              </dd>
+            </div>
+            <div className="steam-fact">
+              <dt>{t('detail.deadlineLabel')}</dt>
+              <dd>{formatDeadline(lang, project.deadline)}</dd>
+            </div>
+            <div className="steam-fact">
+              <dt>{t('detail.minRatingTitle')}</dt>
+              <dd>
+                <span className="min-rating-stars">{'★'.repeat(project.minRating || 1)}{'☆'.repeat(5 - (project.minRating || 1))}</span>
+              </dd>
+            </div>
+            <div className="steam-fact">
+              <dt>{t('detail.ownerLabel')}</dt>
+              <dd>
+                {owner ? escapeHTML(owner.name) : t('card.unknown')}
+                {ownerRating > 0 && <> · <Stars rating={ownerRating} /></>}
+              </dd>
+            </div>
+          </dl>
+          <div className="steam-cta">{sidebarCta}</div>
+          <p className="min-rating-desc">{t('detail.minRatingDesc', { stars: project.minRating || 1 })}</p>
+        </aside>
       </div>
-
-      <div className="detail-section">
-        <h3>{t('detail.techs')}</h3>
-        <SkillTags skills={project.tech} limit={999} />
-      </div>
-
-      <div className="detail-section">
-        <h3>{t('detail.minRatingTitle')}</h3>
-        <div className="min-rating-detail">
-          <span className="min-rating-stars big">{'★'.repeat(project.minRating || 1)}{'☆'.repeat(5 - (project.minRating || 1))}</span>
-          <span className="min-rating-desc">{t('detail.minRatingDesc', { stars: project.minRating || 1 })}</span>
-        </div>
-      </div>
-
-      {ownerActions}
-      {applicantsHTML}
-      {membersHTML}
-    </>
+    </div>
   );
 }
