@@ -165,9 +165,9 @@ export function PublicHeader() {
   return (
     <header className="site-header">
       <div className="header-container">
-        <div className="logo-container">
+        <Link to="/" className="logo-link" aria-label="Ir al inicio">
           <img src="/img/logo-pg.png" alt="Logo ENTYCOLLAB" className="site-logo" />
-        </div>
+        </Link>
         <span className="badge-tag">Open Source Collaboration</span>
         <h1>ENTYCOLLAB</h1>
         <p className="welcome-msg">{t('welcome')}</p>

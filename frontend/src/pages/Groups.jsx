@@ -19,12 +19,13 @@ export default function Groups() {
 }
 
 function GroupsDirectory() {
-  const { user, groups, requestToJoinGroup, createGroup, selectGroup } = useApp();
+  const { user, users, groups, requestToJoinGroup, createGroup, selectGroup } = useApp();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedGroupModal, setSelectedGroupModal] = useState(null);
 
   const submit = (e) => {
     e.preventDefault();
@@ -102,15 +103,34 @@ function GroupsDirectory() {
             const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
             return (
               <article className="group-card" key={group.id}>
-                <div className="group-card-icon">👥</div>
-                <div>
-                  <h3>{group.name}</h3>
-                  <p>{group.description}</p>
+                <div className="group-card-header">
+                  <div className="group-card-icon">👥</div>
+                  {membership && (
+                    <span className="group-role-badge-small">
+                      {membership.role === 'owner' ? '👑 Creador' : membership.role === 'admin' ? '🛡️ Admin' : '👤 Miembro'}
+                    </span>
+                  )}
                 </div>
+
+                <div className="group-card-content">
+                  <h3 className="group-card-title">{group.name}</h3>
+                  <p className="group-card-desc-preview">
+                    {group.description || 'Sin descripción detallada.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-group-view-desc"
+                    onClick={() => setSelectedGroupModal(group)}
+                  >
+                    📄 Ver descripción
+                  </button>
+                </div>
+
                 <div className="group-card-meta">
                   <span>{group.members?.length || 0} miembros</span>
                   <span>{membership ? (membership.role === 'owner' ? 'Creador' : membership.role === 'admin' ? 'Administrador' : 'Miembro') : 'Grupo privado'}</span>
                 </div>
+
                 {membership ? (
                   <button className="btn btn-primary btn-sm" onClick={() => open(group)}>
                     Entrar al grupo
@@ -129,6 +149,128 @@ function GroupsDirectory() {
           })}
         </div>
       )}
+
+      {/* Modal de Detalle / Descripción del Grupo estilo tarjeta de proyecto */}
+      {selectedGroupModal && (
+        <GroupDescriptionModal
+          group={selectedGroupModal}
+          users={users}
+          currentUser={user}
+          onClose={() => setSelectedGroupModal(null)}
+          onOpen={open}
+          onRequest={handleRequest}
+        />
+      )}
+    </div>
+  );
+}
+
+function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onRequest }) {
+  const membership = memberFor(group, currentUser?.id);
+  const pending = group.requests?.some(r => r.userId === currentUser?.id && r.status === 'pending');
+  const owner = users.find(u => u.id === group.ownerId) || (group.members?.[0] ? users.find(u => u.id === group.members[0].userId) : null);
+
+  return (
+    <div
+      className="modal-overlay"
+      style={{ display: 'flex', zIndex: 1100 }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="modal-card modal-large group-modal-dialog">
+        <button
+          type="button"
+          className="modal-close"
+          onClick={onClose}
+          aria-label="Cerrar ventana"
+        >
+          &times;
+        </button>
+
+        {/* Banner Superior Destacado */}
+        <div className="group-modal-banner">
+          <div className="group-modal-banner-icon">👥</div>
+          <span className="group-modal-banner-badge">ESPACIO DE EQUIPO</span>
+        </div>
+
+        {/* Encabezado del Grupo */}
+        <div className="group-modal-header">
+          <div className="group-modal-title-row">
+            <h2 className="group-modal-title">{group.name}</h2>
+            <span className={`group-modal-status-badge ${membership ? 'status-joined' : 'status-private'}`}>
+              {membership ? 'MIEMBRO' : 'GRUPO PRIVADO'}
+            </span>
+          </div>
+
+          <div className="group-modal-meta-bar">
+            <span><strong>Creado por:</strong> {owner?.name || 'Administrador'}</span>
+            <span><strong>Miembros:</strong> {group.members?.length || 1}</span>
+            <span><strong>Fecha:</strong> {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'Reciente'}</span>
+            <span><strong>Rol:</strong> {membership ? (membership.role === 'owner' ? '👑 Creador' : membership.role === 'admin' ? '🛡️ Administrador' : '👤 Miembro') : 'Visitante'}</span>
+          </div>
+        </div>
+
+        {/* Sección Descripción */}
+        <div className="group-modal-section">
+          <h4 className="group-modal-section-heading">DESCRIPCIÓN</h4>
+          <div className="group-modal-description-box">
+            <p>{group.description || 'Este grupo no ha proporcionado una descripción detallada todavía.'}</p>
+          </div>
+        </div>
+
+        {/* Sección Miembros */}
+        {group.members && group.members.length > 0 && (
+          <div className="group-modal-section">
+            <h4 className="group-modal-section-heading">MIEMBROS ({group.members.length})</h4>
+            <div className="group-modal-members-grid">
+              {group.members.map(m => {
+                const memberUser = users.find(u => u.id === m.userId);
+                return (
+                  <div className="group-modal-member-item" key={m.userId}>
+                    <Avatar user={memberUser} />
+                    <div className="group-modal-member-details">
+                      <span className="group-modal-member-name">{memberUser?.name || 'Usuario'}</span>
+                      <small className="group-modal-member-role">
+                        {m.role === 'owner' ? '👑 Creador' : m.role === 'admin' ? '🛡️ Admin' : '👤 Miembro'}
+                      </small>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Acciones del Modal */}
+        <div className="group-modal-actions">
+          {membership ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                onClose();
+                onOpen(group);
+              }}
+            >
+              Entrar al grupo →
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={pending}
+              onClick={() => {
+                onRequest(group.id);
+                onClose();
+              }}
+            >
+              {pending ? 'Solicitud enviada' : 'Solicitar acceso al grupo'}
+            </button>
+          )}
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
