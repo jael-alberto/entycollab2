@@ -4263,10 +4263,6 @@ button.nav-link {
   align-self: flex-start;
 }
 
-/* Group Workspace Tabs */
-.group-workspace {
-  /* Additional styles for group workspace */
-}
 
 .group-workspace-header {
   display: flex;
@@ -5208,6 +5204,7 @@ button.nav-link {
   min-height: 2.4em;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
