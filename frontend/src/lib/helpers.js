@@ -27,17 +27,17 @@ export const STATUSES = {
 };
 
 export const CATEGORY_META = {
-  web: { icon: '💻', labelKey: 'cat.web', gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)' },
-  game: { icon: '🎮', labelKey: 'cat.game', gradient: 'linear-gradient(135deg, #f43f5e, #ec4899)' },
-  rpg: { icon: '🗡️', labelKey: 'cat.rpg', gradient: 'linear-gradient(135deg, #8b5cf6, #6366f1)' },
-  action: { icon: '🎯', labelKey: 'cat.action', gradient: 'linear-gradient(135deg, #ef4444, #f97316)' },
-  platformer: { icon: '🏃', labelKey: 'cat.platformer', gradient: 'linear-gradient(135deg, #10b981, #06b6d4)' },
-  puzzle: { icon: '🧩', labelKey: 'cat.puzzle', gradient: 'linear-gradient(135deg, #a855f7, #ec4899)' },
-  multiplayer: { icon: '🌐', labelKey: 'cat.multiplayer', gradient: 'linear-gradient(135deg, #0ea5e9, #3b82f6)' },
-  strategy: { icon: '🏰', labelKey: 'cat.strategy', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-  vr: { icon: '🥽', labelKey: 'cat.vr', gradient: 'linear-gradient(135deg, #6366f1, #a855f7)' },
-  mobile: { icon: '📱', labelKey: 'cat.mobile', gradient: 'linear-gradient(135deg, #14b8a6, #10b981)' },
-  other: { icon: '🗂️', labelKey: 'cat.other', gradient: 'linear-gradient(135deg, #64748b, #475569)' }
+  web: { icon: 'code', labelKey: 'cat.web', color: '#1d4ed8' },
+  game: { icon: 'gamepad', labelKey: 'cat.game', color: '#9a3412' },
+  rpg: { icon: 'gamepad', labelKey: 'cat.rpg', color: '#5b21b6' },
+  action: { icon: 'gamepad', labelKey: 'cat.action', color: '#b91c1c' },
+  platformer: { icon: 'gamepad', labelKey: 'cat.platformer', color: '#0f766e' },
+  puzzle: { icon: 'tag', labelKey: 'cat.puzzle', color: '#6d28d9' },
+  multiplayer: { icon: 'users', labelKey: 'cat.multiplayer', color: '#0369a1' },
+  strategy: { icon: 'tag', labelKey: 'cat.strategy', color: '#b45309' },
+  vr: { icon: 'gamepad', labelKey: 'cat.vr', color: '#4c1d95' },
+  mobile: { icon: 'smartphone', labelKey: 'cat.mobile', color: '#0f766e' },
+  other: { icon: 'tag', labelKey: 'cat.other', color: '#475569' }
 };
 
 export const WEB_DEV_TECH_LIST = [

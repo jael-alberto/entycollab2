@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { EmptyState, Avatar, GroupAvatar, Icon } from '../components/common.jsx';
+import { EmptyState, Avatar, GroupAvatar, Icon, Modal } from '../components/common.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
@@ -95,7 +95,7 @@ function GroupsDirectory() {
       )}
 
       {groups.length === 0 ? (
-        <EmptyState icon="👥" title="Aún no hay grupos" sub="Crea el primero para empezar a colaborar con tu equipo." />
+        <EmptyState icon="users" title="Aún no hay grupos" sub="Crea el primero para empezar a colaborar con tu equipo." />
       ) : (
         <div className="groups-grid">
           {groups.map(group => {
@@ -104,7 +104,7 @@ function GroupsDirectory() {
             return (
               <article className="group-card" key={group.id}>
                 <div className="group-card-header">
-                  <div className="group-card-icon">👥</div>
+                  <div className="group-card-icon" aria-hidden="true"><Icon name="users" size={22} /></div>
                   {membership && (
                     <span className="group-role-badge-small">
                       {membership.role === 'owner' ? '👑 Creador' : membership.role === 'admin' ? '🛡️ Admin' : '👤 Miembro'}
@@ -345,7 +345,7 @@ function GroupWorkspace({ groupId }) {
   if (!group) {
     return (
       <div className="section-block">
-        <EmptyState icon="🔎" title="Grupo no encontrado" />
+        <EmptyState icon="search" title="Grupo no encontrado" />
         <button className="btn btn-ghost" onClick={() => navigate('/grupos')}>Volver a grupos</button>
       </div>
     );
@@ -355,7 +355,7 @@ function GroupWorkspace({ groupId }) {
     return (
       <div className="section-block">
         <EmptyState
-          icon="🔒"
+          icon="lock"
           title="Este grupo es privado"
           sub="Solicita acceso desde el directorio. Un administrador debe aprobar tu solicitud para ingresar."
         />
@@ -606,7 +606,7 @@ function GroupWorkspace({ groupId }) {
             </div>
 
             {filteredProjects.length === 0 ? (
-              <EmptyState icon="📁" title="No se encontraron proyectos" sub={groupProjects.length === 0 ? 'Este grupo aún no tiene proyectos publicados.' : 'Prueba cambiando los filtros de búsqueda.'} />
+              <EmptyState icon="folder" title="No se encontraron proyectos" sub={groupProjects.length === 0 ? 'Este grupo aún no tiene proyectos publicados.' : 'Prueba cambiando los filtros de búsqueda.'} />
             ) : (
               <div className="groups-grid">
                 {filteredProjects.map(p => <ProjectCard project={p} currentUser={user} key={p.id} />)}
@@ -757,34 +757,31 @@ function GroupWorkspace({ groupId }) {
       )}
 
       {showInviteModal && (
-        <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3>Invitar a miembro</h3>
-            <form onSubmit={handleInviteSubmit}>
-              <div className="form-group">
-                <label>Usuario o email</label>
-                <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario o email" required />
-              </div>
-              <div className="form-group">
-                <label>Proyecto (opcional)</label>
-                <select value={inviteProjectId} onChange={e => setInviteProjectId(e.target.value)}>
-                  <option value="">Sin proyecto específico</option>
-                  {groupProjects.filter(p => p.status === 'open').map(p => (
-                    <option key={p.id} value={p.id}>{l10nValue(lang, p.title)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Mensaje (opcional)</label>
-                <textarea value={inviteMessage} onChange={e => setInviteMessage(e.target.value)} rows="3" placeholder="Por qué te gustaría que se uniera..." />
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowInviteModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">Enviar invitación</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <Modal open onClose={() => setShowInviteModal(false)} title="Invitar a miembro">
+          <form onSubmit={handleInviteSubmit}>
+            <div className="form-group">
+              <label>Usuario o email</label>
+              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario o email" required />
+            </div>
+            <div className="form-group">
+              <label>Proyecto (opcional)</label>
+              <select value={inviteProjectId} onChange={e => setInviteProjectId(e.target.value)}>
+                <option value="">Sin proyecto específico</option>
+                {groupProjects.filter(p => p.status === 'open').map(p => (
+                  <option key={p.id} value={p.id}>{l10nValue(lang, p.title)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Mensaje (opcional)</label>
+              <textarea value={inviteMessage} onChange={e => setInviteMessage(e.target.value)} rows="3" placeholder="Por qué te gustaría que se uniera..." />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowInviteModal(false)}>Cancelar</button>
+              <button type="submit" className="btn btn-primary">Enviar invitación</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

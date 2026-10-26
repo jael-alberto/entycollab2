@@ -121,7 +121,7 @@ export default function SettingsSkillsModal() {
         <label>{t('profile.skillsLabel')}</label>
         <p className="form-hint">{t('profile.skillsHint')}</p>
         {draftCats.length === 0 ? (
-          <EmptyState icon="🗂️" title={t('techFilter.requireCat')} sub={t('techFilter.requireCatSub')} />
+          <EmptyState icon="folder" title={t('techFilter.requireCat')} sub={t('techFilter.requireCatSub')} />
         ) : (
           <>
             <div className="form-group">

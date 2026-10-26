@@ -9,6 +9,22 @@ import { availableCategoriesList } from '../lib/filters.js';
 import { getStatusLabel, escapeHTML } from '../lib/helpers.js';
 import { l10nValue } from '../lib/i18n.js';
 
+const PAGE_SIZE = 12;
+
+// Píldoras de estado con el vocabulario del producto.
+const STATUS_TABS = [
+  { value: 'all', labelKey: 'proj.filterAll' },
+  { value: 'open', labelKey: 'proj.filterRecruiting' },
+  { value: 'in-progress', labelKey: 'proj.filterDeveloping' },
+  { value: 'completed', labelKey: 'proj.filterFinished' }
+];
+
+const SORTS = [
+  { value: 'recent', labelKey: 'proj.sortRecent' },
+  { value: 'deadline', labelKey: 'proj.sortDeadline' },
+  { value: 'rating', labelKey: 'proj.sortRating' }
+];
+
 export default function Projects() {
   return (
     <Routes>
@@ -23,9 +39,12 @@ export default function Projects() {
 // /proyectos — Nuevos proyectos (con filtros) + proyectos en los que participo
 // ==========================================================================
 function NewProjects() {
-  const { user, projects, applications, lang, t, selectedCategories, selectedTechFilters, activeGroup, isActiveGroupAdmin } = useApp();
+  const { user, projects, applications, lang, t, selectedCategories, setSelectedCategories, selectedTechFilters, setSelectedTechFilters, activeGroup, isActiveGroupAdmin, ratings } = useApp();
   const { openCreate, openCategoryFilter, openTechFilter } = useModals();
   const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [sort, setSort] = useState('recent');
+  const [page, setPage] = useState(1);
 
   const enrolled = useMemo(() => {
     const accepted = applications.filter(a => a.userId === user.id && a.status === 'accepted');
@@ -37,7 +56,7 @@ function NewProjects() {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [applications, projects, user.id, activeGroup]);
 
-  const list = useMemo(() => {
+  const filtered = useMemo(() => {
     const myApps = applications.filter(a => a.userId === user.id);
     const appliedIds = new Set(myApps.map(a => a.projectId));
 
@@ -48,12 +67,12 @@ function NewProjects() {
       (activeGroup ? p.groupId === activeGroup.id : !p.groupId)
     );
 
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     if (q) {
       out = out.filter(p =>
         l10nValue(lang, p.title).toLowerCase().includes(q) ||
         l10nValue(lang, p.description).toLowerCase().includes(q) ||
-        p.tech.some(tt => tt.toLowerCase().includes(q))
+        (p.tech || []).some(tt => tt.toLowerCase().includes(q))
       );
     }
     if (selectedCategories.length > 0) {
@@ -62,8 +81,57 @@ function NewProjects() {
     if (selectedTechFilters.length > 0) {
       out = out.filter(p => (p.tech || []).some(tt => selectedTechFilters.includes(tt)));
     }
-    return [...out].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [projects, applications, user, search, selectedCategories, selectedTechFilters, lang, activeGroup]);
+    if (status !== 'all') {
+      out = out.filter(p => p.status === status);
+    }
+    const sorted = [...out];
+    if (sort === 'deadline') {
+      sorted.sort((a, b) => {
+        if (!a.deadline && !b.deadline) return new Date(b.createdAt) - new Date(a.createdAt);
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
+    } else if (sort === 'rating') {
+      sorted.sort((a, b) => {
+        const ra = avgOwner(a);
+        const rb = avgOwner(b);
+        return rb - ra || new Date(b.createdAt) - new Date(a.createdAt);
+      });
+    } else {
+      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+    return sorted;
+
+    function avgOwner(p) {
+      const list = ratings.filter(r => r.ratedUserId === p.ownerId);
+      if (list.length === 0) return 0;
+      return list.reduce((s, r) => s + r.stars, 0) / list.length;
+    }
+  }, [projects, applications, user, search, selectedCategories, selectedTechFilters, lang, activeGroup, status, sort, ratings]);
+
+  // Vuelve a la primera página cada vez que cambia algún filtro
+  // (ajuste en fase de render, sin efecto en cascada).
+  const filterSig = JSON.stringify([search, status, sort, selectedCategories, selectedTechFilters, activeGroup?.id]);
+  const [prevSig, setPrevSig] = useState(filterSig);
+  if (prevSig !== filterSig) {
+    setPrevSig(filterSig);
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const hasFilters = search.trim() !== '' || status !== 'all' || selectedCategories.length > 0 || selectedTechFilters.length > 0;
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatus('all');
+    setSort('recent');
+    setSelectedCategories([]);
+    setSelectedTechFilters([]);
+    setPage(1);
+  };
 
   const catLabel = useMemo(() => {
     if (selectedCategories.length === 0) return t('filter.allCat');
@@ -87,9 +155,9 @@ function NewProjects() {
           <h2 className="section-title">{t('proj.mine')}</h2>
         </div>
         {enrolled.length === 0 ? (
-          <EmptyState icon="🤝" title={t('empty.enrolled')} sub={t('empty.enrolledSub')} />
+          <EmptyState icon="users" title={t('empty.enrolled')} sub={t('empty.enrolledSub')} />
         ) : (
-          <div className="projects-grid">
+          <div className="projects-grid projects-grid-dense">
             {enrolled.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
           </div>
         )}
@@ -101,24 +169,83 @@ function NewProjects() {
           {(!activeGroup || isActiveGroupAdmin) && <button className="btn btn-primary" onClick={openCreate}>{t('proj.newBtn')}</button>}
         </div>
 
-        <div className="filters-bar">
-          <div className="form-group form-group-inline">
-            <input type="text" placeholder={t('proj.searchPh')} value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="proj-toolbar" role="search">
+          <label className="proj-search">
+            <span className="proj-search-icon" aria-hidden="true">⌕</span>
+            <input type="text" placeholder={t('proj.searchPh')} value={search} onChange={e => setSearch(e.target.value)} aria-label={t('proj.searchPh')} />
+            {search && <button type="button" className="proj-search-clear" onClick={() => setSearch('')} aria-label="×">×</button>}
+          </label>
+          <div className="group-filter-pills proj-status-pills" role="tablist" aria-label={t('proj.new')}>
+            {STATUS_TABS.map(tab => (
+              <button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={status === tab.value}
+                className={`group-filter-pill${status === tab.value ? ' active' : ''}`}
+                onClick={() => setStatus(tab.value)}
+              >
+                {t(tab.labelKey)}
+              </button>
+            ))}
           </div>
+          <label className="proj-sort">
+            <span>{t('proj.sortLabel')}</span>
+            <select value={sort} onChange={e => setSort(e.target.value)} aria-label={t('proj.sortLabel')}>
+              {SORTS.map(o => <option key={o.value} value={o.value}>{t(o.labelKey)}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="filters-bar">
           <div className="form-group form-group-inline">
             <button type="button" className="filters-toggle-btn" onClick={openCategoryFilter}>{catLabel}</button>
           </div>
           <div className="form-group form-group-inline">
             <button type="button" className="filters-toggle-btn" onClick={openTechFilter}>{techLabel}</button>
           </div>
+          {hasFilters && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>{t('proj.clearFilters')}</button>
+          )}
+          <span className="proj-count" aria-live="polite">{t('proj.results', { n: filtered.length })}</span>
         </div>
 
-        {list.length === 0 ? (
-          <EmptyState icon="🔍" title={t('empty.projects')} sub={t('empty.projectsSub')} />
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon="search"
+            title={t('empty.projects')}
+            sub={t('empty.projectsSub')}
+            action={hasFilters
+              ? <button className="btn btn-outline btn-sm" onClick={clearFilters}>{t('proj.clearFilters')}</button>
+              : ((!activeGroup || isActiveGroupAdmin) && <button className="btn btn-primary btn-sm" onClick={openCreate}>{t('proj.publish')}</button>)}
+          />
         ) : (
-          <div className="projects-grid">
-            {list.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
-          </div>
+          <>
+            <div className="projects-grid projects-grid-dense">
+              {paged.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
+            </div>
+            {totalPages > 1 && (
+              <nav className="proj-pagination" aria-label={t('proj.sortLabel')}>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                >
+                  ←
+                </button>
+                <span className="proj-page-label">{t('proj.pageOf', { page: safePage, total: totalPages })}</span>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                >
+                  →
+                </button>
+              </nav>
+            )}
+          </>
         )}
       </div>
     </>
@@ -145,9 +272,14 @@ function MyProjects() {
         {(!activeGroup || isActiveGroupAdmin) && <button className="btn btn-primary" onClick={openCreate}>{t('proj.newBtn')}</button>}
       </div>
       {mine.length === 0 ? (
-        <EmptyState icon="📂" title={t('empty.myProjects')} sub={t('empty.myProjectsSub')} />
+        <EmptyState
+          icon="folder"
+          title={t('empty.myProjects')}
+          sub={t('empty.myProjectsSub')}
+          action={(!activeGroup || isActiveGroupAdmin) && <button className="btn btn-primary btn-sm" onClick={openCreate}>{t('proj.publish')}</button>}
+        />
       ) : (
-        <div className="projects-grid">
+        <div className="projects-grid projects-grid-dense">
           {mine.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
         </div>
       )}
@@ -222,9 +354,9 @@ function MyApplications() {
         </div>
       </div>
       {apps.length === 0 ? (
-        <EmptyState icon="📋" title={t('empty.myApps')} sub={t('empty.myAppsSub')} />
+        <EmptyState icon="inbox" title={t('empty.myApps')} sub={t('empty.myAppsSub')} />
       ) : (
-        <div className="projects-grid" key={refreshKey}>
+        <div className="projects-grid projects-grid-dense" key={refreshKey}>
           {apps.map(a => {
             const project = projects.find(p => p.id === a.projectId);
             if (!project) return null;

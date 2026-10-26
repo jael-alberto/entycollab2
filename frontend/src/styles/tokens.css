@@ -1,0 +1,143 @@
+/* ==========================================================================
+   DESIGN TOKENS — ENTYCOLLAB (Agente A: tokens + base UI)
+   Light-first: el modo CLARO es el default. El modo oscuro es opt-in y solo
+   se activa con la clase `dark` en <html> (`:root.dark`), vía el toggle de
+   AppContext (theme=false → light, theme=true → dark).
+
+   Importar ANTES que styles.css (ver src/main.jsx):
+     import './styles/tokens.css';
+     import './styles.css';
+   ========================================================================== */
+
+:root {
+  /* ---- Marca naranja ----------------------------------------------------
+     REGLA DE USO (accesibilidad):
+     - brand-500 (#F97316): SOLO como fondo de CTA con texto blanco, bold y
+       GRANDE (≥18px bold / ≥24px regular). Ratio blanco/#F97316 = 2.80:1
+       (no llega a AA ni siquiera para texto grande: el umbral large es 3:1).
+       Por eso el hover del CTA oscurece a brand-600 (#EA580c, 3.56:1, sí
+       pasa AA-large) y el texto del CTA siempre es bold + grande.
+     - brand-700 (#C2410C) y brand-ink (#9A3412): ÚNICOS tonos naranja
+       permitidos para TEXTO sobre fondo claro (pasan WCAG AA 4.5:1).
+     - NUNCA usar #F97316 / #FB923C / #EA580C como color de texto normal.
+  ------------------------------------------------------------------------ */
+  --color-brand-500: #F97316; /* CTA bg only. Blanco encima: 2.80:1 (solo texto grande bold + hover a 600) */
+  --color-brand-600: #EA580C; /* Hover de CTA. Blanco encima: 3.56:1 (pasa AA texto grande ≥3:1) */
+  --color-brand-700: #C2410C; /* Texto naranja sobre claro: 5.18:1 — PASA AA (≥4.5:1) */
+  --color-brand-ink: #9A3412; /* Texto naranja sobre claro: 7.31:1 — PASA AA/AAA */
+
+  /* ---- Superficies claras ------------------------------------------------ */
+  --color-bg: #FFFFFF;
+  --color-bg-alt: #FAFAF9;
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #FFF7ED; /* tint cálido, solo para realzar */
+  --color-surface-hover: #FFF7ED;
+
+  /* ---- Texto sobre claro (ratios verificados sobre #FFFFFF) --------------- */
+  --color-text-main: #1C1917;  /* 17.49:1 — PASA AAA */
+  --color-text-muted: #57534E; /* 7.63:1 — PASA AAA */
+  --color-text-light: #44403C; /* ~10.4:1 — PASA AAA */
+  --color-text-dim: #A8A29E;   /* ~2.5:1 — SOLO decorativo/placeholders, nunca texto informativo */
+
+  /* ---- Bordes claros ------------------------------------------------------ */
+  --color-border: #E7E5E4;
+  --color-border-light: #FED7AA; /* acento cálido para borde de CTA/realces */
+
+  /* ---- Foco visible (único glow permitido) -------------------------------- */
+  --focus-ring-width: 2px;
+  --color-focus: #C2410C; /* anillo visible sobre claro, 5.18:1 */
+  --shadow-focus: 0 0 0 3px rgba(194, 65, 12, 0.28);
+
+  /* ---- Semáforo (fondos suaves + texto oscuro propio, no naranja) --------- */
+  --color-success: #16A34A;
+  --color-success-ink: #15803D;
+  --color-warning: #B45309; /* oscurecido desde #F59E0B para pasar AA sobre claro */
+  --color-warning-ink: #92400E;
+  --color-danger: #DC2626;
+  --color-danger-ink: #B91C1C;
+  --color-info: #1D4ED8; /* oscurecido desde #2563EB para pasar AA sobre claro */
+  --color-info-ink: #1E40AF;
+
+  /* ---- Tipografía (Inter) -------------------------------------------------- */
+  --font-primary: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-display-xl: 40px;  /* hero / display */
+  --text-display-lg: 32px;  /* h1 */
+  --text-display-md: 24px;  /* h2 */
+  --text-display-sm: 18px;  /* h3 / CTA text mínimo */
+  --text-body: 15px;
+  --text-body-sm: 13px;
+  --text-caption: 12px;
+  --text-mono: 12px;
+
+  --leading-tight: 1.2;
+  --leading-body: 1.6;
+
+  /* ---- Espaciado (múltiplos de 4) ------------------------------------------ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* ---- Radios --------------------------------------------------------------- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* ---- Sombras sutiles (SIN glow; el único resplandor vive en :focus) ------- */
+  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.06);
+  --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.08);
+  --shadow-lg: 0 12px 32px rgba(28, 25, 23, 0.12);
+  /* NOTA: --shadow-glow se eliminó a propósito. No reintroducir salvo foco. */
+
+  --transition: all 0.25s ease;
+
+  /* ---- Aliases legacy (los usa styles.css / componentes existentes) --------- */
+  --color-primary: var(--color-brand-500);
+  --color-primary-light: #FB923C; /* solo fondos/gradientes, NUNCA texto */
+  --color-primary-dark: var(--color-brand-600);
+  --color-primary-deep: var(--color-brand-700);
+  --color-accent: var(--color-brand-700); /* links/texto acento: AA seguro */
+  --color-accent-soft: var(--color-surface-raised);
+  --color-accent-border: var(--color-border-light);
+  --color-label-strong: var(--color-text-main);
+  --color-star: #FBBF24;
+  --color-star-empty: #E7E5E4;
+}
+
+/* ==========================================================================
+   MODO OSCURO (opt-in): solo con <html class="dark"> vía toggleTheme().
+   Sin la clase, el primer paint siempre es claro.
+   ========================================================================== */
+:root.dark {
+  --color-bg: #101014;
+  --color-bg-alt: #17171D;
+  --color-surface: #1B1B22;
+  --color-surface-raised: #22222B;
+  --color-surface-hover: #2D2D38;
+
+  --color-text-main: #F5F5F4;
+  --color-text-muted: #A8A29E;
+  --color-text-light: #E7E5E4;
+  --color-text-dim: #7C7877;
+
+  --color-border: #33333D;
+  --color-border-light: #45454F;
+
+  --color-accent: #FB923C; /* sobre oscuro sí contrasta */
+  --color-focus: #FB923C;
+  --shadow-focus: 0 0 0 3px rgba(251, 146, 60, 0.35);
+
+  --color-label-strong: #FFFFFF;
+  --color-star-empty: #5B5B66;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.55);
+}

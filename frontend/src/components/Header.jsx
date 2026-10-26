@@ -5,6 +5,31 @@ import { useToast } from '../context/ToastContext.jsx';
 import { Icon, GroupAvatar } from './common.jsx';
 import { getUserAvgRating, avatarColorClass, escapeHTML } from '../lib/helpers.js';
 
+// Agente B: navegación única compartida por LoggedHeader y PublicHeader.
+// NavLink aplica aria-current="page" automáticamente al enlace activo.
+const siteLinks = [
+  { to: '/proyectos', label: 'Explorar', end: false },
+  { to: '/proyectos/mis-proyectos', label: 'Publicar', end: false },
+  { to: '/personas', label: 'Personas', end: true },
+  { to: '/perfil', label: 'Mi cuenta', end: true },
+];
+
+function SiteNav({ label = 'Principal' }) {
+  return (
+    <nav className="header-nav" aria-label={label}>
+      <ul className="nav-list">
+        {siteLinks.map(link => (
+          <li key={link.to}>
+            <NavLink to={link.to} end={link.end} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              {link.label}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 export function LoggedHeader() {
   const { user, ratings, lang, theme, menuOpen, setMenuOpen, activeGroup, groups, t, toggleLang, toggleTheme, logout, selectGroup } = useApp();
   const { showToast } = useToast();
@@ -120,15 +145,24 @@ export function LoggedHeader() {
           )}
         </div>
 
+        <SiteNav />
+
+        <div className="header-center">
+          <Link to="/proyectos" className="b2-header-search" aria-label="Buscar proyectos">
+            <span aria-hidden="true">⌕</span>
+            <span>Buscar proyectos…</span>
+          </Link>
+        </div>
+
         <div className="header-right">
           <button className={'theme-toggle lang-toggle' + (theme ? ' active' : '')} onClick={toggleLang} title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'} aria-label="Cambiar idioma">
             {lang === 'es' ? 'ES' : 'EN'}
           </button>
-          <button className={'theme-toggle' + (theme ? ' active' : '')} onClick={toggleTheme} title="Cambiar modo claro/oscuro" aria-label="Cambiar modo claro/oscuro">
-            {theme ? '☀️' : '🌙'}
+          <button className={'theme-toggle' + (theme ? ' active' : '')} onClick={toggleTheme} title="Cambiar modo claro/oscuro" aria-label="Cambiar modo claro/oscuro" aria-pressed={!!theme}>
+            <Icon name={theme ? 'sun' : 'moon'} size={16} />
           </button>
           <div className="user-bubble-wrap" id="user-bubble-wrap" ref={wrapRef}>
-            <button className="user-bubble" onClick={e => { e.stopPropagation(); setMenuOpen(!menuOpen); }}>
+            <button className="user-bubble" onClick={e => { e.stopPropagation(); setMenuOpen(!menuOpen); }} aria-haspopup="menu" aria-expanded={menuOpen}>
               <UserBubbleAvatar user={user} />
               <span className="user-bubble-name">{user ? user.name.split(' ')[0] : ''}</span>
               <span className="user-bubble-rating">
@@ -136,7 +170,7 @@ export function LoggedHeader() {
               </span>
             </button>
             {menuOpen && user && (
-              <div className="user-bubble-menu" style={{ display: 'block' }}>
+              <div className="user-bubble-menu" role="menu" style={{ display: 'block' }}>
                 <Link to="/perfil" onClick={() => setMenuOpen(false)}>{t('menu.profile')}</Link>
                 <Link to="/proyectos/mis-proyectos" onClick={() => setMenuOpen(false)}>{t('menu.myProjects')}</Link>
                 <Link to="/proyectos/postulaciones" onClick={() => setMenuOpen(false)}>{t('menu.myApps')}</Link>
@@ -161,19 +195,20 @@ function UserBubbleAvatar({ user }) {
 }
 
 export function PublicHeader() {
-  const { t } = useApp();
   return (
-    <header className="site-header">
-      <div className="header-container">
-        <Link to="/" className="logo-link" aria-label="Ir al inicio">
-          <img src="/img/logo-pg.png" alt="Logo ENTYCOLLAB" className="site-logo" />
-        </Link>
-        <span className="badge-tag">Open Source Collaboration</span>
-        <h1>ENTYCOLLAB</h1>
-        <p className="welcome-msg">{t('welcome')}</p>
-        <div className="header-actions">
-          <NavLink to="/login" className="btn btn-primary">{t('nav.login')}</NavLink>
-          <NavLink to="/register" className="btn btn-outline">{t('nav.register')}</NavLink>
+    <header className="site-header logged-in-header">
+      <div className="header-container header-compact">
+        <div className="header-left">
+          <Link to="/" className="header-logo-link" aria-label="ENTYCOLLAB — inicio">
+            <img src="/img/logo-pg.png" alt="EntyTec" className="header-logo-img" />
+          </Link>
+        </div>
+
+        <SiteNav />
+
+        <div className="header-right">
+          <Link to="/login" className="btn btn-ghost btn-sm">Iniciar sesión</Link>
+          <Link to="/register" className="btn btn-primary btn-sm">Crear cuenta</Link>
         </div>
       </div>
     </header>

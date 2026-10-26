@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import CreateProjectModal from '../modals/CreateProjectModal.jsx';
+import ApplyModal from '../modals/ApplyModal.jsx';
 import ProjectDetailModal from '../modals/ProjectDetailModal.jsx';
 import RateModal from '../modals/RateModal.jsx';
 import SelectFilterModal from '../modals/SelectFilterModal.jsx';
@@ -12,6 +13,7 @@ const ModalContext = createContext(null);
 
 export function ModalProvider({ children }) {
   const [createOpen, setCreateOpen] = useState(false);
+  const [applyProjectId, setApplyProjectId] = useState(null);
   const [detailProjectId, setDetailProjectId] = useState(null);
   const [rateProjectId, setRateProjectId] = useState(null);
   const [invitePersonId, setInvitePersonId] = useState(null);
@@ -23,6 +25,8 @@ export function ModalProvider({ children }) {
 
   const openCreate = useCallback(() => setCreateOpen(true), []);
   const closeCreate = useCallback(() => setCreateOpen(false), []);
+  const openApply = useCallback((id) => setApplyProjectId(id), []);
+  const closeApply = useCallback(() => setApplyProjectId(null), []);
   const openDetail = useCallback((id) => setDetailProjectId(id), []);
   const closeDetail = useCallback(() => setDetailProjectId(null), []);
   const openRate = useCallback((id) => setRateProjectId(id), []);
@@ -42,6 +46,7 @@ export function ModalProvider({ children }) {
 
   const value = {
     openCreate, closeCreate, createOpen,
+    openApply, closeApply, applyProjectId,
     openDetail, closeDetail, detailProjectId,
     openRate, closeRate, rateProjectId,
     openInvite, closeInvite, invitePersonId,
@@ -66,6 +71,7 @@ export function ModalProvider({ children }) {
       {catOpen && <SelectFilterModal kind="category" />}
       {techOpen && <SelectFilterModal kind="tech" />}
       {createOpen && <CreateProjectModal />}
+      {applyProjectId && <ApplyModal />}
     </ModalContext.Provider>
   );
 }
