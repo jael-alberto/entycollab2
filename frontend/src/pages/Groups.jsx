@@ -416,7 +416,11 @@ function GroupWorkspace({ groupId }) {
   const handleInviteSubmit = (e) => {
     e.preventDefault();
     if (!inviteUsername.trim() || !inviteProjectId) return;
-    const targetUser = users.find(u => u.username.toLowerCase() === inviteUsername.toLowerCase() || u.email.toLowerCase() === inviteUsername.toLowerCase());
+    const cleanSearch = inviteUsername.trim().toLowerCase().replace(/^@/, '');
+    const targetUser = users.find(u => 
+      u.username?.toLowerCase() === cleanSearch || 
+      (u.email && u.email.toLowerCase() === cleanSearch)
+    );
     if (!targetUser) {
       showToast('Usuario no encontrado', 'error');
       return;
@@ -717,7 +721,7 @@ function GroupWorkspace({ groupId }) {
 
           <div className="group-panel" style={{ marginBottom: '1.25rem' }}>
             <h3>{t('group.invite')}</h3>
-            <p style={{ color: 'var(--color-text-dim)', margin: '0 0 1rem' }}>Invita a alguien a un proyecto del grupo por nombre de usuario o email.</p>
+            <p style={{ color: 'var(--color-text-dim)', margin: '0 0 1rem' }}>Invita a alguien a un proyecto del grupo por nombre de usuario.</p>
             <button className="btn btn-primary btn-sm" onClick={() => setShowInviteModal(true)}>Invitar miembro</button>
           </div>
 
@@ -760,8 +764,8 @@ function GroupWorkspace({ groupId }) {
         <Modal open onClose={() => setShowInviteModal(false)} title="Invitar a miembro">
           <form onSubmit={handleInviteSubmit}>
             <div className="form-group">
-              <label>Usuario o email</label>
-              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario o email" required />
+              <label>Nombre de usuario</label>
+              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario" required />
             </div>
             <div className="form-group">
               <label>Proyecto (opcional)</label>

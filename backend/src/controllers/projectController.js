@@ -119,7 +119,10 @@ export const createProject = asyncHandler(async (req, res) => {
 // PUT /api/projects/:id
 export const updateProject = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  const updateData = req.validated.body;
+  const updateData = { ...req.validated.body };
+  delete updateData.id;
+  delete updateData.owner_id;
+  delete updateData.created_at;
   
   // Verificar permisos
   const { data: project } = await supabaseAdmin

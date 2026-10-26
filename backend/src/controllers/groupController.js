@@ -385,7 +385,6 @@ export const decideGroupRequest = asyncHandler(async (req, res) => {
     .from('group_requests')
     .update({
       status: newStatus,
-      decided_at: new Date().toISOString(),
       decided_by: userId
     })
     .eq('id', requestId)

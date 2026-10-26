@@ -41,11 +41,11 @@ export const schemas = {
   register: z.object({
     body: z.object({
       name: z.string().min(1).max(100),
-      username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/),
+      username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/),
       email: z.string().email(),
       password: z.string().min(6).max(100),
       bio: z.string().max(500).optional(),
-      skills: z.array(z.string()).optional()
+      skills: z.array(z.string()).max(50).optional()
     })
   }),
   
@@ -60,18 +60,18 @@ export const schemas = {
   updateProfile: z.object({
     body: z.object({
       name: z.string().min(1).max(100).optional(),
-      username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/).optional(),
+      username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/).optional(),
       email: z.string().email().optional(),
       bio: z.union([z.string(), z.object({ es: z.string(), en: z.string() })]).optional(),
-      skills: z.array(z.string()).optional(),
-      categories: z.array(z.string()).optional(),
+      skills: z.array(z.string()).max(50).optional(),
+      categories: z.array(z.string()).max(50).optional(),
       githubUrl: z.string().url().optional().nullable(),
       portfolioUrl: z.string().url().optional().nullable(),
       available: z.boolean().optional(),
-      gameTypes: z.array(z.string()).optional(),
-      languages: z.array(z.string()).optional(),
-      favoriteGenres: z.array(z.string()).optional(),
-      disciplines: z.array(z.string()).optional()
+      gameTypes: z.array(z.string()).max(50).optional(),
+      languages: z.array(z.string()).max(50).optional(),
+      favoriteGenres: z.array(z.string()).max(50).optional(),
+      disciplines: z.array(z.string()).max(50).optional()
     }),
     params: z.object({
       id: z.string().uuid()
@@ -82,15 +82,15 @@ export const schemas = {
   createProject: z.object({
     body: z.object({
       title: z.object({ es: z.string().min(1), en: z.string().min(1) }),
-      category: z.string().min(1),
-      slots: z.number().int().min(1).max(20),
-      tech: z.array(z.string()).optional(),
+      category: z.string().min(1).max(60),
+      slots: z.number().int().min(1).max(100),
+      tech: z.array(z.string()).max(50).optional(),
       description: z.object({ es: z.string().min(1), en: z.string().min(1) }),
       minRating: z.number().min(0).max(5).optional(),
       deadline: z.string().date().optional().nullable(),
       repo: z.string().url().optional().nullable(),
       image: z.string().url().optional().nullable(),
-      roles: z.array(z.string()).optional(),
+      roles: z.array(z.string()).max(50).optional(),
       groupId: z.string().uuid().optional().nullable()
     })
   }),
@@ -98,15 +98,15 @@ export const schemas = {
   updateProject: z.object({
     body: z.object({
       title: z.object({ es: z.string().min(1), en: z.string().min(1) }).optional(),
-      category: z.string().optional(),
-      slots: z.number().int().min(1).max(20).optional(),
-      tech: z.array(z.string()).optional(),
+      category: z.string().max(60).optional(),
+      slots: z.number().int().min(1).max(100).optional(),
+      tech: z.array(z.string()).max(50).optional(),
       description: z.object({ es: z.string().min(1), en: z.string().min(1) }).optional(),
       minRating: z.number().min(0).max(5).optional(),
       deadline: z.string().date().optional().nullable(),
       repo: z.string().url().optional().nullable(),
       image: z.string().url().optional().nullable(),
-      roles: z.array(z.string()).optional(),
+      roles: z.array(z.string()).max(50).optional(),
       status: z.enum(['open', 'in-progress', 'completed', 'closed']).optional()
     }),
     params: z.object({
@@ -141,14 +141,14 @@ export const schemas = {
     body: z.object({
       projectId: z.string().uuid(),
       targetUserId: z.string().uuid(),
-      message: z.string().max(500).optional()
+      message: z.string().max(1000).optional()
     })
   }),
   
   handleApplication: z.object({
     body: z.object({
       status: z.enum(['accepted', 'rejected']),
-      projectRole: z.string().optional()
+      projectRole: z.string().max(100).optional()
     }),
     params: z.object({
       id: z.string().uuid()
@@ -178,7 +178,7 @@ export const schemas = {
   createGroup: z.object({
     body: z.object({
       name: z.string().min(1).max(100),
-      description: z.string().max(1000).optional(),
+      description: z.string().max(2000).optional(),
       isPrivate: z.boolean().default(true)
     })
   }),
@@ -186,7 +186,7 @@ export const schemas = {
   updateGroup: z.object({
     body: z.object({
       name: z.string().min(1).max(100).optional(),
-      description: z.string().max(1000).optional(),
+      description: z.string().max(2000).optional(),
       isPrivate: z.boolean().optional()
     }),
     params: z.object({
@@ -223,15 +223,15 @@ export const schemas = {
   createGroupProject: z.object({
     body: z.object({
       title: z.object({ es: z.string().min(1), en: z.string().min(1) }),
-      category: z.string().min(1),
-      slots: z.number().int().min(1).max(20),
-      tech: z.array(z.string()).optional(),
+      category: z.string().min(1).max(60),
+      slots: z.number().int().min(1).max(100),
+      tech: z.array(z.string()).max(50).optional(),
       description: z.object({ es: z.string().min(1), en: z.string().min(1) }),
       minRating: z.number().min(0).max(5).optional(),
       deadline: z.string().date().optional().nullable(),
       repo: z.string().url().optional().nullable(),
       image: z.string().url().optional().nullable(),
-      roles: z.array(z.string()).optional()
+      roles: z.array(z.string()).max(50).optional()
     }),
     params: z.object({
       id: z.string().uuid()

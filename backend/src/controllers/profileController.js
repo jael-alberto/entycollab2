@@ -4,13 +4,21 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { asyncHandler, NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../middleware/errorHandler.js';
 
+// Campos públicos de perfiles (email nunca se expone a terceros)
+const PUBLIC_PROFILE_FIELDS = `
+  id, username, name, bio, skills, categories,
+  github_url, portfolio_url, avatar, available,
+  game_types, languages, favorite_genres, disciplines,
+  featured_project_ids, created_at, updated_at
+`;
+
 // GET /api/profiles
 export const listProfiles = asyncHandler(async (req, res) => {
   const { page = 1, pageSize = 20, available } = req.query;
   
   let query = supabaseAdmin
     .from('profiles')
-    .select('*', { count: 'exact' })
+    .select(PUBLIC_PROFILE_FIELDS, { count: 'exact' })
     .order('created_at', { ascending: false });
   
   if (available === 'true') {
@@ -46,7 +54,7 @@ export const searchProfiles = asyncHandler(async (req, res) => {
   
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .select('*')
+    .select(PUBLIC_PROFILE_FIELDS)
     .or(`name.ilike.%${q}%,username.ilike.%${q}%,bio->>es.ilike.%${q}%,bio->>en.ilike.%${q}%`)
     .limit(Number(limit));
   
@@ -64,7 +72,7 @@ export const getAvailablePeople = asyncHandler(async (req, res) => {
   
   let query = supabaseAdmin
     .from('profiles')
-    .select('*', { count: 'exact' })
+    .select(PUBLIC_PROFILE_FIELDS, { count: 'exact' })
     .eq('available', true);
   
   if (gameTypes) query = query.overlaps('game_types', gameTypes.split(','));
@@ -111,6 +119,7 @@ export const getAvailablePeople = asyncHandler(async (req, res) => {
 // GET /api/profiles/:id
 export const getProfile = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
+  const currentUserId = req.user?.id;
   
   const { data, error } = await supabaseAdmin
     .from('profiles')
@@ -123,12 +132,18 @@ export const getProfile = asyncHandler(async (req, res) => {
     throw new Error(error.message);
   }
   
+  // Solo exponer email si es el propio usuario solicitante
+  if (data && data.id !== currentUserId) {
+    delete data.email;
+  }
+  
   res.json({ user: data });
 });
 
 // GET /api/profiles/by-username/:username
 export const getProfileByUsername = asyncHandler(async (req, res) => {
   const { username } = req.params;
+  const currentUserId = req.user?.id;
   
   const { data, error } = await supabaseAdmin
     .from('profiles')
@@ -141,13 +156,18 @@ export const getProfileByUsername = asyncHandler(async (req, res) => {
     throw new Error(error.message);
   }
   
+  // Solo exponer email si es el propio usuario solicitante
+  if (data && data.id !== currentUserId) {
+    delete data.email;
+  }
+  
   res.json({ user: data });
 });
 
 // PUT /api/profiles/:id
 export const updateProfile = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  const updateData = req.validated.body;
+  const updateData = { ...req.validated.body };
   
   // Verificar ownership
   if (id !== req.user.id) {
@@ -166,7 +186,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
     if (existing) throw new ConflictError('Ese nombre de usuario ya está en uso');
   }
   
-  // Verificar email único
+  // Si cambia email, actualizar en Auth (profiles.email es inmutable por trigger)
   if (updateData.email) {
     const { data: existing } = await supabaseAdmin
       .from('profiles')
@@ -177,12 +197,17 @@ export const updateProfile = asyncHandler(async (req, res) => {
     
     if (existing) throw new ConflictError('Ya existe una cuenta con ese correo');
     
-    // También actualizar en Auth
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, {
       email: updateData.email
     });
     if (authError) throw new Error(authError.message);
+    delete updateData.email;
   }
+  
+  // Eliminar columnas inmutables
+  delete updateData.id;
+  delete updateData.email;
+  delete updateData.created_at;
   
   // Actualizar perfil
   const { data, error } = await supabaseAdmin
