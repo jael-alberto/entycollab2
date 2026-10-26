@@ -2,7 +2,7 @@
 // Controlador de perfiles
 
 import { supabaseAdmin } from '../config/supabase.js';
-import { asyncHandler, NotFoundError, ConflictError } from '../middleware/errorHandler.js';
+import { asyncHandler, NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../middleware/errorHandler.js';
 
 // GET /api/profiles
 export const listProfiles = asyncHandler(async (req, res) => {

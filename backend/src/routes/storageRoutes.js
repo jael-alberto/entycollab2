@@ -3,7 +3,7 @@
 
 import { Router } from 'express';
 import multer from 'multer';
-import { storageController } from '../controllers/storageController.js';
+import { uploadAvatar, deleteAvatar, uploadProjectImage, deleteProjectImage } from '../controllers/storageController.js';
 import { requireAuth } from '../middleware/auth.js';
 
 // Configurar multer para manejar archivos en memoria
@@ -24,15 +24,15 @@ const upload = multer({
 const router = Router();
 
 // POST /api/storage/avatar - subir avatar
-router.post('/avatar', requireAuth, upload.single('avatar'), storageController.uploadAvatar);
+router.post('/avatar', requireAuth, upload.single('avatar'), uploadAvatar);
 
 // DELETE /api/storage/avatar - eliminar avatar
-router.delete('/avatar', requireAuth, storageController.deleteAvatar);
+router.delete('/avatar', requireAuth, deleteAvatar);
 
 // POST /api/storage/project-image - subir imagen de proyecto
-router.post('/project-image', requireAuth, upload.single('image'), storageController.uploadProjectImage);
+router.post('/project-image', requireAuth, upload.single('image'), uploadProjectImage);
 
 // DELETE /api/storage/project-image - eliminar imagen de proyecto
-router.delete('/project-image', requireAuth, storageController.deleteProjectImage);
+router.delete('/project-image', requireAuth, deleteProjectImage);
 
 export default router;

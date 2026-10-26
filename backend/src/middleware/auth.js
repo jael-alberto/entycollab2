@@ -1,7 +1,7 @@
 // backend/src/middleware/auth.js
 // Middleware de autenticación JWT
 
-import { verifyAuthToken } from '../config/supabase.js';
+import { verifyAuthToken, supabaseAdmin } from '../config/supabase.js';
 
 // Middleware: requiere autenticación (inyecta req.user)
 export async function requireAuth(req, res, next) {
@@ -114,7 +114,4 @@ export function requireGroupRole(groupIdParam, allowedRoles = ['owner', 'admin']
       });
     }
   };
-}
-
-// Importar supabaseAdmin aquí para evitar dependencias circulares
-import { supabaseAdmin } from '../config/supabase.js';
+}

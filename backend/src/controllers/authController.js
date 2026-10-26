@@ -53,18 +53,21 @@ export const register = asyncHandler(async (req, res) => {
   
   if (profileError) throw new Error(profileError.message);
   
-  // Crear sesión para devolver token
-  const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'magiclink',
-    email
-  });
-  
-  // Alternative: sign in to get session
+  // Iniciar sesión para obtener token de sesión
   const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
     email,
     password
   });
-  
+
+  if (signInError || !signInData?.session) {
+    // Registration succeeded but auto-login failed — still return the profile
+    return res.status(201).json({
+      message: 'Cuenta creada exitosamente',
+      user: profile,
+      session: null
+    });
+  }
+
   res.status(201).json({
     message: 'Cuenta creada exitosamente',
     user: profile,
