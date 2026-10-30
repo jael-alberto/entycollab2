@@ -28,15 +28,15 @@ router.put('/:id/respond', requireAuth, validate(schemas.respondInvite), respond
 router.get('/user', requireAuth, getUserApplications);
 
 // GET /api/applications/project/:projectId - postulaciones a un proyecto (owner)
-router.get('/project/:projectId', requireAuth, getProjectApplications);
+router.get('/project/:projectId', requireAuth, validate(schemas.projectIdParams), getProjectApplications);
 
 // GET /api/applications/invites/pending - invitaciones pendientes
 router.get('/invites/pending', requireAuth, getPendingInvites);
 
 // GET /api/applications/check/:projectId - verificar si usuario aplicó
-router.get('/check/:projectId', requireAuth, checkUserApplication);
+router.get('/check/:projectId', requireAuth, validate(schemas.projectIdParams), checkUserApplication);
 
 // GET /api/applications/project/:projectId/accepted - participantes aceptados
-router.get('/project/:projectId/accepted', requireAuth, getAcceptedApplications);
+router.get('/project/:projectId/accepted', requireAuth, validate(schemas.projectIdParams), getAcceptedApplications);
 
 export default router;

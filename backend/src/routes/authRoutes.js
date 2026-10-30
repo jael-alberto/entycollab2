@@ -3,7 +3,7 @@
 
 import { Router } from 'express';
 import { register, login, logout, me, refresh } from '../controllers/authController.js';
-import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
 
 const router = Router();
@@ -21,6 +21,6 @@ router.post('/logout', requireAuth, logout);
 router.get('/me', requireAuth, me);
 
 // POST /api/auth/refresh
-router.post('/refresh', refresh);
+router.post('/refresh', validate(schemas.refresh), refresh);
 
 export default router;

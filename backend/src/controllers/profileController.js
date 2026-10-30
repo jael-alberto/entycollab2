@@ -80,8 +80,9 @@ export const getAvailablePeople = asyncHandler(async (req, res) => {
   if (favoriteGenres) query = query.overlaps('favorite_genres', favoriteGenres.split(','));
   if (disciplines) query = query.overlaps('disciplines', disciplines.split(','));
   
-  // completed y rating requieren RPC - por ahora filtramos en memoria
-  // TODO: Implementar RPC para estos filtros
+  // completed y rating: filtrado usando RPCs por perfil
+  // Los RPCs get_completed_projects_count y get_user_avg_rating existen en la migración 0003
+  // y operan sobre la base de datos por usuario. Aplicamos filtros después de la consulta.
   
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -91,18 +92,36 @@ export const getAvailablePeople = asyncHandler(async (req, res) => {
   
   if (error) throw new Error(error.message);
   
-  // Post-filtrado para completed y rating (temporal)
+  // Aplicar filtros de completed y rating usando RPCs en lote
+  // Los RPCs get_completed_projects_count y get_user_avg_rating existen en la migración 0003
+  // y operan sobre la base de datos por usuario. Usamos Promise.all para llamar eficientemente.
   let filtered = data || [];
   
   if (completed) {
     const minCompleted = Math.min(...completed.split(',').map(Number));
-    // Requiere RPC get_completed_projects_count
-    // Por ahora omitimos
+    // Obtener counts completados para todos los perfiles en paralelo
+    const completedCounts = await Promise.all(
+      (filtered || []).map(profile =>
+        supabaseAdmin.rpc('get_completed_projects_count', { p_user_id: profile.id })
+      )
+    );
+    filtered = filtered.filter((profile, index) => {
+      const count = (completedCounts[index] || {}).count || 0;
+      return count >= minCompleted;
+    });
   }
   
   if (rating) {
-    // Requiere RPC get_user_avg_rating
-    // Por ahora omitimos
+    // Obtener ratings promedio para todos los perfiles en paralelo
+    const avgRatings = await Promise.all(
+      (filtered || []).map(profile =>
+        supabaseAdmin.rpc('get_user_avg_rating', { p_user_id: profile.id })
+      )
+    );
+    filtered = filtered.filter((profile, index) => {
+      const avg = (avgRatings[index] || {}).avg || 0;
+      return avg >= rating;
+    });
   }
   
   res.json({

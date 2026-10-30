@@ -17,16 +17,16 @@ router.get('/', optionalAuth, validate(schemas.listProjects), listProjects);
 
 // Static /user/:userId routes MUST come before dynamic /:id to avoid conflicts
 // GET /api/projects/user/:userId - proyectos de un usuario
-router.get('/user/:userId', optionalAuth, getUserProjects);
+router.get('/user/:userId', optionalAuth, validate(schemas.userIdParams), getUserProjects);
 
 // GET /api/projects/user/:userId/featured - proyectos destacados
-router.get('/user/:userId/featured', optionalAuth, getFeaturedProjects);
+router.get('/user/:userId/featured', optionalAuth, validate(schemas.userIdParams), getFeaturedProjects);
 
 // PUT /api/projects/user/:userId/featured - guardar destacados
-router.put('/user/:userId/featured', requireAuth, saveFeaturedProjects);
+router.put('/user/:userId/featured', requireAuth, validate(schemas.saveProjectFeatured), saveFeaturedProjects);
 
 // GET /api/projects/:id - obtener proyecto
-router.get('/:id', optionalAuth, validate(schemas.updateProject), getProject);
+router.get('/:id', optionalAuth, validate(schemas.idParams), getProject);
 
 // POST /api/projects - crear proyecto
 router.post('/', requireAuth, validate(schemas.createProject), createProject);
@@ -35,12 +35,12 @@ router.post('/', requireAuth, validate(schemas.createProject), createProject);
 router.put('/:id', requireAuth, validate(schemas.updateProject), updateProject);
 
 // PUT /api/projects/:id/status - cambiar estado
-router.put('/:id/status', requireAuth, validate(schemas.updateProject), changeProjectStatus);
+router.put('/:id/status', requireAuth, validate(schemas.changeProjectStatus), changeProjectStatus);
 
 // DELETE /api/projects/:id - eliminar proyecto
-router.delete('/:id', requireAuth, validate(schemas.updateProject), deleteProject);
+router.delete('/:id', requireAuth, validate(schemas.idParams), deleteProject);
 
 // GET /api/projects/:id/can-rate/:ratedId - verificar si puede calificar
-router.get('/:id/can-rate/:ratedId', requireAuth, validate(schemas.updateProject), canRateUser);
+router.get('/:id/can-rate/:ratedId', requireAuth, validate(schemas.canRateProjectUser), canRateUser);
 
 export default router;

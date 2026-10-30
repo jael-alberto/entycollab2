@@ -14,13 +14,13 @@ import { validate, schemas } from '../middleware/validation.js';
 const router = Router();
 
 // GET /api/groups - listar grupos
-router.get('/', requireAuth, listGroups);
+router.get('/', requireAuth, validate(schemas.listGroups), listGroups);
 
 // GET /api/groups/user - mis grupos
 router.get('/user', requireAuth, getUserGroups);
 
 // GET /api/groups/:id - obtener grupo
-router.get('/:id', requireAuth, validate(schemas.updateGroup), getGroup);
+router.get('/:id', requireAuth, validate(schemas.idParams), getGroup);
 
 // POST /api/groups - crear grupo
 router.post('/', requireAuth, validate(schemas.createGroup), createGroup);
@@ -29,16 +29,16 @@ router.post('/', requireAuth, validate(schemas.createGroup), createGroup);
 router.put('/:id', requireAuth, validate(schemas.updateGroup), updateGroup);
 
 // DELETE /api/groups/:id - eliminar grupo
-router.delete('/:id', requireAuth, validate(schemas.updateGroup), deleteGroup);
+router.delete('/:id', requireAuth, validate(schemas.idParams), deleteGroup);
 
 // GET /api/groups/:id/members - miembros
-router.get('/:id/members', requireAuth, validate(schemas.updateGroup), getGroupMembers);
+router.get('/:id/members', requireAuth, validate(schemas.idParams), getGroupMembers);
 
 // PUT /api/groups/:id/members/:memberId - cambiar rol
 router.put('/:id/members/:memberId', requireAuth, validate(schemas.setGroupMemberRole), setGroupMemberRole);
 
 // DELETE /api/groups/:id/members/:memberId - eliminar miembro
-router.delete('/:id/members/:memberId', requireAuth, validate(schemas.setGroupMemberRole), removeGroupMember);
+router.delete('/:id/members/:memberId', requireAuth, validate(schemas.groupMemberParams), removeGroupMember);
 
 // POST /api/groups/:id/join - solicitar ingreso
 router.post('/:id/join', requireAuth, validate(schemas.requestToJoinGroup), requestToJoinGroup);
@@ -47,10 +47,10 @@ router.post('/:id/join', requireAuth, validate(schemas.requestToJoinGroup), requ
 router.put('/:id/requests/:requestId', requireAuth, validate(schemas.decideGroupRequest), decideGroupRequest);
 
 // GET /api/groups/:id/requests - solicitudes pendientes
-router.get('/:id/requests', requireAuth, validate(schemas.updateGroup), getGroupRequests);
+router.get('/:id/requests', requireAuth, validate(schemas.idParams), getGroupRequests);
 
 // GET /api/groups/:id/projects - proyectos del grupo
-router.get('/:id/projects', requireAuth, validate(schemas.pagination), listGroupProjects);
+router.get('/:id/projects', requireAuth, validate(schemas.listGroupProjects), listGroupProjects);
 
 // POST /api/groups/:id/projects - crear proyecto en grupo
 router.post('/:id/projects', requireAuth, validate(schemas.createGroupProject), createGroupProject);
