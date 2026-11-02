@@ -2,11 +2,15 @@ import { createContext, useCallback, useContext, useState } from 'react';
 
 const ToastContext = createContext(null);
 
+let _toastId = 0;
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const showToast = useCallback((message, type = 'info') => {
-    const id = Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+    const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `toast-${Date.now()}-${++_toastId}`;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));

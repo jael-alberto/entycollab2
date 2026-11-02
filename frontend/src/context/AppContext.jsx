@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import {
   getUsers, getProjects, getApplications, getRatings,
   getCurrentUserId, setCurrentUserId, clearCurrentUserId,
-  getActiveGroupId, setActiveGroupId, generateId, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
+  getActiveGroupId, setActiveGroupId, generateId, hashPassword, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
 } from '../lib/store.js';
 import { listGroups, createGroup as apiCreateGroup, requestToJoinGroup as apiRequestToJoinGroup, decideGroupRequest as apiDecideGroupRequest, updateGroup as apiUpdateGroup, removeGroupMember as apiRemoveGroupMember, setGroupMemberRole as apiSetGroupMemberRole, getGroupMembers, getGroupRequests, listGroupProjects } from '../lib/api/groups.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
@@ -181,8 +181,19 @@ export function AppProvider({ children }) {
     }
 
     // 2. Fallback a usuarios locales
-    const found = getUsers().find(u => (u.email.toLowerCase() === cleanIdentifier || u.username.toLowerCase() === cleanIdentifier) && u.password === password);
+    const pHash = password ? await hashPassword(password) : '';
+    const localUsers = getUsers();
+    const found = localUsers.find(u => {
+      const matchIdentity = u.email.toLowerCase() === cleanIdentifier || u.username.toLowerCase() === cleanIdentifier;
+      if (!matchIdentity) return false;
+      if (u.passwordHash) return u.passwordHash === pHash;
+      if (u.password) return u.password === password || u.password === pHash;
+      return false;
+    });
     if (!found) return null;
+    // Migrate legacy local accounts: remove any plaintext password the next
+    // time the user list is persisted. New accounts store only passwordHash.
+    if (Object.hasOwn(found, 'password')) saveUsers(localUsers);
     setUserInStore(found.id);
     return found;
   }, [setUserInStore]);
@@ -198,12 +209,14 @@ export function AppProvider({ children }) {
       if (supaProfile === 'email') return 'email';
     }
 
+    const hashedPassword = data.password ? await hashPassword(data.password) : '';
+
     const newUser = supaProfile || {
       id: generateId(),
       name: data.name,
       username: data.username,
       email: data.email,
-      password: data.password,
+      passwordHash: hashedPassword,
       skills: data.skills,
       categories: userCategories({ skills: data.skills }),
       bio: data.bio,
@@ -254,7 +267,7 @@ export function AppProvider({ children }) {
   }, [userId, refresh]);
 
   // Edita los datos de la cuenta desde Ajustes.
-  const updateAccount = useCallback(({ name, username, email, password }) => {
+  const updateAccount = useCallback(async ({ name, username, email, password }) => {
     const current = getUsers();
     const idx = current.findIndex(u => u.id === userId);
     if (idx < 0) return 'error';
@@ -271,7 +284,10 @@ export function AppProvider({ children }) {
     target.name = cleanName;
     target.username = cleanUsername;
     target.email = cleanEmail;
-    if (password) target.password = password;
+    if (password) {
+      target.passwordHash = await hashPassword(password);
+      delete target.password;
+    }
 
     saveUsers(current);
     setUsers(current);
