@@ -81,14 +81,21 @@ entycollab2/
 
 ## Instalación y ejecución
 
+### Opción rápida en Windows (Automática)
+Haz doble clic sobre el archivo [setup.bat](file:///c:/Users/6E/Documents/GitHub/entycollab2/setup.bat) en la raíz del proyecto (o ejecútalo en tu terminal):
+
+```cmd
+setup.bat
+```
+Este script verificará Node.js y npm, instalará automáticamente las dependencias de la raíz, frontend y backend, y preparará los archivos `.env` locales.
+
+### Opción manual
+
 ```bash
-# 1. Entrar al frontend (la app Vite vive en frontend/)
-cd frontend
+# 1. Instalar todas las dependencias
+npm run setup
 
-# 2. Instalar dependencias
-npm install
-
-# 3. Servidor de desarrollo
+# 2. Servidor de desarrollo
 npm run dev
 ```
 

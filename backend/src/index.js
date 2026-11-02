@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
-import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 // Importar rutas
 import authRoutes from './routes/authRoutes.js';
