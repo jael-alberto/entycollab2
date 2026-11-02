@@ -9,6 +9,8 @@ let supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 let supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
 const jwtSecret = process.env.JWT_SECRET || 'devcollab-secret-key-change-in-production';
+const databaseUrl = process.env.DATABASE_URL || '';
+const shadowDatabaseUrl = process.env.SHADOW_DATABASE_URL || '';
 
 const isSupabaseConfigured = Boolean(
   supabaseUrl && 
@@ -35,6 +37,13 @@ if (!isSupabaseConfigured && !isProduction) {
   console.warn('⚠️  El servidor backend iniciará en modo desarrollo, pero las consultas a la base de datos requerirán credenciales válidas.\n');
 }
 
+if (!databaseUrl) {
+  if (isProduction) {
+    throw new Error('Variable de entorno requerida faltante: DATABASE_URL');
+  }
+  console.warn('\n⚠️  [BACKEND] ADVERTENCIA: DATABASE_URL no está configurada. Prisma no podrá conectar a PostgreSQL.\n');
+}
+
 export const env = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -45,6 +54,11 @@ export const env = {
     serviceRoleKey: supabaseSecretKey,
     anonKey: supabaseAnonKey || '',
     jwksUrl: process.env.SUPABASE_JWKS_URL || `${supabaseUrl}/auth/v1/.well-known/jwks.json`
+  },
+
+  prisma: {
+    databaseUrl,
+    shadowDatabaseUrl
   },
   
   jwt: {

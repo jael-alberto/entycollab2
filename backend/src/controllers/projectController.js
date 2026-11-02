@@ -1,75 +1,92 @@
 // backend/src/controllers/projectController.js
-// Controlador de proyectos
+// Controlador de proyectos (Prisma)
 
-import { supabaseAdmin } from '../config/supabase.js';
+import { prisma } from '../config/prisma.js';
+import {
+  serializeProject,
+  serializeProfile,
+  projectInputToPrisma
+} from '../utils/serializers.js';
 import {
   asyncHandler, NotFoundError, ForbiddenError, AppError, ValidationError
 } from '../middleware/errorHandler.js';
 
-// Limpia texto usado en filtros PostgREST para evitar inyección de operadores.
+// Limpia texto usado en filtros para evitar caracteres problemáticos.
 function sanitizeSearch(value = '') {
   return String(value).replace(/[,()%\\]/g, ' ').trim().slice(0, 100);
 }
 
 // IDs de grupos visibles para un usuario: grupos públicos + grupos a los que pertenece.
 async function getVisibleGroupIds(userId) {
-  const { data: publicGroups } = await supabaseAdmin
-    .from('groups')
-    .select('id')
-    .eq('is_private', false);
+  const where = userId
+    ? {
+        OR: [
+          { isPrivate: false },
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      }
+    : { isPrivate: false };
 
-  const ids = new Set((publicGroups || []).map(group => group.id));
-
-  if (userId) {
-    const { data: memberships } = await supabaseAdmin
-      .from('group_members')
-      .select('group_id')
-      .eq('user_id', userId);
-
-    (memberships || []).forEach(membership => ids.add(membership.group_id));
-  }
-
-  return ids;
+  const groups = await prisma.group.findMany({ where, select: { id: true } });
+  return new Set(groups.map(group => group.id));
 }
 
 async function getGroupRole(groupId, userId) {
   if (!groupId || !userId) return null;
 
-  const { data: membership } = await supabaseAdmin
-    .from('group_members')
-    .select('role')
-    .eq('group_id', groupId)
-    .eq('user_id', userId)
-    .maybeSingle();
+  const membership = await prisma.groupMember.findUnique({
+    where: { groupId_userId: { groupId, userId } },
+    select: { role: true }
+  });
 
   return membership?.role || null;
 }
 
 async function canManageProject(project, userId) {
   if (!userId) return false;
-  if (project.owner_id === userId) return true;
-  if (!project.group_id) return false;
+  if (project.ownerId === userId) return true;
+  if (!project.groupId) return false;
 
-  const role = await getGroupRole(project.group_id, userId);
+  const role = await getGroupRole(project.groupId, userId);
   return role === 'owner' || role === 'admin';
 }
 
 async function assertProjectVisible(project, userId) {
-  if (!project.group_id) return;
+  if (!project.groupId) return;
 
-  const { data: group } = await supabaseAdmin
-    .from('groups')
-    .select('owner_id, is_private')
-    .eq('id', project.group_id)
-    .maybeSingle();
+  const group = await prisma.group.findUnique({
+    where: { id: project.groupId },
+    select: { ownerId: true, isPrivate: true }
+  });
 
   if (!group) throw new NotFoundError('Proyecto');
 
-  if (!group.is_private) return;
-  if (userId && (group.owner_id === userId || await getGroupRole(project.group_id, userId))) return;
+  if (!group.isPrivate) return;
+  if (userId && (group.ownerId === userId || await getGroupRole(project.groupId, userId))) return;
 
   throw new ForbiddenError('Este proyecto pertenece a un grupo privado');
 }
+
+const PROJECT_LIST_INCLUDE = {
+  owner: { select: { id: true, name: true, username: true, avatar: true } },
+  group: { select: { id: true, name: true } }
+};
+
+const PROJECT_DETAIL_INCLUDE = {
+  owner: {
+    select: { id: true, name: true, username: true, avatar: true, available: true }
+  },
+  group: {
+    select: { id: true, name: true, ownerId: true, isPrivate: true }
+  },
+  applications: {
+    include: {
+      user: { select: { id: true, name: true, username: true, avatar: true } },
+      inviter: { select: { id: true, name: true, username: true } }
+    }
+  }
+};
 
 // GET /api/projects
 export const listProjects = asyncHandler(async (req, res) => {
@@ -78,68 +95,80 @@ export const listProjects = asyncHandler(async (req, res) => {
     tech, search, sortBy = 'created_at', sortOrder = 'desc', globalOnly
   } = req.validated.query;
 
-  let query = supabaseAdmin
-    .from('projects')
-    .select(`
-      *,
-      owner:profiles!owner_id(id, name, username, avatar),
-      group:groups!group_id(id, name)
-    `, { count: 'exact' });
+  const where = {};
 
   if (groupId) {
     const visibleGroupIds = await getVisibleGroupIds(req.user?.id);
     if (!visibleGroupIds.has(groupId)) {
       throw new ForbiddenError('No tienes acceso a este grupo');
     }
-    query = query.eq('group_id', groupId);
+    where.groupId = groupId;
   } else if (globalOnly) {
-    query = query.is('group_id', null);
+    where.groupId = null;
   } else {
     const visibleGroupIds = await getVisibleGroupIds(req.user?.id);
     if (visibleGroupIds.size === 0) {
-      query = query.is('group_id', null);
+      where.groupId = null;
     } else {
-      const groupFilter = Array.from(visibleGroupIds).join(',');
-      query = query.or(`group_id.is.null,group_id.in.(${groupFilter})`);
+      where.OR = [
+        { groupId: null },
+        { groupId: { in: Array.from(visibleGroupIds) } }
+      ];
     }
   }
 
-  if (status) query = query.eq('status', status);
-  if (category) query = query.eq('category', category);
-  if (ownerId) query = query.eq('owner_id', ownerId);
+  if (status) where.status = status;
+  if (category) where.category = category;
+  if (ownerId) where.ownerId = ownerId;
+
   if (tech) {
     const techList = tech.split(',').map(item => item.trim()).filter(Boolean);
-    if (techList.length > 0) query = query.overlaps('tech', techList);
+    if (techList.length > 0) where.tech = { hasSome: techList };
   }
 
   const cleanSearch = sanitizeSearch(search);
   if (cleanSearch) {
-    query = query.or(
-      `title->>es.ilike.%${cleanSearch}%,title->>en.ilike.%${cleanSearch}%,` +
-      `description->>es.ilike.%${cleanSearch}%,description->>en.ilike.%${cleanSearch}%`
-    );
+    const searchConditions = [
+      { title: { path: ['es'], string_contains: cleanSearch, mode: 'insensitive' } },
+      { title: { path: ['en'], string_contains: cleanSearch, mode: 'insensitive' } },
+      { description: { path: ['es'], string_contains: cleanSearch, mode: 'insensitive' } },
+      { description: { path: ['en'], string_contains: cleanSearch, mode: 'insensitive' } }
+    ];
+
+    if (where.OR) {
+      where.AND = [{ OR: where.OR }, { OR: searchConditions }];
+      delete where.OR;
+    } else {
+      where.OR = searchConditions;
+    }
   }
 
-  const allowedSortFields = ['created_at', 'title', 'status', 'category'];
-  const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
-  const order = sortOrder === 'asc' ? { ascending: true } : { ascending: false };
-  query = query.order(sortField, order);
+  const sortFieldMap = {
+    created_at: 'createdAt',
+    status: 'status',
+    category: 'category'
+  };
+  // Prisma no permite ordenar por campos Json (title), así que se usa createdAt.
+  const orderBy = { [sortFieldMap[sortBy] || 'createdAt']: sortOrder === 'asc' ? 'asc' : 'desc' };
 
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-  query = query.range(from, to);
-
-  const { data, error, count } = await query;
-
-  if (error) throw new Error(error.message);
+  const [projects, total] = await prisma.$transaction([
+    prisma.project.findMany({
+      where,
+      include: PROJECT_LIST_INCLUDE,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    }),
+    prisma.project.count({ where })
+  ]);
 
   res.json({
-    data: data || [],
+    data: projects.map(serializeProject),
     pagination: {
       page: Number(page),
       pageSize: Number(pageSize),
-      total: count || 0,
-      totalPages: Math.ceil((count || 0) / pageSize)
+      total,
+      totalPages: Math.ceil(total / pageSize)
     }
   });
 });
@@ -148,34 +177,23 @@ export const listProjects = asyncHandler(async (req, res) => {
 export const getProject = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
 
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .select(`
-      *,
-      owner:profiles!owner_id(id, name, username, avatar, available),
-      group:groups!group_id(id, name, owner_id, is_private),
-      applications(
-        id, user_id, status, project_role, invited_by, message, applied_at, responded_at,
-        user:profiles!user_id(id, name, username, avatar),
-        invited_by_profile:profiles!invited_by(id, name, username)
-      )
-    `)
-    .eq('id', id)
-    .maybeSingle();
+  const project = await prisma.project.findUnique({
+    where: { id },
+    include: PROJECT_DETAIL_INCLUDE
+  });
 
-  if (error) throw new Error(error.message);
-  if (!data) throw new NotFoundError('Proyecto');
+  if (!project) throw new NotFoundError('Proyecto');
 
-  await assertProjectVisible(data, req.user?.id);
+  await assertProjectVisible(project, req.user?.id);
 
-  const canManage = await canManageProject(data, req.user?.id);
+  const canManage = await canManageProject(project, req.user?.id);
   if (!canManage) {
-    data.applications = (data.applications || []).filter(
-      application => req.user && application.user_id === req.user.id
+    project.applications = (project.applications || []).filter(
+      application => req.user && application.userId === req.user.id
     );
   }
 
-  res.json({ project: data });
+  res.json({ project: serializeProject(project) });
 });
 
 // POST /api/projects
@@ -189,27 +207,20 @@ export const createProject = asyncHandler(async (req, res) => {
     }
   }
 
-  const projectData = {
+  const data = projectInputToPrisma({
     ...body,
-    owner_id: req.user.id,
+    ownerId: req.user.id,
     status: 'open',
-    min_rating: minRating ?? 1,
-    group_id: groupId || null
-  };
+    minRating: minRating ?? 1,
+    groupId: groupId || null
+  });
 
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .insert(projectData)
-    .select(`
-      *,
-      owner:profiles!owner_id(id, name, username, avatar),
-      group:groups!group_id(id, name)
-    `)
-    .single();
+  const project = await prisma.project.create({
+    data,
+    include: PROJECT_LIST_INCLUDE
+  });
 
-  if (error) throw new AppError(error.message, 400, 'PROJECT_CREATE_FAILED');
-
-  res.status(201).json({ project: data });
+  res.status(201).json({ project: serializeProject(project) });
 });
 
 // PUT /api/projects/:id
@@ -217,47 +228,37 @@ export const updateProject = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
   const { minRating, ...body } = req.validated.body;
 
-  const updateData = { ...body };
-  if (minRating !== undefined) updateData.min_rating = minRating;
+  const project = await prisma.project.findUnique({
+    where: { id },
+    select: { id: true, ownerId: true, groupId: true }
+  });
 
-  // El grupo de un proyecto no se reasigna desde la edición normal.
-  delete updateData.groupId;
-  delete updateData.group_id;
-  delete updateData.id;
-  delete updateData.owner_id;
-  delete updateData.created_at;
-
-  const { data: project, error: projectError } = await supabaseAdmin
-    .from('projects')
-    .select('id, owner_id, group_id')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (projectError) throw new Error(projectError.message);
   if (!project) throw new NotFoundError('Proyecto');
 
   if (!await canManageProject(project, req.user.id)) {
     throw new ForbiddenError('No tienes permisos para editar este proyecto');
   }
 
+  // El grupo de un proyecto no se reasigna desde la edición normal.
+  const updateData = projectInputToPrisma(body);
+  if (minRating !== undefined) updateData.minRating = minRating;
+
+  delete updateData.groupId;
+  delete updateData.id;
+  delete updateData.ownerId;
+  delete updateData.createdAt;
+
   if (Object.keys(updateData).length === 0) {
     throw new ValidationError({ body: ['No se enviaron campos para actualizar'] });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .update(updateData)
-    .eq('id', id)
-    .select(`
-      *,
-      owner:profiles!owner_id(id, name, username, avatar),
-      group:groups!group_id(id, name)
-    `)
-    .single();
+  const updated = await prisma.project.update({
+    where: { id },
+    data: updateData,
+    include: PROJECT_LIST_INCLUDE
+  });
 
-  if (error) throw new AppError(error.message, 400, 'PROJECT_UPDATE_FAILED');
-
-  res.json({ project: data });
+  res.json({ project: serializeProject(updated) });
 });
 
 // PUT /api/projects/:id/status
@@ -265,13 +266,11 @@ export const changeProjectStatus = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
   const { status } = req.validated.body;
 
-  const { data: project, error: projectError } = await supabaseAdmin
-    .from('projects')
-    .select('id, owner_id, group_id, status')
-    .eq('id', id)
-    .maybeSingle();
+  const project = await prisma.project.findUnique({
+    where: { id },
+    select: { id: true, ownerId: true, groupId: true, status: true }
+  });
 
-  if (projectError) throw new Error(projectError.message);
   if (!project) throw new NotFoundError('Proyecto');
 
   if (!await canManageProject(project, req.user.id)) {
@@ -294,13 +293,11 @@ export const changeProjectStatus = asyncHandler(async (req, res) => {
   }
 
   if (status === 'completed') {
-    const { count } = await supabaseAdmin
-      .from('applications')
-      .select('*', { count: 'exact', head: true })
-      .eq('project_id', id)
-      .eq('status', 'accepted');
+    const acceptedCount = await prisma.application.count({
+      where: { projectId: id, status: 'accepted' }
+    });
 
-    if (!count) {
+    if (!acceptedCount) {
       throw new AppError(
         'No hay participantes aceptados para completar el proyecto',
         400,
@@ -310,48 +307,38 @@ export const changeProjectStatus = asyncHandler(async (req, res) => {
   }
 
   if (project.status === status) {
-    return res.json({ project });
+    const current = await prisma.project.findUnique({
+      where: { id },
+      include: PROJECT_LIST_INCLUDE
+    });
+    return res.json({ project: serializeProject(current) });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .update({ status })
-    .eq('id', id)
-    .select(`
-      *,
-      owner:profiles!owner_id(id, name, username, avatar),
-      group:groups!group_id(id, name)
-    `)
-    .single();
+  const updated = await prisma.project.update({
+    where: { id },
+    data: { status },
+    include: PROJECT_LIST_INCLUDE
+  });
 
-  if (error) throw new AppError(error.message, 400, 'PROJECT_STATUS_FAILED');
-
-  res.json({ project: data });
+  res.json({ project: serializeProject(updated) });
 });
 
 // DELETE /api/projects/:id
 export const deleteProject = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
 
-  const { data: project, error: projectError } = await supabaseAdmin
-    .from('projects')
-    .select('id, owner_id, group_id')
-    .eq('id', id)
-    .maybeSingle();
+  const project = await prisma.project.findUnique({
+    where: { id },
+    select: { id: true, ownerId: true, groupId: true }
+  });
 
-  if (projectError) throw new Error(projectError.message);
   if (!project) throw new NotFoundError('Proyecto');
 
   if (!await canManageProject(project, req.user.id)) {
     throw new ForbiddenError('Solo el owner del proyecto o un admin del grupo puede eliminarlo');
   }
 
-  const { error } = await supabaseAdmin
-    .from('projects')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw new Error(error.message);
+  await prisma.project.delete({ where: { id } });
 
   res.json({ message: 'Proyecto eliminado' });
 });
@@ -361,75 +348,60 @@ export const getUserProjects = asyncHandler(async (req, res) => {
   const { userId } = req.validated.params;
   const isSelf = req.user?.id === userId;
   const visibleGroupIds = isSelf ? null : await getVisibleGroupIds(req.user?.id);
-  const isVisible = project => !project.group_id ||
+  const isVisible = project => !project.groupId ||
     isSelf ||
-    visibleGroupIds.has(project.group_id);
+    visibleGroupIds.has(project.groupId);
 
-  // Proyectos creados
-  const { data: created, error: createdError } = await supabaseAdmin
-    .from('projects')
-    .select('*')
-    .eq('owner_id', userId)
-    .order('created_at', { ascending: false });
+  const [created, participated] = await Promise.all([
+    prisma.project.findMany({
+      where: { ownerId: userId },
+      orderBy: { createdAt: 'desc' }
+    }),
+    prisma.application.findMany({
+      where: { userId, status: 'accepted' },
+      select: { project: true }
+    })
+  ]);
 
-  if (createdError) throw new Error(createdError.message);
+  const participatedProjects = participated.map(item => item.project).filter(Boolean);
 
-  // Proyectos participados
-  const { data: participated, error: participatedError } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      project:projects(*)
-    `)
-    .eq('user_id', userId)
-    .eq('status', 'accepted');
-
-  if (participatedError) throw new Error(participatedError.message);
-
-  const participatedProjects = (participated || []).map(item => item.project).filter(Boolean);
-
-  // Combinar, deduplicar y aplicar visibilidad de grupos privados
-  const allProjects = [...(created || []), ...participatedProjects]
+  const allProjects = [...created, ...participatedProjects]
     .filter(isVisible)
     .filter((project, index, self) => self.findIndex(item => item.id === project.id) === index);
 
-  allProjects.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  allProjects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  res.json({ projects: allProjects });
+  res.json({ projects: allProjects.map(serializeProject) });
 });
 
 // GET /api/projects/user/:userId/featured
 export const getFeaturedProjects = asyncHandler(async (req, res) => {
   const { userId } = req.validated.params;
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .select('featured_project_ids')
-    .eq('id', userId)
-    .maybeSingle();
+  const profile = await prisma.profile.findUnique({
+    where: { id: userId },
+    select: { featuredProjectIds: true }
+  });
 
-  if (profileError) throw new Error(profileError.message);
-  if (!profile?.featured_project_ids?.length) {
+  if (!profile?.featuredProjectIds?.length) {
     return res.json({ projects: [] });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .select('*')
-    .in('id', profile.featured_project_ids);
-
-  if (error) throw new Error(error.message);
+  const projects = await prisma.project.findMany({
+    where: { id: { in: profile.featuredProjectIds } }
+  });
 
   const isSelf = req.user?.id === userId;
   const visibleGroupIds = isSelf ? null : await getVisibleGroupIds(req.user?.id);
-  const visible = (data || []).filter(project =>
-    !project.group_id || isSelf || visibleGroupIds.has(project.group_id)
+  const visible = projects.filter(project =>
+    !project.groupId || isSelf || visibleGroupIds.has(project.groupId)
   );
 
   // Mantener el orden elegido por el usuario
-  const orderMap = new Map(profile.featured_project_ids.map((id, index) => [id, index]));
+  const orderMap = new Map(profile.featuredProjectIds.map((id, index) => [id, index]));
   visible.sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999));
 
-  res.json({ projects: visible });
+  res.json({ projects: visible.map(serializeProject) });
 });
 
 // PUT /api/projects/user/:userId/featured
@@ -442,23 +414,20 @@ export const saveFeaturedProjects = asyncHandler(async (req, res) => {
   }
 
   if (projectIds.length > 0) {
-    const [{ data: owned }, { data: accepted }] = await Promise.all([
-      supabaseAdmin
-        .from('projects')
-        .select('id')
-        .eq('owner_id', userId)
-        .in('id', projectIds),
-      supabaseAdmin
-        .from('applications')
-        .select('project_id')
-        .eq('user_id', userId)
-        .eq('status', 'accepted')
-        .in('project_id', projectIds)
+    const [owned, accepted] = await Promise.all([
+      prisma.project.findMany({
+        where: { ownerId: userId, id: { in: projectIds } },
+        select: { id: true }
+      }),
+      prisma.application.findMany({
+        where: { userId, status: 'accepted', projectId: { in: projectIds } },
+        select: { projectId: true }
+      })
     ]);
 
     const allowedIds = new Set([
-      ...(owned || []).map(project => project.id),
-      ...(accepted || []).map(application => application.project_id)
+      ...owned.map(project => project.id),
+      ...accepted.map(application => application.projectId)
     ]);
 
     const invalid = projectIds.filter(id => !allowedIds.has(id));
@@ -469,30 +438,27 @@ export const saveFeaturedProjects = asyncHandler(async (req, res) => {
     }
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .update({ featured_project_ids: projectIds })
-    .eq('id', userId)
-    .select('id, featured_project_ids')
-    .single();
+  const profile = await prisma.profile.update({
+    where: { id: userId },
+    data: { featuredProjectIds: projectIds }
+  });
 
-  if (error) throw new Error(error.message);
-
-  res.json({ user: data });
+  res.json({ user: serializeProfile(profile, { includeEmail: true }) });
 });
 
 // GET /api/projects/:id/can-rate/:ratedId
 export const canRateUser = asyncHandler(async (req, res) => {
   const { id, ratedId } = req.validated.params;
 
-  const { data, error } = await supabaseAdmin
-    .rpc('can_rate_user', {
-      p_project_id: id,
-      p_rater_id: req.user.id,
-      p_rated_id: ratedId
-    });
+  const project = await prisma.project.findFirst({
+    where: {
+      id,
+      ownerId: req.user.id,
+      status: 'completed',
+      applications: { some: { userId: ratedId, status: 'accepted' } }
+    },
+    select: { id: true }
+  });
 
-  if (error) throw new Error(error.message);
-
-  res.json({ canRate: data });
+  res.json({ canRate: Boolean(project) });
 });

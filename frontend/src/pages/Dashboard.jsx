@@ -40,7 +40,10 @@ export default function Dashboard() {
   const filteredOther = useMemo(() => otherGroups.filter(matchGroup), [otherGroups, groupSearch]);
 
   const openGroup = (groupId) => {
-    selectGroup(groupId);
+    // Solo se activa como grupo de trabajo si el usuario es miembro; los
+    // grupos públicos de los que no forma parte se abren en modo vista previa.
+    const group = groups.find(g => g.id === groupId);
+    if (group?.members?.some(m => m.userId === user.id)) selectGroup(groupId);
     navigate(`/grupos/${groupId}`);
   };
 

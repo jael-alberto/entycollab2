@@ -357,6 +357,15 @@ export function migrateLegacyData() {
   });
   if (changed) saveProjects(projects);
 
+  // Grupos viejos sin visibilidad: se marcan públicos, que es el modelo actual.
+  changed = false;
+  const groups = getGroups().map(g => {
+    if (typeof g.isPrivate === 'boolean') return g;
+    changed = true;
+    return { ...g, isPrivate: false };
+  });
+  if (changed) saveGroups(groups);
+
   // Datos demo guardados como texto simple -> contenido bilingüe
   upgradeDemoContent();
 }
@@ -850,7 +859,7 @@ export function seedCarlosGroups() {
   const genId = generateId;
 
   // Helper to create group with projects, apps, ratings
-  function createGroup({ name, description, ownerId, memberRoles, projectData, requests = [] }) {
+  function createGroup({ name, description, ownerId, memberRoles, projectData, requests = [], isPrivate = false }) {
     const groupId = genId();
     const createdAt = new Date(now - 60 * day).toISOString();
 
@@ -865,6 +874,7 @@ export function seedCarlosGroups() {
       name,
       description,
       ownerId,
+      isPrivate,
       createdAt,
       members,
       requests: requests.map((req, idx) => ({
@@ -1068,6 +1078,7 @@ export function seedCarlosGroups() {
     name: 'Comunidad Game Dev',
     description: 'Grupo abierto para desarrolladores de videojuegos',
     ownerId: otherUsers[1]?.id,
+    isPrivate: false,
     memberRoles: [
       { userId: otherUsers[1]?.id, role: 'owner' },
       { userId: otherUsers[2]?.id, role: 'admin' },

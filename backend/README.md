@@ -1,32 +1,42 @@
 # Entycollab Backend API
 
-Backend API para Entycollab construido con Node.js + Express + Supabase.
+Backend API para Entycollab construido con Node.js + Express + Prisma + Supabase.
 
 ## Arquitectura
 
 ```
-Frontend (React) → Backend API (Express) → Supabase (Postgres + Auth + Storage)
+Frontend (React) → Backend API (Express) → Prisma → PostgreSQL (Supabase)
+                                        ↘ Supabase Auth + Storage
 ```
 
 El backend actúa como intermediario:
 - Valida y sanitiza entradas
 - Aplica reglas de negocio
-- Usa **Service Role Key** de Supabase para bypass RLS
+- Usa **Prisma** para todas las consultas de datos de la aplicación (`public.*`)
+- Usa **Supabase** solo para Auth (registro/login/tokens) y Storage (avatares/imágenes)
 - Expone API REST limpia al frontend
+
+> Prisma se conecta directamente a PostgreSQL (equivale al Service Role: bypass RLS).
+> Los triggers y políticas de la base de datos siguen activos.
 
 ## Estructura
 
 ```
 backend/
+├── prisma/
+│   └── schema.prisma            # Modelos Prisma (public + puente auth.users)
 ├── src/
 │   ├── index.js                 # Entry point
 │   ├── config/
 │   │   ├── env.js               # Variables de entorno validadas
-│   │   └── supabase.js          # Cliente Supabase (admin + user)
+│   │   ├── prisma.js            # Cliente Prisma singleton
+│   │   └── supabase.js          # Cliente Supabase (Auth + Storage)
 │   ├── middleware/
 │   │   ├── auth.js              # JWT auth, ownership, group roles
 │   │   ├── validation.js        # Zod schemas
-│   │   └── errorHandler.js      # Errores centralizados
+│   │   └── errorHandler.js      # Errores centralizados (Prisma + triggers)
+│   ├── utils/
+│   │   └── serializers.js       # camelCase (Prisma) → snake_case (API)
 │   ├── controllers/             # Lógica de negocio
 │   │   ├── authController.js
 │   │   ├── profileController.js
@@ -147,6 +157,10 @@ PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 
+# Base de datos (Prisma)
+DATABASE_URL=postgresql://postgres.tu-proyecto:TU_PASSWORD@aws-0-region.pooler.supabase.com:5432/postgres
+SHADOW_DATABASE_URL=postgresql://postgres.tu-proyecto:TU_PASSWORD@aws-0-region.pooler.supabase.com:5432/postgres
+
 # Supabase (Service Role Key - SOLO BACKEND)
 SUPABASE_URL=https://tu-proyecto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -172,16 +186,44 @@ cd backend
 npm install
 cp .env.example .env
 # Editar .env con tus credenciales
+npx prisma generate
 npm run dev
 ```
 
 ## Base de Datos
 
-Ejecuta las migraciones en Supabase SQL Editor:
+El esquema de la base de datos ya está definido en `database/supabase/migrations`:
 
 1. `database/supabase/migrations/0001_init.sql` - Esquema completo
 2. `database/supabase/migrations/0002_storage.sql` - Buckets y políticas
-3. `database/supabase/seed.sql` - Datos demo (opcional)
+3. `database/supabase/migrations/0003_security_hardening.sql` - RLS, triggers y validaciones
+4. `database/supabase/seed.sql` - Datos demo (opcional)
+
+Prisma **no reemplaza** esas migraciones: `backend/prisma/schema.prisma` describe las
+mismas tablas para que el cliente Prisma pueda consultarlas.
+
+### Comandos Prisma
+
+```bash
+npm run prisma:validate   # Valida el schema
+npm run prisma:generate   # Genera el cliente en node_modules/@prisma/client
+npm run prisma:format     # Formatea el schema
+npm run prisma:studio     # Abre Prisma Studio
+npm run prisma:db:pull    # Introspección (sobrescribe el schema: úsalo con cuidado)
+```
+
+> ⚠️ **No uses `prisma migrate dev` ni `prisma db push` contra la base de datos existente**
+> sin revisar antes el diff. Prisma no modela RLS, triggers, políticas ni el índice único
+> parcial `uq_group_requests_pending`, y `db push` podría intentar eliminarlos.
+> Para pruebas, ejecuta primero las migraciones SQL de Supabase y luego `prisma generate`.
+
+### Notas sobre Prisma + Supabase
+
+- `auth.users` se declara como `AuthUser` con `@@ignore`: Prisma nunca la crea ni la modifica.
+- `Profile.authUser` también está ignorado (solo documenta la relación 1:1).
+- Los controladores fijan explícitamente `decidedBy`/`decidedAt` porque los triggers usan
+  `auth.uid()`, que es `NULL` en conexiones directas de Prisma.
+- Los triggers de PostgreSQL siguen validando cupos, calificaciones y solicitudes.
 
 ## Reglas de Negocio Implementadas
 

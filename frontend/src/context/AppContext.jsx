@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   getUsers, getProjects, getApplications, getRatings,
-  getGroups, saveUsers, saveProjects, saveApplications, saveRatingsData, saveGroups,
   getCurrentUserId, setCurrentUserId, clearCurrentUserId,
   getActiveGroupId, setActiveGroupId, generateId, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
 } from '../lib/store.js';
+import { listGroups, createGroup as apiCreateGroup, requestToJoinGroup as apiRequestToJoinGroup, decideGroupRequest as apiDecideGroupRequest, updateGroup as apiUpdateGroup, removeGroupMember as apiRemoveGroupMember, setGroupMemberRole as apiSetGroupMemberRole, getGroupMembers, getGroupRequests, listGroupProjects } from '../lib/api/groups.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { getUserAvgRating, userCategories } from '../lib/helpers.js';
 import { isSupabaseConfigured } from '../lib/supabaseClient.js';
@@ -100,6 +100,40 @@ export function AppProvider({ children }) {
   }, []);
 
   // ========================================================================
+  // OBTENER GRUPOS DEL BACKEND PRISMA (siempre que haya API disponible)
+  // ========================================================================
+  useEffect(() => {
+    async function fetchGroupsFromBackend() {
+      try {
+        const result = await listGroups();
+        if (Array.isArray(result.data) && result.data.length > 0) {
+          setGroups(result.data);
+          saveGroups(result.data);
+        } else {
+          // Si la API falla o está vacía, mantener localStorage/Supabase como fallback
+          if (!isSupabaseConfigured()) {
+            const localGroups = getGroups();
+            if (localGroups.length > 0) {
+              setGroups(localGroups);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[AppContext] No se pudieron cargar grupos del backend:', err);
+        // Mantener datos locales si la API falla
+        if (!isSupabaseConfigured()) {
+          const localGroups = getGroups();
+          if (localGroups.length > 0) {
+            setGroups(localGroups);
+          }
+        }
+      }
+    }
+
+    fetchGroupsFromBackend();
+  }, []);
+
+// ========================================================================
   // I18N / THEME
   // ========================================================================
   const t = useCallback((key, replacements) => i18nT(lang, key, replacements), [lang]);
@@ -321,93 +355,69 @@ export function AppProvider({ children }) {
     setActiveGroupIdState(groupId || null);
   }, []);
 
-  const createGroup = useCallback(({ name, description }) => {
+  const createGroup = useCallback(async ({ name, description, isPrivate = false }) => {
     const group = {
       id: generateId(),
       name: name.trim(),
       description: description.trim(),
       ownerId: userId,
+      isPrivate: isPrivate === true,
       createdAt: new Date().toISOString(),
       members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
       requests: []
     };
-    const current = getGroups();
-    current.push(group);
-    saveGroups(current);
-    setGroups(current);
+    const created = await apiCreateGroup(group);
+    setGroups(prev => {
+      const idx = prev.findIndex(g => g.id === created.id);
+      if (idx >= 0) prev[idx] = created;
+      return [...prev];
+    });
     selectGroup(group.id);
-    syncGroupToSupabase(group);
-    return group;
+    return created;
   }, [userId, selectGroup]);
 
-  const requestToJoinGroup = useCallback((groupId) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return 'missing';
-    if ((group.members || []).some(m => m.userId === userId)) return 'member';
-    if ((group.requests || []).some(r => r.userId === userId && r.status === 'pending')) return 'pending';
-    group.requests = [...(group.requests || []), { id: generateId(), userId, status: 'pending', requestedAt: new Date().toISOString() }];
-    saveGroups(current);
-    setGroups(current);
-    syncGroupToSupabase(group);
-    return 'ok';
-  }, [userId]);
+  const requestToJoinGroup = useCallback(async (groupId) => {
+    const res = await apiRequestToJoinGroup(groupId);
+    if (res === 'pending') showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
+    else if (res === 'member') showToast('Ya eres miembro de este grupo', 'info');
+    else showToast('Solicitud enviada al administrador', 'success');
+    refresh();
+    return res;
+  }, [showToast, refresh]);
 
-  const decideGroupRequest = useCallback((groupId, requestId, accepted) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    const me = group?.members?.find(m => m.userId === userId);
-    if (!group || !me || !['owner', 'admin'].includes(me.role)) return false;
-    const request = group.requests?.find(r => r.id === requestId);
-    if (!request || request.status !== 'pending') return false;
-    request.status = accepted ? 'accepted' : 'rejected';
-    if (accepted) group.members.push({ userId: request.userId, role: 'member', joinedAt: new Date().toISOString() });
-    saveGroups(current);
-    setGroups(current);
-    syncGroupToSupabase(group);
-    return true;
-  }, [userId]);
+  const decideGroupRequest = useCallback(async (groupId, requestId, accepted) => {
+    const ok = await apiDecideGroupRequest(groupId, requestId, accepted);
+    if (ok) showToast(accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.', accepted ? 'success' : 'info');
+    refresh();
+    return ok;
+  }, [showToast, refresh]);
 
-  const setGroupMemberRole = useCallback((groupId, memberId, role) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group || group.ownerId !== userId || !['admin', 'member'].includes(role)) return false;
-    const member = group.members?.find(m => m.userId === memberId);
-    if (!member || member.role === 'owner') return false;
-    member.role = role;
-    saveGroups(current);
-    setGroups(current);
-    syncGroupToSupabase(group);
-    return true;
-  }, [userId]);
+  const setGroupMemberRole = useCallback(async (groupId, memberId, role) => {
+    const ok = await apiSetGroupMemberRole(groupId, memberId, role);
+    if (ok) {
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.map(m => m.userId === memberId ? { ...m, role } : m) } : g));
+      refresh();
+    }
+    return ok;
+  }, []);
 
-  const updateGroup = useCallback((groupId, { name, description }) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return false;
-    const me = group.members?.find(m => m.userId === userId);
-    if (!me || !['owner', 'admin'].includes(me.role)) return false;
-    if (name && name.trim()) group.name = name.trim();
-    if (description !== undefined) group.description = description.trim();
-    saveGroups(current);
-    setGroups(current);
-    syncGroupToSupabase(group);
-    return true;
-  }, [userId]);
+  const updateGroup = useCallback(async (groupId, { name, description, isPrivate }) => {
+    const ok = await apiUpdateGroup(groupId, { name, description, isPrivate });
+    if (ok) {
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, name: name ?? g.name, description: description ?? g.description, isPrivate: isPrivate !== undefined ? isPrivate : g.isPrivate } : g));
+      refresh();
+    }
+    return ok;
+  }, []);
 
-  const removeGroupMember = useCallback((groupId, memberId) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return false;
-    const me = group.members?.find(m => m.userId === userId);
-    if (!me || !['owner', 'admin'].includes(me.role)) return false;
-    if (group.ownerId === memberId) return false;
-    group.members = (group.members || []).filter(m => m.userId !== memberId);
-    saveGroups(current);
-    setGroups(current);
-    syncGroupToSupabase(group);
-    return true;
-  }, [userId]);
+  const removeGroupMember = useCallback(async (groupId, memberId) => {
+    const ok = await apiRemoveGroupMember(groupId, memberId);
+    if (ok) {
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.filter(m => m.userId !== memberId) } : g));
+      refresh();
+    }
+    return ok;
+  }, []);
 
   const changeProjectStatus = useCallback((projectId, newStatus) => {
     const current = getProjects();

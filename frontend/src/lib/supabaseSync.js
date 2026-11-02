@@ -155,7 +155,8 @@ export function groupToDb(g) {
     name: g.name,
     description: g.description || '',
     owner_id: isUUID(g.ownerId) ? g.ownerId : undefined,
-    is_private: Boolean(g.isPrivate),
+    // Todos los grupos son públicos; el acceso al contenido requiere solicitud.
+    is_private: false,
     created_at: g.createdAt || new Date().toISOString()
   };
 }
@@ -166,7 +167,9 @@ export function groupFromDb(row) {
     name: row.name,
     description: row.description || '',
     ownerId: row.owner_id,
-    isPrivate: Boolean(row.is_private),
+    // Se conserva el valor de la BD, pero la UI no restringe por privacidad:
+    // todos los grupos se muestran y el contenido requiere membresía.
+    isPrivate: row.is_private === true,
     createdAt: row.created_at,
     members: (row.group_members || []).map(m => ({
       userId: m.user_id,
