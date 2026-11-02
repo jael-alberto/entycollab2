@@ -1,6 +1,7 @@
 // backend/src/controllers/storageController.js
 // Controlador de subida de archivos a Supabase Storage
 
+import { randomUUID } from 'node:crypto';
 import { supabaseAdmin } from '../config/supabase.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 
@@ -22,7 +23,7 @@ export const uploadAvatar = asyncHandler(async (req, res) => {
   }
   
   const fileExt = file.originalname.split('.').pop().toLowerCase();
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+  const fileName = `${Date.now()}-${randomUUID()}.${fileExt}`;
   const path = `${userId}/${fileName}`;
   
   const { data, error } = await supabaseAdmin.storage
@@ -114,7 +115,7 @@ export const uploadProjectImage = asyncHandler(async (req, res) => {
   }
   
   const fileExt = file.originalname.split('.').pop().toLowerCase();
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+  const fileName = `${Date.now()}-${randomUUID()}.${fileExt}`;
   const path = `${projectId}/${fileName}`;
   
   const { data, error } = await supabaseAdmin.storage
