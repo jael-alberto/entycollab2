@@ -336,8 +336,8 @@ export function AppProvider({ children }) {
   // ========================================================================
   // PROJECTS
   // ========================================================================
-  const createProject = useCallback((data) => {
-    if (activeGroup && !isActiveGroupAdmin) return null;
+  const createProject = useCallback(async (data) => {
+    if (activeGroup && !isActiveGroupAdmin) return { error: 'No tienes permisos para crear proyectos en este grupo' };
     const project = {
       id: generateId(),
       ownerId: userId,
@@ -356,11 +356,13 @@ export function AppProvider({ children }) {
       createdAt: new Date().toISOString()
     };
     const current = getProjects();
+    const exists = current.some(p => p.title === data.title && p.ownerId === userId);
+    if (exists) return { error: 'Ya tienes un proyecto con este nombre' };
     current.push(project);
     saveProjects(current);
     setProjects(current);
     syncProjectToSupabase(project);
-    return project;
+    return { project, success: true };
   }, [userId, activeGroup, isActiveGroupAdmin]);
 
   // ========================================================================
