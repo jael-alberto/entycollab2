@@ -8,6 +8,7 @@ import ProjectCard from '../components/ProjectCard.jsx';
 import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
 import { getGroups, saveGroups } from '../lib/store.js';
+import { getGroupById, getGroupRequestStatus } from '../lib/api/groups.js';
 
 function memberFor(group, userId) {
   return group.members?.find(m => m.userId === userId) || null;
@@ -27,16 +28,12 @@ function GroupsDirectory() {
   const [description, setDescription] = useState('');
   const [selectedGroupModal, setSelectedGroupModal] = useState(null);
 
-  const submit = async (e) => {
+  const submit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    try {
-      const group = await createGroup({ name, description });
-      showToast('Grupo creado con éxito', 'success');
-      navigate(`/grupos/${group.id}`);
-    } catch {
-      showToast('No se pudo crear el grupo. Inténtalo de nuevo.', 'error');
-    }
+    const group = createGroup({ name, description });
+    showToast('Grupo creado con éxito', 'success');
+    navigate(`/grupos/${group.id}`);
   };
 
   const open = (group) => {
@@ -44,13 +41,13 @@ function GroupsDirectory() {
     navigate(`/grupos/${group.id}`);
   };
 
-  const handleRequest = async (groupId) => {
-    const res = await requestToJoinGroup(groupId);
+  const handleRequest = (groupId) => {
+    const res = requestToJoinGroup(groupId);
     if (res === 'pending') {
       showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
     } else if (res === 'member') {
       showToast('Ya eres miembro de este grupo', 'info');
-    } else if (res) {
+    } else {
       showToast('Solicitud enviada al administrador', 'success');
     }
   };
@@ -102,7 +99,10 @@ function GroupsDirectory() {
         <div className="groups-grid">
           {groups.map(group => {
             const membership = memberFor(group, user.id);
-            const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
+            const pending = Boolean(
+              group.hasPendingRequest ||
+              group.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
+            );
             return (
               <article className="group-card" key={group.id}>
                 <div className="group-card-header">
@@ -142,13 +142,31 @@ function GroupsDirectory() {
                     <button className="btn btn-ghost btn-sm" onClick={() => open(group)}>
                       Ver grupo
                     </button>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      disabled={pending}
-                      onClick={() => handleRequest(group.id)}
-                    >
-                      {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
-                    </button>
+                    {pending ? (
+                      <span
+                        className="project-status status-in-progress"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontSize: '0.78rem',
+                          padding: '0.35rem 0.65rem',
+                          borderRadius: '4px',
+                          cursor: 'default',
+                          userSelect: 'none'
+                        }}
+                        role="status"
+                      >
+                        <Icon name="clock" size={13} /> Solicitud pendiente
+                      </span>
+                    ) : (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleRequest(group.id)}
+                      >
+                        Solicitar acceso
+                      </button>
+                    )}
                   </div>
                 )}
               </article>
@@ -174,7 +192,10 @@ function GroupsDirectory() {
 
 function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onRequest }) {
   const membership = memberFor(group, currentUser?.id);
-  const pending = group.requests?.some(r => r.userId === currentUser?.id && r.status === 'pending');
+  const pending = Boolean(
+    group.hasPendingRequest ||
+    group.requests?.some(r => (r.userId === currentUser?.id || r.user_id === currentUser?.id) && r.status === 'pending')
+  );
   const owner = users.find(u => u.id === group.ownerId) || (group.members?.[0] ? users.find(u => u.id === group.members[0].userId) : null);
 
   return (
@@ -280,17 +301,36 @@ function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onR
               >
                 Ver grupo
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={pending}
-                onClick={() => {
-                  onRequest(group.id);
-                  onClose();
-                }}
-              >
-                {pending ? 'Solicitud enviada' : 'Solicitar acceso al grupo'}
-              </button>
+              {pending ? (
+                <span
+                  className="project-status status-in-progress"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.5rem 0.95rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    cursor: 'default',
+                    userSelect: 'none'
+                  }}
+                  role="status"
+                >
+                  <Icon name="clock" size={14} /> Solicitud pendiente
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    onRequest(group.id);
+                    onClose();
+                  }}
+                >
+                  Solicitar acceso al grupo
+                </button>
+              )}
             </>
           )}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -333,9 +373,30 @@ function PublicGroupPreview({ group, owner, memberCount, pending, onRequest, onB
           envía una solicitud y espera la aprobación de un administrador.
         </p>
         <div className="group-public-actions">
-          <button className="btn btn-primary" disabled={pending} onClick={onRequest}>
-            {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
-          </button>
+          {pending ? (
+            <span
+              className="project-status status-in-progress"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.55rem 1.15rem',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                cursor: 'default',
+                userSelect: 'none'
+              }}
+              role="status"
+              aria-live="polite"
+            >
+              <Icon name="clock" size={16} /> Solicitud pendiente
+            </span>
+          ) : (
+            <button className="btn btn-primary" onClick={onRequest}>
+              Solicitar acceso
+            </button>
+          )}
           <button className="btn btn-ghost" onClick={onBack}>Volver a grupos</button>
         </div>
       </div>
@@ -347,18 +408,66 @@ function GroupWorkspace({ groupId }) {
   const {
     user, users, groups, projects, activeGroup, selectGroup,
     decideGroupRequest, setGroupMemberRole, updateGroup, removeGroupMember,
-    requestToJoinGroup, sendInvite, lang, t
+    requestToJoinGroup, sendInvite, lang, t, setGroups
   } = useApp();
   const { openCreate } = useModals();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const group = groups.find(g => g.id === groupId);
-  const membership = group && memberFor(group, user.id);
+  const [groupDetail, setGroupDetail] = useState(null);
+  const [requestStatus, setRequestStatus] = useState(null);
+  const [loadingBackend, setLoadingBackend] = useState(false);
+
+  // Recargar el grupo y el estado de la solicitud desde el backend al abrir/reabrir la página
+  useEffect(() => {
+    let isCancelled = false;
+    async function loadGroupAndRequestState() {
+      if (!groupId) return;
+      try {
+        setLoadingBackend(true);
+        const [freshGroup, reqStatus] = await Promise.all([
+          getGroupById(groupId).catch(() => null),
+          getGroupRequestStatus(groupId).catch(() => null)
+        ]);
+        if (isCancelled) return;
+        if (freshGroup) {
+          setGroupDetail(freshGroup);
+          if (setGroups) {
+            setGroups(prev => {
+              const idx = prev.findIndex(g => g.id === groupId);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = { ...next[idx], ...freshGroup };
+                return next;
+              }
+              return [...prev, freshGroup];
+            });
+          }
+        }
+        if (reqStatus) {
+          setRequestStatus(reqStatus);
+        }
+      } catch (err) {
+        console.warn('[GroupWorkspace] Error recargando estado de grupo/solicitud:', err);
+      } finally {
+        if (!isCancelled) setLoadingBackend(false);
+      }
+    }
+    loadGroupAndRequestState();
+    return () => { isCancelled = true; };
+  }, [groupId, setGroups]);
+
+  const baseGroup = groups.find(g => g.id === groupId);
+  const group = groupDetail ? { ...baseGroup, ...groupDetail } : baseGroup;
+  const membership = group && memberFor(group, user?.id);
   const isOwner = group?.ownerId === user?.id;
   const isAdmin = membership?.role === 'owner' || membership?.role === 'admin';
-  const hasPendingRequest = !!group?.requests?.some(r => r.userId === user.id && r.status === 'pending');
+  const hasPendingRequest = Boolean(
+    requestStatus?.hasPendingRequest ||
+    group?.hasPendingRequest ||
+    group?.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
+  );
 
   const requestedTab = searchParams.get('tab') || (isOwner ? 'overview' : 'projects');
   const activeTab = requestedTab === 'overview' && !isOwner ? 'projects' : requestedTab;
@@ -423,9 +532,22 @@ function GroupWorkspace({ groupId }) {
   if (!membership) {
     const handleJoinRequest = async () => {
       const res = await requestToJoinGroup(group.id);
-      if (res === 'pending') showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
-      else if (res === 'member') showToast('Ya eres miembro de este grupo', 'info');
-      else if (res) showToast('Solicitud enviada al administrador', 'success');
+      setRequestStatus({ hasPendingRequest: true, request: res });
+      setGroupDetail(prev => ({
+        ...(prev || group),
+        hasPendingRequest: true,
+        requests: [
+          ...((prev || group)?.requests || []),
+          {
+            id: (typeof res === 'object' && res?.id) ? res.id : 'temp-' + Date.now(),
+            groupId: group.id,
+            userId: user?.id,
+            user_id: user?.id,
+            status: 'pending',
+            requestedAt: new Date().toISOString()
+          }
+        ]
+      }));
     };
 
     return (
@@ -440,35 +562,35 @@ function GroupWorkspace({ groupId }) {
     );
   }
 
-  const handleSaveGroupInfo = async (e) => {
+  const handleSaveGroupInfo = (e) => {
     e.preventDefault();
     if (!editName.trim()) return;
     setSavingInfo(true);
-    const ok = await updateGroup(group.id, { name: editName, description: editDesc });
+    const ok = updateGroup(group.id, { name: editName, description: editDesc });
     setSavingInfo(false);
     if (ok) showToast('Información del grupo actualizada', 'success');
     else showToast('No tienes permisos para editar este grupo', 'error');
   };
 
-  const handleRequestDecision = async (requestId, accepted) => {
-    const ok = await decideGroupRequest(group.id, requestId, accepted);
+  const handleRequestDecision = (requestId, accepted) => {
+    const ok = decideGroupRequest(group.id, requestId, accepted);
     if (ok) showToast(accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.', accepted ? 'success' : 'info');
   };
 
-  const handleRoleChange = async (memberId, newRole) => {
-    const ok = await setGroupMemberRole(group.id, memberId, newRole);
+  const handleRoleChange = (memberId, newRole) => {
+    const ok = setGroupMemberRole(group.id, memberId, newRole);
     if (ok) showToast('Rol de miembro actualizado', 'success');
   };
 
-  const handleRemoveMember = async (memberId, memberName) => {
+  const handleRemoveMember = (memberId, memberName) => {
     if (!window.confirm(`¿Estás seguro de expulsar a ${memberName} del grupo?`)) return;
-    const ok = await removeGroupMember(group.id, memberId);
+    const ok = removeGroupMember(group.id, memberId);
     if (ok) showToast(`${memberName} ha sido removido del grupo`, 'info');
   };
 
-  const handleLeaveGroup = async () => {
+  const handleLeaveGroup = () => {
     if (!window.confirm(t('group.leaveConfirm'))) return;
-    const ok = await removeGroupMember(group.id, user.id);
+    const ok = removeGroupMember(group.id, user.id);
     if (ok) {
       showToast('Has salido del grupo', 'info');
       selectGroup(null);
