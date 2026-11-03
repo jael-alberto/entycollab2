@@ -20,6 +20,11 @@ export default function Dashboard() {
   const [groupSearch, setGroupSearch] = useState('');
   const view = searchParams.get('view') === 'global' ? 'global' : 'welcome';
 
+  // Clear any persisted selected-group state when dashboard loads
+  useEffect(() => {
+    selectGroup(null);
+  }, [selectGroup]);
+
   const myGroups = useMemo(
     () => groups.filter(g => g.members?.some(m => m.userId === user.id)),
     [groups, user.id]
