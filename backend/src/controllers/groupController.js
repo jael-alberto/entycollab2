@@ -266,10 +266,11 @@ export const setGroupMemberRole = asyncHandler(async (req, res) => {
   const { role } = req.validated.body;
   const userId = req.user.id;
 
-  // Verificar permisos: owner o admin del grupo
+  // El creador conserva el control de la jerarquía. Los administradores
+  // pueden gestionar solicitudes y proyectos, pero no delegar administración.
   const access = await getGroupWithAccess(id, userId);
-  if (!access.isAdmin) {
-    throw new ForbiddenError('Solo el owner o un admin puede cambiar roles');
+  if (!access.isOwner) {
+    throw new ForbiddenError('Solo el creador puede cambiar roles de miembros');
   }
 
   const targetMember = await prisma.groupMember.findUnique({
@@ -281,10 +282,6 @@ export const setGroupMemberRole = asyncHandler(async (req, res) => {
   if (targetMember.role === 'owner') {
     throw new AppError('No se puede cambiar el rol del owner', 400, 'CANNOT_CHANGE_OWNER');
   }
-  if (!access.isOwner && targetMember.role === 'admin') {
-    throw new ForbiddenError('Solo el owner puede cambiar el rol de un administrador');
-  }
-
   const member = await prisma.groupMember.update({
     where: { groupId_userId: { groupId: id, userId: memberId } },
     data: { role }

@@ -86,40 +86,27 @@ export function getCurrentUser() {
 export async function hashPassword(plainText) {
   if (!plainText) return '';
   const cryptoObj = typeof crypto !== 'undefined' ? crypto : (typeof window !== 'undefined' ? window.crypto : null);
-  if (cryptoObj && cryptoObj.subtle) {
-    const buffer = await cryptoObj.subtle.digest('SHA-256', new TextEncoder().encode(plainText));
-    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  if (!cryptoObj?.subtle) {
+    throw new Error('La autenticación local requiere Web Crypto. Usa Supabase/Auth en este navegador.');
   }
-  // Cryptographic fallback hash (murmur-inspired 64-bit mix)
-  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
-  for (let i = 0; i < plainText.length; i++) {
-    const ch = plainText.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+  const buffer = await cryptoObj.subtle.digest('SHA-256', new TextEncoder().encode(plainText));
+  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-let _fallbackIdCounter = 0;
 export function generateId() {
   const cryptoObj = typeof crypto !== 'undefined' ? crypto : (typeof window !== 'undefined' ? window.crypto : null);
-  if (cryptoObj) {
-    if (typeof cryptoObj.randomUUID === 'function') {
-      return cryptoObj.randomUUID();
-    }
-    if (typeof cryptoObj.getRandomValues === 'function') {
-      const bytes = new Uint8Array(16);
-      cryptoObj.getRandomValues(bytes);
-      bytes[6] = (bytes[6] & 0x0f) | 0x40; // RFC4122 v4
-      bytes[8] = (bytes[8] & 0x3f) | 0x80;
-      const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-    }
+  if (typeof cryptoObj?.randomUUID === 'function') {
+    return cryptoObj.randomUUID();
   }
-  _fallbackIdCounter = (_fallbackIdCounter + 1) & 0xffffff;
-  return `id-${Date.now().toString(36)}-${_fallbackIdCounter.toString(36)}`;
+  if (typeof cryptoObj?.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    cryptoObj.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // RFC4122 v4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  throw new Error('No hay una fuente criptográficamente segura para generar identificadores.');
 }
 
 export function getTheme() {

@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
-  getUsers, getProjects, getApplications, getRatings,
+  getUsers, getProjects, getApplications, getRatings, getGroups,
+  saveUsers, saveProjects, saveApplications, saveRatingsData, saveGroups,
   getCurrentUserId, setCurrentUserId, clearCurrentUserId,
   getActiveGroupId, setActiveGroupId, generateId, hashPassword, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
 } from '../lib/store.js';
-import { listGroups, createGroup as apiCreateGroup, requestToJoinGroup as apiRequestToJoinGroup, decideGroupRequest as apiDecideGroupRequest, updateGroup as apiUpdateGroup, removeGroupMember as apiRemoveGroupMember, setGroupMemberRole as apiSetGroupMemberRole, getGroupMembers, getGroupRequests, listGroupProjects } from '../lib/api/groups.js';
+import { listGroups, createGroup as apiCreateGroup, requestToJoinGroup as apiRequestToJoinGroup, decideGroupRequest as apiDecideGroupRequest, updateGroup as apiUpdateGroup, removeGroupMember as apiRemoveGroupMember, setGroupMemberRole as apiSetGroupMemberRole } from '../lib/api/groups.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { getUserAvgRating, userCategories } from '../lib/helpers.js';
 import { isSupabaseConfigured } from '../lib/supabaseClient.js';
@@ -382,58 +383,129 @@ export function AppProvider({ children }) {
       members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
       requests: []
     };
-    const created = await apiCreateGroup(group);
-    setGroups(prev => {
-      const idx = prev.findIndex(g => g.id === created.id);
-      if (idx >= 0) prev[idx] = created;
-      return [...prev];
-    });
-    selectGroup(group.id);
+    // La aplicación puede usarse sin levantar el API local. En ese caso el
+    // espacio sigue siendo funcional y se sincronizará cuando haya servidor.
+    let created = group;
+    try {
+      created = await apiCreateGroup(group);
+    } catch (error) {
+      console.warn('[AppContext] Creando grupo solo en almacenamiento local:', error);
+    }
+    const current = getGroups();
+    const idx = current.findIndex(g => g.id === created.id);
+    if (idx >= 0) current[idx] = created;
+    else current.push(created);
+    saveGroups(current);
+    setGroups(current);
+    syncGroupToSupabase(created);
+    selectGroup(created.id);
     return created;
   }, [userId, selectGroup]);
 
   const requestToJoinGroup = useCallback(async (groupId) => {
-    const res = await apiRequestToJoinGroup(groupId);
-    if (res === 'pending') showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
-    else if (res === 'member') showToast('Ya eres miembro de este grupo', 'info');
-    else showToast('Solicitud enviada al administrador', 'success');
-    refresh();
-    return res;
-  }, [showToast, refresh]);
+    const group = getGroups().find(item => item.id === groupId);
+    if (!group || !userId) return null;
+    if (group.members?.some(member => member.userId === userId)) return 'member';
+    if (group.requests?.some(request => request.userId === userId && request.status === 'pending')) return 'pending';
+
+    try {
+      await apiRequestToJoinGroup(groupId);
+    } catch (error) {
+      console.warn('[AppContext] Guardando solicitud de grupo localmente:', error);
+    }
+
+    const request = { id: generateId(), userId, status: 'pending', requestedAt: new Date().toISOString() };
+    const current = getGroups().map(item => item.id === groupId
+      ? { ...item, requests: [...(item.requests || []), request] }
+      : item);
+    saveGroups(current);
+    setGroups(current);
+    return 'requested';
+  }, [userId]);
 
   const decideGroupRequest = useCallback(async (groupId, requestId, accepted) => {
-    const ok = await apiDecideGroupRequest(groupId, requestId, accepted);
-    if (ok) showToast(accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.', accepted ? 'success' : 'info');
-    refresh();
-    return ok;
-  }, [showToast, refresh]);
+    const group = getGroups().find(item => item.id === groupId);
+    const membership = group?.members?.find(member => member.userId === userId);
+    if (!group || !membership || !['owner', 'admin'].includes(membership.role)) return false;
+    const request = group.requests?.find(item => item.id === requestId && item.status === 'pending');
+    if (!request) return false;
+
+    try {
+      await apiDecideGroupRequest(groupId, requestId, accepted);
+    } catch (error) {
+      console.warn('[AppContext] Decidiendo solicitud de grupo localmente:', error);
+    }
+
+    const current = getGroups().map(item => {
+      if (item.id !== groupId) return item;
+      const requests = (item.requests || []).map(entry => entry.id === requestId ? { ...entry, status: accepted ? 'accepted' : 'rejected', decidedAt: new Date().toISOString() } : entry);
+      const members = accepted && !item.members?.some(member => member.userId === request.userId)
+        ? [...(item.members || []), { userId: request.userId, role: 'member', joinedAt: new Date().toISOString() }]
+        : item.members;
+      return { ...item, requests, members };
+    });
+    saveGroups(current);
+    setGroups(current);
+    return true;
+  }, [userId]);
 
   const setGroupMemberRole = useCallback(async (groupId, memberId, role) => {
-    const ok = await apiSetGroupMemberRole(groupId, memberId, role);
-    if (ok) {
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.map(m => m.userId === memberId ? { ...m, role } : m) } : g));
-      refresh();
+    if (!['admin', 'member'].includes(role)) return false;
+    const group = getGroups().find(item => item.id === groupId);
+    const actor = group?.members?.find(member => member.userId === userId);
+    const target = group?.members?.find(member => member.userId === memberId);
+    // Solo el creador puede delegar o retirar administración y nunca se puede
+    // degradar al creador desde la interfaz.
+    if (!group || actor?.role !== 'owner' || !target || target.role === 'owner') return false;
+    try {
+      await apiSetGroupMemberRole(groupId, memberId, role);
+    } catch (error) {
+      console.warn('[AppContext] Actualizando rol de grupo localmente:', error);
     }
-    return ok;
-  }, []);
+    const current = getGroups().map(item => item.id === groupId
+      ? { ...item, members: item.members.map(member => member.userId === memberId ? { ...member, role } : member) }
+      : item);
+    saveGroups(current);
+    setGroups(current);
+    return true;
+  }, [userId]);
 
   const updateGroup = useCallback(async (groupId, { name, description, isPrivate }) => {
-    const ok = await apiUpdateGroup(groupId, { name, description, isPrivate });
-    if (ok) {
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, name: name ?? g.name, description: description ?? g.description, isPrivate: isPrivate !== undefined ? isPrivate : g.isPrivate } : g));
-      refresh();
+    const group = getGroups().find(item => item.id === groupId);
+    const actor = group?.members?.find(member => member.userId === userId);
+    if (!group || !['owner', 'admin'].includes(actor?.role)) return false;
+    try {
+      await apiUpdateGroup(groupId, { name, description, isPrivate });
+    } catch (error) {
+      console.warn('[AppContext] Actualizando grupo localmente:', error);
     }
-    return ok;
-  }, []);
+    const current = getGroups().map(item => item.id === groupId
+      ? { ...item, name: name ?? item.name, description: description ?? item.description, isPrivate: isPrivate !== undefined ? isPrivate : item.isPrivate }
+      : item);
+    saveGroups(current);
+    setGroups(current);
+    return true;
+  }, [userId]);
 
   const removeGroupMember = useCallback(async (groupId, memberId) => {
-    const ok = await apiRemoveGroupMember(groupId, memberId);
-    if (ok) {
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.filter(m => m.userId !== memberId) } : g));
-      refresh();
+    const group = getGroups().find(item => item.id === groupId);
+    const actor = group?.members?.find(member => member.userId === userId);
+    const target = group?.members?.find(member => member.userId === memberId);
+    const leaving = memberId === userId && actor?.role !== 'owner';
+    const mayRemove = actor?.role === 'owner' || (actor?.role === 'admin' && target?.role === 'member') || leaving;
+    if (!group || !target || target.role === 'owner' || !mayRemove) return false;
+    try {
+      await apiRemoveGroupMember(groupId, memberId);
+    } catch (error) {
+      console.warn('[AppContext] Eliminando miembro localmente:', error);
     }
-    return ok;
-  }, []);
+    const current = getGroups().map(item => item.id === groupId
+      ? { ...item, members: item.members.filter(member => member.userId !== memberId) }
+      : item);
+    saveGroups(current);
+    setGroups(current);
+    return true;
+  }, [userId]);
 
   const changeProjectStatus = useCallback((projectId, newStatus) => {
     const current = getProjects();

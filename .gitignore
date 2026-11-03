@@ -18,6 +18,12 @@ dist-ssr
 !backend/.env.example
 !frontend/.env.example
 
+# TestSprite conserva los planes como pruebas versionables; los videos,
+# snapshots y resultados de ejecuciones locales no deben versionarse.
+.testsprite/runs/
+# Plan local de verificación que incluye credenciales demo para TestSprite.
+.testsprite/plans/group-workflow-verification.jsonl
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
