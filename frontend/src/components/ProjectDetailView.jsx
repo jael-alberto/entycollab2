@@ -172,6 +172,9 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
                       {applicant.skills.map(s => escapeHTML(s)).join(', ')}
                       {rating > 0 && <> · <Stars rating={rating} /></>}
                     </span>
+                    {(a.pitch || a.message) && (
+                      <p className="applicant-pitch">{escapeHTML(a.pitch || a.message)}</p>
+                    )}
                   </div>
                   <div className="applicant-actions">
                     <button className="btn btn-ghost btn-sm" onClick={() => openUserDetail(applicant.id, 2)}>{t('detail.viewProfile')}</button>

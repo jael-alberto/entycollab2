@@ -121,6 +121,9 @@ export default function ProjectDetailModal() {
                   {applicant.skills.map(s => escapeHTML(s)).join(', ')}
                   {rating > 0 && <> · <Stars rating={rating} /></>}
                 </span>
+                {(a.pitch || a.message) && (
+                  <p className="applicant-pitch">{escapeHTML(a.pitch || a.message)}</p>
+                )}
               </div>
               <div className="applicant-actions">
                 {a.status === 'pending' ? (

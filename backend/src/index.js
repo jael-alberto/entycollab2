@@ -7,7 +7,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
-import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
+import { disconnectPrisma } from './config/prisma.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 // Importar rutas
 import authRoutes from './routes/authRoutes.js';
@@ -112,16 +113,18 @@ const server = app.listen(env.port, () => {
 // Manejo graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
+  server.close(async () => {
     console.log('Server closed');
+    await disconnectPrisma().catch(() => {});
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT received. Shutting down gracefully...');
-  server.close(() => {
+  server.close(async () => {
     console.log('Server closed');
+    await disconnectPrisma().catch(() => {});
     process.exit(0);
   });
 });

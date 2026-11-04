@@ -8,6 +8,7 @@ import ProjectCard from '../components/ProjectCard.jsx';
 import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
 import { getGroups, saveGroups } from '../lib/store.js';
+import { getGroupById, getGroupRequestStatus } from '../lib/api/groups.js';
 
 function memberFor(group, userId) {
   return group.members?.find(m => m.userId === userId) || null;
@@ -36,10 +37,8 @@ function GroupsDirectory() {
   };
 
   const open = (group) => {
-    if (memberFor(group, user.id)) {
-      selectGroup(group.id);
-      navigate(`/grupos/${group.id}`);
-    }
+    if (memberFor(group, user.id)) selectGroup(group.id);
+    navigate(`/grupos/${group.id}`);
   };
 
   const handleRequest = (groupId) => {
@@ -58,7 +57,7 @@ function GroupsDirectory() {
       <div className="section-header-row">
         <div>
           <h2 className="section-title">Grupos</h2>
-          <p className="groups-intro">Espacios privados para que equipos organicen sus proyectos y miembros.</p>
+          <p className="groups-intro">Espacios públicos para descubrir equipos. Cualquiera puede ver su información principal; para acceder a proyectos y miembros hay que solicitar entrada.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setCreating(v => !v)}>
           {creating ? 'Cancelar' : 'Crear grupo'}
@@ -100,7 +99,10 @@ function GroupsDirectory() {
         <div className="groups-grid">
           {groups.map(group => {
             const membership = memberFor(group, user.id);
-            const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
+            const pending = Boolean(
+              group.hasPendingRequest ||
+              group.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
+            );
             return (
               <article className="group-card" key={group.id}>
                 <div className="group-card-header">
@@ -128,7 +130,7 @@ function GroupsDirectory() {
 
                 <div className="group-card-meta">
                   <span>{group.members?.length || 0} miembros</span>
-                  <span>{membership ? (membership.role === 'owner' ? 'Creador' : membership.role === 'admin' ? 'Administrador' : 'Miembro') : 'Grupo privado'}</span>
+                  <span>{membership ? (membership.role === 'owner' ? 'Creador' : membership.role === 'admin' ? 'Administrador' : 'Miembro') : 'Público · solicitud para acceder'}</span>
                 </div>
 
                 {membership ? (
@@ -136,13 +138,36 @@ function GroupsDirectory() {
                     Entrar al grupo
                   </button>
                 ) : (
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    disabled={pending}
-                    onClick={() => handleRequest(group.id)}
-                  >
-                    {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
-                  </button>
+                  <div className="group-card-actions">
+                    <button className="btn btn-ghost btn-sm" onClick={() => open(group)}>
+                      Ver grupo
+                    </button>
+                    {pending ? (
+                      <span
+                        className="project-status status-in-progress"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontSize: '0.78rem',
+                          padding: '0.35rem 0.65rem',
+                          borderRadius: '4px',
+                          cursor: 'default',
+                          userSelect: 'none'
+                        }}
+                        role="status"
+                      >
+                        <Icon name="clock" size={13} /> Solicitud pendiente
+                      </span>
+                    ) : (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleRequest(group.id)}
+                      >
+                        Solicitar acceso
+                      </button>
+                    )}
+                  </div>
                 )}
               </article>
             );
@@ -167,7 +192,10 @@ function GroupsDirectory() {
 
 function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onRequest }) {
   const membership = memberFor(group, currentUser?.id);
-  const pending = group.requests?.some(r => r.userId === currentUser?.id && r.status === 'pending');
+  const pending = Boolean(
+    group.hasPendingRequest ||
+    group.requests?.some(r => (r.userId === currentUser?.id || r.user_id === currentUser?.id) && r.status === 'pending')
+  );
   const owner = users.find(u => u.id === group.ownerId) || (group.members?.[0] ? users.find(u => u.id === group.members[0].userId) : null);
 
   return (
@@ -196,8 +224,8 @@ function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onR
         <div className="group-modal-header">
           <div className="group-modal-title-row">
             <h2 className="group-modal-title">{group.name}</h2>
-            <span className={`group-modal-status-badge ${membership ? 'status-joined' : 'status-private'}`}>
-              {membership ? 'MIEMBRO' : 'GRUPO PRIVADO'}
+            <span className={`group-modal-status-badge ${membership ? 'status-joined' : 'status-public'}`}>
+              {membership ? 'MIEMBRO' : 'GRUPO PÚBLICO'}
             </span>
           </div>
 
@@ -217,8 +245,8 @@ function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onR
           </div>
         </div>
 
-        {/* Sección Miembros */}
-        {group.members && group.members.length > 0 && (
+        {/* Sección Miembros: solo visible para miembros del grupo */}
+        {membership && group.members && group.members.length > 0 && (
           <div className="group-modal-section">
             <h4 className="group-modal-section-heading">MIEMBROS ({group.members.length})</h4>
             <div className="group-modal-members-grid">
@@ -240,6 +268,14 @@ function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onR
           </div>
         )}
 
+        {!membership && (
+          <div className="group-modal-section">
+            <div className="group-modal-description-box">
+              <p>La lista de miembros y los proyectos del grupo son visibles solo para sus miembros. Envía una solicitud para acceder.</p>
+            </div>
+          </div>
+        )}
+
         {/* Acciones del Modal */}
         <div className="group-modal-actions">
           {membership ? (
@@ -254,17 +290,48 @@ function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onR
               Entrar al grupo →
             </button>
           ) : (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={pending}
-              onClick={() => {
-                onRequest(group.id);
-                onClose();
-              }}
-            >
-              {pending ? 'Solicitud enviada' : 'Solicitar acceso al grupo'}
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  onClose();
+                  onOpen(group);
+                }}
+              >
+                Ver grupo
+              </button>
+              {pending ? (
+                <span
+                  className="project-status status-in-progress"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.5rem 0.95rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    cursor: 'default',
+                    userSelect: 'none'
+                  }}
+                  role="status"
+                >
+                  <Icon name="clock" size={14} /> Solicitud pendiente
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    onRequest(group.id);
+                    onClose();
+                  }}
+                >
+                  Solicitar acceso al grupo
+                </button>
+              )}
+            </>
           )}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cerrar
@@ -275,21 +342,132 @@ function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onR
   );
 }
 
+// Vista pública de un grupo para quienes todavía no son miembros: muestra la
+// información principal (nombre, avatar, descripción, creador y nº de miembros)
+// y permite solicitar acceso. Los proyectos y la lista de miembros quedan
+// ocultos hasta que un administrador apruebe la solicitud.
+function PublicGroupPreview({ group, owner, memberCount, pending, onRequest, onBack }) {
+  return (
+    <div className="section-block groups-page group-workspace group-public-preview">
+      <header className="repo-header">
+        <div className="repo-title-row">
+          <GroupAvatar group={group} size="xl" />
+          <div className="repo-title-info">
+            <div className="repo-name-line">
+              <h1 className="repo-name">{group.name}</h1>
+              <span className="repo-visibility"><Icon name="globe" size={13} />Público</span>
+            </div>
+            <p className="repo-desc">{group.description}</p>
+          </div>
+        </div>
+      </header>
+
+      <div className="group-panel" style={{ marginTop: '1.25rem' }}>
+        <div className="group-public-meta">
+          <span><strong>Creador:</strong> {owner?.name || 'Administrador'}</span>
+          <span><strong>Miembros:</strong> {memberCount}</span>
+          <span><strong>Fecha:</strong> {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'Reciente'}</span>
+        </div>
+        <p className="form-hint" style={{ marginTop: '1rem' }}>
+          Este grupo es público: puedes ver su información principal. Para acceder a los proyectos y a la lista de miembros,
+          envía una solicitud y espera la aprobación de un administrador.
+        </p>
+        <div className="group-public-actions">
+          {pending ? (
+            <span
+              className="project-status status-in-progress"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.55rem 1.15rem',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                cursor: 'default',
+                userSelect: 'none'
+              }}
+              role="status"
+              aria-live="polite"
+            >
+              <Icon name="clock" size={16} /> Solicitud pendiente
+            </span>
+          ) : (
+            <button className="btn btn-primary" onClick={onRequest}>
+              Solicitar acceso
+            </button>
+          )}
+          <button className="btn btn-ghost" onClick={onBack}>Volver a grupos</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GroupWorkspace({ groupId }) {
   const {
     user, users, groups, projects, activeGroup, selectGroup,
     decideGroupRequest, setGroupMemberRole, updateGroup, removeGroupMember,
-    sendInvite, lang, t
+    requestToJoinGroup, sendInvite, lang, t, setGroups
   } = useApp();
   const { openCreate } = useModals();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const group = groups.find(g => g.id === groupId);
-  const membership = group && memberFor(group, user.id);
+  const [groupDetail, setGroupDetail] = useState(null);
+  const [requestStatus, setRequestStatus] = useState(null);
+  const [loadingBackend, setLoadingBackend] = useState(false);
+
+  // Recargar el grupo y el estado de la solicitud desde el backend al abrir/reabrir la página
+  useEffect(() => {
+    let isCancelled = false;
+    async function loadGroupAndRequestState() {
+      if (!groupId) return;
+      try {
+        setLoadingBackend(true);
+        const [freshGroup, reqStatus] = await Promise.all([
+          getGroupById(groupId).catch(() => null),
+          getGroupRequestStatus(groupId).catch(() => null)
+        ]);
+        if (isCancelled) return;
+        if (freshGroup) {
+          setGroupDetail(freshGroup);
+          if (setGroups) {
+            setGroups(prev => {
+              const idx = prev.findIndex(g => g.id === groupId);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = { ...next[idx], ...freshGroup };
+                return next;
+              }
+              return [...prev, freshGroup];
+            });
+          }
+        }
+        if (reqStatus) {
+          setRequestStatus(reqStatus);
+        }
+      } catch (err) {
+        console.warn('[GroupWorkspace] Error recargando estado de grupo/solicitud:', err);
+      } finally {
+        if (!isCancelled) setLoadingBackend(false);
+      }
+    }
+    loadGroupAndRequestState();
+    return () => { isCancelled = true; };
+  }, [groupId, setGroups]);
+
+  const baseGroup = groups.find(g => g.id === groupId);
+  const group = groupDetail ? { ...baseGroup, ...groupDetail } : baseGroup;
+  const membership = group && memberFor(group, user?.id);
   const isOwner = group?.ownerId === user?.id;
   const isAdmin = membership?.role === 'owner' || membership?.role === 'admin';
+  const hasPendingRequest = Boolean(
+    requestStatus?.hasPendingRequest ||
+    group?.hasPendingRequest ||
+    group?.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
+  );
 
   const requestedTab = searchParams.get('tab') || (isOwner ? 'overview' : 'projects');
   const activeTab = requestedTab === 'overview' && !isOwner ? 'projects' : requestedTab;
@@ -352,15 +530,35 @@ function GroupWorkspace({ groupId }) {
   }
 
   if (!membership) {
+    const handleJoinRequest = async () => {
+      const res = await requestToJoinGroup(group.id);
+      setRequestStatus({ hasPendingRequest: true, request: res });
+      setGroupDetail(prev => ({
+        ...(prev || group),
+        hasPendingRequest: true,
+        requests: [
+          ...((prev || group)?.requests || []),
+          {
+            id: (typeof res === 'object' && res?.id) ? res.id : 'temp-' + Date.now(),
+            groupId: group.id,
+            userId: user?.id,
+            user_id: user?.id,
+            status: 'pending',
+            requestedAt: new Date().toISOString()
+          }
+        ]
+      }));
+    };
+
     return (
-      <div className="section-block">
-        <EmptyState
-          icon="lock"
-          title="Este grupo es privado"
-          sub="Solicita acceso desde el directorio. Un administrador debe aprobar tu solicitud para ingresar."
-        />
-        <button className="btn btn-ghost" onClick={() => navigate('/grupos')}>Volver a grupos</button>
-      </div>
+      <PublicGroupPreview
+        group={group}
+        owner={users.find(u => u.id === group.ownerId)}
+        memberCount={group.members?.length || 0}
+        pending={hasPendingRequest}
+        onRequest={handleJoinRequest}
+        onBack={() => navigate('/grupos')}
+      />
     );
   }
 
@@ -465,7 +663,7 @@ function GroupWorkspace({ groupId }) {
           <div className="repo-title-info">
             <div className="repo-name-line">
               <h1 className="repo-name">{group.name}</h1>
-              <span className="repo-visibility"><Icon name="lock" size={13} />{t('group.private')}</span>
+              <span className="repo-visibility"><Icon name="globe" size={13} />Público</span>
               <span className={`group-role-badge ${roleBadgeClass(membership.role)}`}>{roleLabel(membership.role)}</span>
             </div>
             <p className="repo-desc">{group.description}</p>
@@ -630,7 +828,7 @@ function GroupWorkspace({ groupId }) {
                     Solicitudes de acceso
                     <span className="tab-badge">{requests.length}</span>
                   </h3>
-                  <p>Aspirantes que desean unirse a este espacio de trabajo privado.</p>
+                  <p>Aspirantes que desean unirse a este espacio de trabajo.</p>
                 </div>
               </div>
               <div style={{ marginTop: '1rem' }}>

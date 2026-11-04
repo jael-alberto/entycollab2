@@ -5,7 +5,7 @@ import { Router } from 'express';
 import {
   listGroups, getUserGroups, getGroup, createGroup, updateGroup, deleteGroup,
   getGroupMembers, setGroupMemberRole, removeGroupMember,
-  requestToJoinGroup, decideGroupRequest, getGroupRequests,
+  requestToJoinGroup, decideGroupRequest, getGroupRequests, getMyGroupRequest,
   listGroupProjects, createGroupProject
 } from '../controllers/groupController.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -48,6 +48,9 @@ router.put('/:id/requests/:requestId', requireAuth, validate(schemas.decideGroup
 
 // GET /api/groups/:id/requests - solicitudes pendientes
 router.get('/:id/requests', requireAuth, validate(schemas.idParams), getGroupRequests);
+
+// GET /api/groups/:id/my-request - estado de solicitud del usuario actual
+router.get('/:id/my-request', requireAuth, validate(schemas.idParams), getMyGroupRequest);
 
 // GET /api/groups/:id/projects - proyectos del grupo
 router.get('/:id/projects', requireAuth, validate(schemas.listGroupProjects), listGroupProjects);

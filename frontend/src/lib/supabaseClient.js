@@ -1,51 +1,49 @@
 // frontend/src/lib/supabaseClient.js
-// Cliente Supabase - ahora solo para gestión de auth tokens
-// La capa de datos usa el backend propio (src/lib/api/client.js)
+// Cliente de Supabase para el frontend (utiliza la Anon/Publishable Key)
+import { createClient } from '@supabase/supabase-js';
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const USE_SUPABASE = import.meta.env.VITE_USE_SUPABASE === 'true';
+// Admite tanto variables con prefijo VITE_ (estándar de Vite) como SUPABASE_
+export const SUPABASE_URL = (
+  import.meta.env.VITE_SUPABASE_URL ||
+  import.meta.env.SUPABASE_URL ||
+  ''
+).trim();
+
+export const SUPABASE_ANON_KEY = (
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.SUPABASE_PUBLISHABLE_KEY ||
+  ''
+).trim();
+
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-let _authToken = null;
-let _refreshToken = null;
-
-// Inicializar tokens desde localStorage
-export function initAuthTokens() {
-  _authToken = localStorage.getItem('auth_token');
-  _refreshToken = localStorage.getItem('refresh_token');
-}
-
-export function getAuthToken() {
-  return _authToken;
-}
-
-export function getRefreshToken() {
-  return _refreshToken;
-}
-
-export function setAuthTokens(authToken, refreshToken) {
-  _authToken = authToken;
-  _refreshToken = refreshToken;
-  if (authToken) localStorage.setItem('auth_token', authToken);
-  if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
-}
-
-export function clearAuthTokens() {
-  _authToken = null;
-  _refreshToken = null;
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('refresh_token');
-}
-
+/**
+ * Valida si las credenciales de Supabase están configuradas con valores válidos (no placeholders).
+ */
 export function isSupabaseConfigured() {
-  return USE_SUPABASE && !!SUPABASE_URL && !!SUPABASE_ANON_KEY;
+  return Boolean(
+    SUPABASE_URL &&
+    SUPABASE_ANON_KEY &&
+    !SUPABASE_URL.includes('tu-proyecto') &&
+    !SUPABASE_ANON_KEY.startsWith('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...')
+  );
 }
 
-// Función legacy para compatibilidad - ahora usa backend
+// Instancia única del cliente Supabase para el navegador
+export const supabase = isSupabaseConfigured()
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null;
+
 export function getSupabaseClient() {
-  console.warn('getSupabaseClient() está deprecado. Usa la capa API en src/lib/api/');
-  return null;
+  return supabase;
 }
 
 // Helper para renovar token usando refresh_token

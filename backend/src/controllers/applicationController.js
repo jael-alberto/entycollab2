@@ -1,7 +1,8 @@
 // backend/src/controllers/applicationController.js
-// Controlador de postulaciones e invitaciones
+// Controlador de postulaciones e invitaciones (Prisma)
 
-import { supabaseAdmin } from '../config/supabase.js';
+import { prisma } from '../config/prisma.js';
+import { serializeApplication } from '../utils/serializers.js';
 import {
   asyncHandler, NotFoundError, ForbiddenError, ConflictError, AppError
 } from '../middleware/errorHandler.js';
@@ -9,116 +10,129 @@ import {
 async function getGroupRole(groupId, userId) {
   if (!groupId) return null;
 
-  const { data } = await supabaseAdmin
-    .from('group_members')
-    .select('role')
-    .eq('group_id', groupId)
-    .eq('user_id', userId)
-    .maybeSingle();
+  const membership = await prisma.groupMember.findUnique({
+    where: { groupId_userId: { groupId, userId } },
+    select: { role: true }
+  });
 
-  return data?.role || null;
+  return membership?.role || null;
 }
 
 async function canManageProject(project, userId) {
-  if (project.owner_id === userId) return true;
-  if (!project.group_id) return false;
+  if (project.ownerId === userId) return true;
+  if (!project.groupId) return false;
 
-  const role = await getGroupRole(project.group_id, userId);
+  const role = await getGroupRole(project.groupId, userId);
   return role === 'owner' || role === 'admin';
 }
 
 async function assertGroupProjectAccess(project, userId) {
-  if (!project.group_id) return;
+  if (!project.groupId) return;
 
-  const { data: group } = await supabaseAdmin
-    .from('groups')
-    .select('is_private')
-    .eq('id', project.group_id)
-    .maybeSingle();
+  const group = await prisma.group.findUnique({
+    where: { id: project.groupId },
+    select: { isPrivate: true }
+  });
 
   if (!group) throw new NotFoundError('Proyecto');
 
-  if (group.is_private) {
-    const role = await getGroupRole(project.group_id, userId);
+  if (group.isPrivate) {
+    const role = await getGroupRole(project.groupId, userId);
     if (!role) throw new ForbiddenError('Este proyecto pertenece a un grupo privado');
   }
 }
+
+const APPLICATION_PROJECT_INCLUDE = {
+  project: {
+    select: {
+      id: true, title: true, category: true, status: true,
+      image: true, deadline: true, slots: true, minRating: true, ownerId: true,
+      owner: { select: { id: true, name: true, username: true, avatar: true } },
+      group: { select: { id: true, name: true } }
+    }
+  },
+  user: {
+    select: {
+      id: true, name: true, username: true, avatar: true,
+      skills: true, gameTypes: true, disciplines: true
+    }
+  },
+  inviter: { select: { id: true, name: true, username: true, avatar: true } }
+};
 
 // POST /api/applications/apply
 export const applyToProject = asyncHandler(async (req, res) => {
   const { projectId, message = '' } = req.validated.body;
   const userId = req.user.id;
 
-  const { data: project, error: projectError } = await supabaseAdmin
-    .from('projects')
-    .select('id, status, min_rating, owner_id, group_id, slots')
-    .eq('id', projectId)
-    .maybeSingle();
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true, status: true, minRating: true, ownerId: true, groupId: true, slots: true
+    }
+  });
 
-  if (projectError) throw new Error(projectError.message);
   if (!project) throw new NotFoundError('Proyecto');
   if (project.status !== 'open') {
     throw new AppError('El proyecto no está abierto para postulaciones', 400, 'PROJECT_NOT_OPEN');
   }
-  if (project.owner_id === userId) {
+  if (project.ownerId === userId) {
     throw new AppError('No puedes postularte a tu propio proyecto', 400, 'OWN_PROJECT');
   }
 
   await assertGroupProjectAccess(project, userId);
 
-  const { data: existing } = await supabaseAdmin
-    .from('applications')
-    .select('id')
-    .eq('project_id', projectId)
-    .eq('user_id', userId)
-    .maybeSingle();
+  const existing = await prisma.application.findUnique({
+    where: { projectId_userId: { projectId, userId } },
+    select: { id: true }
+  });
 
   if (existing) throw new ConflictError('Ya te has postulado a este proyecto');
 
-  const { count: acceptedCount } = await supabaseAdmin
-    .from('applications')
-    .select('*', { count: 'exact', head: true })
-    .eq('project_id', projectId)
-    .eq('status', 'accepted');
+  const acceptedCount = await prisma.application.count({
+    where: { projectId, status: 'accepted' }
+  });
 
-  if ((acceptedCount || 0) >= project.slots) {
+  if (acceptedCount >= project.slots) {
     throw new AppError('No hay cupos disponibles', 400, 'SLOTS_FULL');
   }
 
   // Verificar rating mínimo
-  if (project.min_rating > 0) {
-    const { data: avgRating } = await supabaseAdmin
-      .rpc('get_user_avg_rating', { p_user_id: userId });
+  if (Number(project.minRating) > 0) {
+    const ratingAgg = await prisma.rating.aggregate({
+      where: { ratedUserId: userId },
+      _avg: { stars: true }
+    });
 
-    if ((avgRating || 0) < project.min_rating) {
+    const avgRating = Number(ratingAgg._avg.stars || 0);
+
+    if (avgRating < Number(project.minRating)) {
       throw new AppError(
-        `Necesitas un promedio de ${project.min_rating}★ o más`,
+        `Necesitas un promedio de ${project.minRating}★ o más`,
         400,
         'MIN_RATING_REQUIRED'
       );
     }
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .insert({
-      project_id: projectId,
-      user_id: userId,
+  const application = await prisma.application.create({
+    data: {
+      projectId,
+      userId,
       status: 'pending',
       message
-    })
-    .select(`
-      *,
-      project:projects(id, title, category, status, min_rating, slots, owner_id)
-    `)
-    .single();
+    },
+    include: {
+      project: {
+        select: {
+          id: true, title: true, category: true, status: true,
+          minRating: true, slots: true, ownerId: true
+        }
+      }
+    }
+  });
 
-  if (error) {
-    if (error.code === '23505') throw new ConflictError('Ya te has postulado a este proyecto');
-    throw new Error(error.message);
-  }
-
-  res.status(201).json({ application: data });
+  res.status(201).json({ application: serializeApplication(application) });
 });
 
 // POST /api/applications/invite
@@ -126,13 +140,11 @@ export const sendInvite = asyncHandler(async (req, res) => {
   const { projectId, targetUserId, message = '' } = req.validated.body;
   const userId = req.user.id;
 
-  const { data: project, error: projectError } = await supabaseAdmin
-    .from('projects')
-    .select('id, status, slots, owner_id, group_id')
-    .eq('id', projectId)
-    .maybeSingle();
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, status: true, slots: true, ownerId: true, groupId: true }
+  });
 
-  if (projectError) throw new Error(projectError.message);
   if (!project) throw new NotFoundError('Proyecto');
 
   if (!await canManageProject(project, userId)) {
@@ -141,53 +153,42 @@ export const sendInvite = asyncHandler(async (req, res) => {
   if (project.status !== 'open') {
     throw new AppError('El proyecto no está abierto', 400, 'PROJECT_NOT_OPEN');
   }
-  if (targetUserId === project.owner_id) {
+  if (targetUserId === project.ownerId) {
     throw new AppError('No puedes invitarte a tu propio proyecto', 400, 'OWN_PROJECT');
   }
 
-  const { count: acceptedCount } = await supabaseAdmin
-    .from('applications')
-    .select('*', { count: 'exact', head: true })
-    .eq('project_id', projectId)
-    .eq('status', 'accepted');
+  const acceptedCount = await prisma.application.count({
+    where: { projectId, status: 'accepted' }
+  });
 
-  if ((acceptedCount || 0) >= project.slots) {
+  if (acceptedCount >= project.slots) {
     throw new AppError('No hay cupos disponibles', 400, 'SLOTS_FULL');
   }
 
-  const { data: targetUser, error: targetError } = await supabaseAdmin
-    .from('profiles')
-    .select('id, name, username')
-    .eq('id', targetUserId)
-    .maybeSingle();
+  const targetUser = await prisma.profile.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, name: true, username: true }
+  });
 
-  if (targetError) throw new Error(targetError.message);
   if (!targetUser) throw new NotFoundError('Usuario');
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .insert({
-      project_id: projectId,
-      user_id: targetUserId,
+  const application = await prisma.application.create({
+    data: {
+      projectId,
+      userId: targetUserId,
       status: 'pending',
-      invited_by: userId,
+      invitedBy: userId,
       message
-    })
-    .select(`
-      *,
-      project:projects(id, title, category, status, slots),
-      invited_by_profile:profiles!invited_by(id, name, username)
-    `)
-    .single();
-
-  if (error) {
-    if (error.code === '23505') {
-      throw new ConflictError('Esta persona ya está postulada o invitada a ese proyecto');
+    },
+    include: {
+      project: {
+        select: { id: true, title: true, category: true, status: true, slots: true }
+      },
+      inviter: { select: { id: true, name: true, username: true } }
     }
-    throw new Error(error.message);
-  }
+  });
 
-  res.status(201).json({ application: data });
+  res.status(201).json({ application: serializeApplication(application) });
 });
 
 // PUT /api/applications/:id
@@ -196,23 +197,24 @@ export const handleApplication = asyncHandler(async (req, res) => {
   const { status, projectRole } = req.validated.body;
   const userId = req.user.id;
 
-  const { data: app, error: appError } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      *,
-      project:projects(id, title, status, slots, owner_id, group_id)
-    `)
-    .eq('id', id)
-    .maybeSingle();
+  const application = await prisma.application.findUnique({
+    where: { id },
+    include: {
+      project: {
+        select: {
+          id: true, title: true, status: true, slots: true, ownerId: true, groupId: true
+        }
+      }
+    }
+  });
 
-  if (appError) throw new Error(appError.message);
-  if (!app || !app.project) throw new NotFoundError('Postulación');
+  if (!application || !application.project) throw new NotFoundError('Postulación');
 
-  if (!await canManageProject(app.project, userId)) {
+  if (!await canManageProject(application.project, userId)) {
     throw new ForbiddenError('Solo el owner del proyecto o un admin del grupo puede gestionar postulaciones');
   }
 
-  if (app.status !== 'pending') {
+  if (application.status !== 'pending') {
     throw new AppError(
       'Solo se pueden gestionar postulaciones pendientes',
       400,
@@ -220,7 +222,7 @@ export const handleApplication = asyncHandler(async (req, res) => {
     );
   }
 
-  if (status === 'accepted' && !['open', 'in-progress'].includes(app.project.status)) {
+  if (status === 'accepted' && !['open', 'in-progress'].includes(application.project.status)) {
     throw new AppError(
       'No se pueden aceptar participantes en un proyecto cerrado o completado',
       400,
@@ -228,30 +230,21 @@ export const handleApplication = asyncHandler(async (req, res) => {
     );
   }
 
-  const updateData = { status, responded_at: new Date().toISOString() };
+  const data = { status, respondedAt: new Date() };
   if (status === 'accepted') {
-    updateData.project_role = projectRole || 'Developer';
+    data.projectRole = projectRole || 'Developer';
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .update(updateData)
-    .eq('id', id)
-    .select(`
-      *,
-      user:profiles!user_id(id, name, username, avatar),
-      project:projects(id, title, owner_id)
-    `)
-    .single();
-
-  if (error) {
-    if (error.code === 'P0001' && /cupos|slots/i.test(error.message)) {
-      throw new AppError('No hay cupos disponibles', 400, 'SLOTS_FULL');
+  const updated = await prisma.application.update({
+    where: { id },
+    data,
+    include: {
+      user: { select: { id: true, name: true, username: true, avatar: true } },
+      project: { select: { id: true, title: true, ownerId: true } }
     }
-    throw new Error(error.message);
-  }
+  });
 
-  res.json({ application: data });
+  res.json({ application: serializeApplication(updated) });
 });
 
 // PUT /api/applications/:id/respond
@@ -260,24 +253,22 @@ export const respondInvite = asyncHandler(async (req, res) => {
   const { action } = req.validated.body; // 'accepted' | 'rejected'
   const userId = req.user.id;
 
-  const { data: app, error: appError } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      *,
-      project:projects(id, title, status, slots, owner_id)
-    `)
-    .eq('id', id)
-    .eq('user_id', userId)
-    .maybeSingle();
+  const application = await prisma.application.findFirst({
+    where: { id, userId },
+    include: {
+      project: {
+        select: { id: true, title: true, status: true, slots: true, ownerId: true }
+      }
+    }
+  });
 
-  if (appError) throw new Error(appError.message);
-  if (!app || !app.project) throw new NotFoundError('Invitación');
-  if (!app.invited_by) throw new AppError('Esta no es una invitación', 400, 'NOT_INVITE');
-  if (app.status !== 'pending') {
+  if (!application || !application.project) throw new NotFoundError('Invitación');
+  if (!application.invitedBy) throw new AppError('Esta no es una invitación', 400, 'NOT_INVITE');
+  if (application.status !== 'pending') {
     throw new AppError('Esta invitación ya fue respondida', 400, 'ALREADY_RESPONDED');
   }
 
-  if (action === 'accepted' && !['open', 'in-progress'].includes(app.project.status)) {
+  if (action === 'accepted' && !['open', 'in-progress'].includes(application.project.status)) {
     throw new AppError(
       'No puedes aceptar una invitación de un proyecto cerrado o completado',
       400,
@@ -287,105 +278,85 @@ export const respondInvite = asyncHandler(async (req, res) => {
 
   const newStatus = action === 'accepted' ? 'accepted' : 'rejected';
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .update({
-      status: newStatus,
-      responded_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .select(`
-      *,
-      project:projects(id, title, owner_id)
-    `)
-    .single();
-
-  if (error) {
-    if (error.code === 'P0001' && /cupos|slots/i.test(error.message)) {
-      throw new AppError('No hay cupos disponibles', 400, 'SLOTS_FULL');
+  const updated = await prisma.application.update({
+    where: { id },
+    data: { status: newStatus, respondedAt: new Date() },
+    include: {
+      project: { select: { id: true, title: true, ownerId: true } }
     }
-    throw new Error(error.message);
-  }
+  });
 
-  res.json({ application: data });
+  res.json({ application: serializeApplication(updated) });
 });
 
 // GET /api/applications/user
 export const getUserApplications = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      *,
-      project:projects(
-        id, title, category, status, image, deadline,
-        owner:profiles!owner_id(id, name, username, avatar),
-        group:groups!group_id(id, name)
-      )
-    `)
-    .eq('user_id', userId)
-    .order('applied_at', { ascending: false });
+  const applications = await prisma.application.findMany({
+    where: { userId },
+    include: APPLICATION_PROJECT_INCLUDE,
+    orderBy: { appliedAt: 'desc' }
+  });
 
-  if (error) throw new Error(error.message);
-
-  res.json({ applications: data || [] });
+  res.json({ applications: applications.map(serializeApplication) });
 });
 
 // GET /api/applications/project/:projectId
 export const getProjectApplications = asyncHandler(async (req, res) => {
   const { projectId } = req.validated.params;
 
-  const { data: project, error: projectError } = await supabaseAdmin
-    .from('projects')
-    .select('owner_id, group_id')
-    .eq('id', projectId)
-    .maybeSingle();
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { ownerId: true, groupId: true }
+  });
 
-  if (projectError) throw new Error(projectError.message);
   if (!project) throw new NotFoundError('Proyecto');
 
   if (!await canManageProject(project, req.user.id)) {
     throw new ForbiddenError('No tienes permisos para ver las postulaciones');
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      *,
-      user:profiles!user_id(id, name, username, avatar, skills, game_types, disciplines),
-      invited_by_profile:profiles!invited_by(id, name, username)
-    `)
-    .eq('project_id', projectId)
-    .order('applied_at', { ascending: false });
+  const applications = await prisma.application.findMany({
+    where: { projectId },
+    include: {
+      user: {
+        select: {
+          id: true, name: true, username: true, avatar: true,
+          skills: true, gameTypes: true, disciplines: true
+        }
+      },
+      inviter: { select: { id: true, name: true, username: true } }
+    },
+    orderBy: { appliedAt: 'desc' }
+  });
 
-  if (error) throw new Error(error.message);
-
-  res.json({ applications: data || [] });
+  res.json({ applications: applications.map(serializeApplication) });
 });
 
 // GET /api/applications/invites/pending
 export const getPendingInvites = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      *,
-      project:projects(
-        id, title, category, status, image,
-        owner:profiles!owner_id(id, name, username, avatar)
-      ),
-      invited_by_profile:profiles!invited_by(id, name, username, avatar)
-    `)
-    .eq('user_id', userId)
-    .eq('status', 'pending')
-    .not('invited_by', 'is', null)
-    .order('applied_at', { ascending: false });
+  const invitations = await prisma.application.findMany({
+    where: {
+      userId,
+      status: 'pending',
+      invitedBy: { not: null }
+    },
+    include: {
+      project: {
+        select: {
+          id: true, title: true, category: true, status: true, image: true,
+          owner: { select: { id: true, name: true, username: true, avatar: true } }
+        }
+      },
+      inviter: { select: { id: true, name: true, username: true, avatar: true } }
+    },
+    orderBy: { appliedAt: 'desc' }
+  });
 
-  if (error) throw new Error(error.message);
-
-  res.json({ invitations: data || [] });
+  res.json({ invitations: invitations.map(serializeApplication) });
 });
 
 // GET /api/applications/check/:projectId
@@ -393,50 +364,62 @@ export const checkUserApplication = asyncHandler(async (req, res) => {
   const { projectId } = req.validated.params;
   const userId = req.user.id;
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .select('id, status, project_role')
-    .eq('project_id', projectId)
-    .eq('user_id', userId)
-    .maybeSingle();
+  const application = await prisma.application.findUnique({
+    where: { projectId_userId: { projectId, userId } },
+    select: { id: true, status: true, projectRole: true }
+  });
 
-  if (error) throw new Error(error.message);
-
-  res.json({ application: data || null });
+  res.json({
+    application: application
+      ? {
+          id: application.id,
+          status: application.status,
+          project_role: application.projectRole
+        }
+      : null
+  });
 });
 
 // GET /api/applications/project/:projectId/accepted
 export const getAcceptedApplications = asyncHandler(async (req, res) => {
   const { projectId } = req.validated.params;
 
-  const { data: project, error: projectError } = await supabaseAdmin
-    .from('projects')
-    .select('owner_id, group_id')
-    .eq('id', projectId)
-    .maybeSingle();
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { ownerId: true, groupId: true }
+  });
 
-  if (projectError) throw new Error(projectError.message);
   if (!project) throw new NotFoundError('Proyecto');
 
-  if (project.group_id) {
-    const role = await getGroupRole(project.group_id, req.user.id);
-    const isOwner = project.owner_id === req.user.id;
+  if (project.groupId) {
+    const role = await getGroupRole(project.groupId, req.user.id);
+    const isOwner = project.ownerId === req.user.id;
     if (!isOwner && !role) {
       throw new ForbiddenError('No tienes acceso a los participantes de este proyecto');
     }
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      user_id,
-      project_role,
-      user:profiles!user_id(id, name, username, avatar)
-    `)
-    .eq('project_id', projectId)
-    .eq('status', 'accepted');
+  const applications = await prisma.application.findMany({
+    where: { projectId, status: 'accepted' },
+    select: {
+      userId: true,
+      projectRole: true,
+      user: { select: { id: true, name: true, username: true, avatar: true } }
+    }
+  });
 
-  if (error) throw new Error(error.message);
-
-  res.json({ participants: data || [] });
+  res.json({
+    participants: applications.map(application => ({
+      user_id: application.userId,
+      project_role: application.projectRole,
+      user: application.user
+        ? {
+            id: application.user.id,
+            name: application.user.name,
+            username: application.user.username,
+            avatar: application.user.avatar ?? null
+          }
+        : null
+    }))
+  });
 });

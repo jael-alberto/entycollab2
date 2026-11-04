@@ -62,7 +62,7 @@ export default function CreateProjectModal() {
     setImage(dataUrl);
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const found = validate();
     setErrors(found);
@@ -74,20 +74,28 @@ export default function CreateProjectModal() {
     setLoading(true);
     let finalCategory = category;
     if (category === 'other') finalCategory = customCategory.trim();
-    createProject({
-      title: title.trim(),
-      category: finalCategory,
-      slots: parseInt(slots, 10) || 1,
-      tech: techs,
-      minRating,
-      description: description.trim(),
-      deadline: deadline || null,
-      repo: repo.trim() || null,
-      image,
-      roles: rolesText.split(',').map(role => role.trim()).filter(Boolean)
-    });
-    closeCreate();
-    showToast(t('toast.published'), 'success');
+    try {
+      await createProject({
+        title: title.trim(),
+        category: finalCategory,
+        slots: parseInt(slots, 10) || 1,
+        tech: techs,
+        minRating,
+        description: description.trim(),
+        deadline: deadline || null,
+        repo: repo.trim() || null,
+        image,
+        roles: rolesText.split(',').map(role => role.trim()).filter(Boolean)
+      });
+      showToast(t('toast.published'), 'success');
+      closeCreate();
+    } catch (error) {
+      console.error('[CreateProject] Error:', error);
+      showToast(error || t('form.submitError'), 'error');
+      // Keep modal open - don't close on error
+    } finally {
+      setLoading(false);
+    }
   };
 
   const minRatingLabel = minRating === 1

@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Opcional pero recomendado en Supabase para que Prisma vea el esquema 'auth'
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  schemas  = ["public", "auth"]
+}
+
+// ==========================================================
+// MODELO PUENTE PARA SUPABASE AUTH (¡NO TOCAR NI MIGRAR!)
+// ==========================================================
+model AuthUser {
+  id       String    @id @db.Uuid
+  profiles Profile[]
+
+  @@ignore // ← CRUCIAL: Evita que Prisma gestione esta tabla de Supabase
+  @@map("users")
+  @@schema("auth")
+}
+
+// ==========================================================
+// MODELOS DE LA APLICACIÓN (schema: public)
+// ==========================================================
+
+model Profile {
+  id                 String          @id @db.Uuid
+  name               String
+  username           String          @unique
+  email              String?         @unique
+  avatar             String?
+  skills             String[]        @default([])
+  categories         String[]        @default([])
+  bio                Json?
+  githubUrl          String?         @map("github_url")
+  portfolioUrl       String?         @map("portfolio_url")
+  available          Boolean         @default(false)
+  featuredProjectIds String[]        @default([]) @map("featured_project_ids") @db.Uuid
+  gameTypes          String[]        @default([]) @map("game_types")
+  languages          String[]        @default([])
+  favoriteGenres     String[]        @default([]) @map("favorite_genres")
+  disciplines        String[]        @default([])
+  createdAt          DateTime        @default(now()) @map("created_at")
+
+  // Relaciones
+  ownedGroups        Group[]         @relation("GroupOwner")
+  groupMemberships   GroupMember[]
+  sentRequests       GroupRequest[]  @relation("RequestSender")
+  decidedRequests    GroupRequest[]  @relation("RequestDecider")
+
+  ownedProjects      Project[]       @relation("ProjectOwner")
+  applications       Application[]
+  invitedApplications Application[]  @relation("ApplicationInviter")
+
+  ratedRatings       Rating[]        @relation("RatingGiver")
+  receivedRatings    Rating[]        @relation("RatingReceiver")
+
+  // Relación con la tabla auth de Supabase
+  authUser           AuthUser        @relation(fields: [id], references: [id]) @ignore
+
+  @@map("profiles")
+  @@schema("public")
+}
+
+model Group {
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String
+  description String          @default("")
+  ownerId     String          @map("owner_id") @db.Uuid
+  isPrivate   Boolean         @default(true) @map("is_private")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  owner       Profile         @relation("GroupOwner", fields: [ownerId], references: [id])
+  members     GroupMember[]
+  requests    GroupRequest[]
+  projects    Project[]
+
+  @@map("groups")
+  @@schema("public")
+}
+
+model GroupMember {
+  groupId   String   @map("group_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      String   @default("member") // Validar en backend: 'owner' | 'admin' | 'member'
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@map("group_members")
+  @@schema("public")
+}
+
+model GroupRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  groupId     String    @map("group_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  status      String    @default("pending") // Validar en backend: 'pending' | 'accepted' | 'rejected'
+  requestedAt DateTime  @default(now()) @map("requested_at")
+  decidedAt   DateTime? @map("decided_at")
+  decidedBy   String?   @map("decided_by") @db.Uuid
+
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user        Profile   @relation("RequestSender", fields: [userId], references: [id], onDelete: Cascade)
+  decider     Profile?  @relation("RequestDecider", fields: [decidedBy], references: [id])
+
+  @@map("group_requests")
+  @@schema("public")
+}
+
+model Project {
+  id          String    @id @default(uuid()) @db.Uuid
+  ownerId     String    @map("owner_id") @db.Uuid
+  groupId     String?   @map("group_id") @db.Uuid
+  title       Json
+  category    String
+  slots       Int
+  tech        String[]  @default([])
+  description Json
+  minRating   Decimal   @default(1) @map("min_rating") @db.Decimal(2, 1)
+  deadline    DateTime? @db.Date
+  repo        String?
+  image       String?
+  roles       String[]  @default([])
+  status      String    @default("open") // Validar en backend: 'open' | 'in-progress' | 'completed' | 'closed'
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  owner       Profile   @relation("ProjectOwner", fields: [ownerId], references: [id])
+  group       Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  applications Application[]
+  ratings     Rating[]
+
+  @@map("projects")
+  @@schema("public")
+}
+
+model Application {
+  id           String    @id @default(uuid()) @db.Uuid
+  projectId    String    @map("project_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  status       String    @default("pending") // Validar en backend: 'pending' | 'accepted' | 'rejected'
+  projectRole  String?   @map("project_role")
+  invitedBy    String?   @map("invited_by") @db.Uuid
+  message      String    @default("")
+  appliedAt    DateTime  @default(now()) @map("applied_at")
+  respondedAt  DateTime? @map("responded_at")
+
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         Profile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviter      Profile?  @relation("ApplicationInviter", fields: [invitedBy], references: [id])
+
+  @@map("applications")
+  @@schema("public")
+}
+
+model Rating {
+  id           String    @id @default(uuid()) @db.Uuid
+  projectId    String    @map("project_id") @db.Uuid
+  ratedUserId  String    @map("rated_user_id") @db.Uuid
+  ratedById    String    @map("rated_by") @db.Uuid
+  stars        Int       // Validar en backend: 1 a 5
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime? @map("updated_at")
+
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ratedUser    Profile   @relation("RatingReceiver", fields: [ratedUserId], references: [id])
+  rater        Profile   @relation("RatingGiver", fields: [ratedById], references: [id])
+
+  @@map("ratings")
+  @@schema("public")
+}

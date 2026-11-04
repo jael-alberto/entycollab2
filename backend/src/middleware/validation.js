@@ -246,7 +246,7 @@ export const schemas = {
     body: z.object({
       name: z.string().trim().min(1).max(100),
       description: z.string().max(2000).optional(),
-      isPrivate: z.boolean().default(true)
+      isPrivate: z.boolean().default(false)
     })
   }),
 

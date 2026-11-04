@@ -2243,6 +2243,18 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   color: var(--color-text-dim);
 }
 
+.applicant-pitch {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-text-main);
+  background: var(--color-surface-alt, rgba(148, 163, 184, 0.1));
+  border-left: 3px solid var(--color-primary);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  white-space: pre-wrap;
+}
+
 .applicant-actions {
   display: flex;
   gap: 0.4rem;
@@ -2988,7 +3000,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* ===========================================================================
-   GROUPS — espacios privados de empresas y equipos
+   GROUPS — espacios públicos de empresas y equipos
    ========================================================================== */
 .groups-intro { margin: .25rem 0 0; color: var(--color-text-dim); }
 .groups-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
@@ -3034,6 +3046,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   transform: translateY(-1px);
 }
 .group-card-meta { display: flex; justify-content: space-between; gap: .5rem; font-size: .8rem; color: var(--color-text-dim); margin-top: auto; padding-top: 0.25rem; border-top: 1px dashed var(--color-border); }
+.group-card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.group-public-meta { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--color-text-dim); }
+.group-public-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
 
 /* Ventana Modal / Detalle de Grupo */
 .group-modal-dialog {
@@ -3108,6 +3123,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   background: rgba(249, 115, 22, 0.15);
   color: #ea580c;
   border: 1px solid rgba(249, 115, 22, 0.3);
+}
+.group-modal-status-badge.status-public {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 .group-modal-meta-bar {
   display: flex;
@@ -7095,6 +7115,38 @@ button.nav-link {
 
 .oauth-btn svg {
   flex: none;
+}
+
+.oauth-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---- Social OAuth prefilled notice ---- */
+.game-auth-social-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0 0 4px;
+  line-height: 1.5;
+}
+
+.dark .game-auth-social-notice {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+}
+
+.game-auth-social-notice span[aria-hidden] {
+  font-size: 14px;
+  font-weight: 700;
 }
 
 /* ---- Links legales junto al submit ---- */

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -6,6 +6,10 @@ import { Field, Icon, Modal, SkipLink, Spinner } from './common.jsx';
 import { LegalContent } from '../pages/Legal.jsx';
 import { ALL_LANGUAGES, DISCIPLINES, FAVORITE_GENRES, GAME_TYPES, disciplineLabel, favoriteGenreLabel, gameTypeLabel } from '../lib/talent.js';
 import { emailKey, nameKey, passwordKey, requiredKey, usernameKey } from '../lib/validation.js';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
+import { syncProfileToSupabase } from '../lib/supabaseSync.js';
+import { userCategories } from '../lib/helpers.js';
+import { getUsers, saveUsers, setCurrentUserId } from '../lib/store.js';
 
 function ChoiceGrid({ items, selected, onChange, label, describedBy }) {
   return (
@@ -52,7 +56,7 @@ function GitHubMark() {
 }
 
 export default function GameAuth({ initialMode }) {
-  const { login, register, t, lang } = useApp();
+  const { login, register, t, lang, refresh } = useApp();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -71,13 +75,116 @@ export default function GameAuth({ initialMode }) {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [stepError, setStepError] = useState('');
+  // Tracks if the user came via OAuth (no password required)
+  const [isSocialFlow, setIsSocialFlow] = useState(false);
   const isRegister = initialMode === 'register';
 
   const toggle = (setter, selected, value) =>
     setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]);
 
-  // Solo UI brandeada: no hay OAuth real implementado.
-  const social = () => showToast(t('auth.socialSoon'), 'info');
+  // -------------------------------------------------------------------------
+  // OAUTH CALLBACK HANDLER
+  // After the provider redirects back, Supabase sets a session in the URL hash.
+  // We read the user metadata, fill the form fields, and jump directly to Step 2.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isRegister || !isSupabaseConfigured() || !supabase) return;
+
+    async function handleOAuthCallback() {
+      // getSession() resolves the hash fragment tokens automatically
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const u = session.user;
+      const meta = u.user_metadata || {};
+
+      // Provider-agnostic field extraction
+      const fullName = meta.full_name || meta.name || meta.user_name || u.email?.split('@')[0] || '';
+      const rawUsername = meta.user_name || meta.preferred_username || meta.name
+        || fullName.replace(/\s+/g, '_').toLowerCase() || u.email?.split('@')[0] || '';
+      const userEmail = u.email || '';
+      const avatarUrl = meta.avatar_url || meta.picture || null;
+
+      // Check if this user already exists in the local store
+      const existing = getUsers().find(u2 => u2.email === userEmail || u2.id === u.id);
+      if (existing) {
+        // Already registered → just log in and go to dashboard
+        setCurrentUserId(existing.id);
+        refresh();
+        showToast(t('toast.welcome', { name: existing.username }), 'success');
+        navigate('/dashboard');
+        return;
+      }
+
+      // New OAuth user → pre-fill Step 1 fields, skip to Step 2
+      setName(fullName);
+      setUsername(rawUsername);
+      setEmail(userEmail);
+      setIsSocialFlow(true);
+      setFieldErrors({});
+      setStepError('');
+
+      // Persist a local profile so the app works even without completing the wizard
+      const newUser = {
+        id: u.id,
+        name: fullName,
+        username: rawUsername,
+        email: userEmail,
+        avatar: avatarUrl,
+        skills: [],
+        categories: userCategories({ skills: [] }),
+        bio: '',
+        gameTypes: [],
+        favoriteGenres: [],
+        disciplines: [],
+        languages: [],
+        createdAt: new Date().toISOString()
+      };
+
+      const current = getUsers();
+      if (!current.find(x => x.id === u.id)) {
+        current.push(newUser);
+        saveUsers(current);
+      }
+
+      if (isSupabaseConfigured()) {
+        syncProfileToSupabase(newUser);
+      }
+
+      // Advance to Step 2 so user can pick their game preferences
+      setStep(2);
+    }
+
+    handleOAuthCallback();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRegister]);
+
+  // -------------------------------------------------------------------------
+  // OAUTH SIGN-IN TRIGGER
+  // Redirects the user to Google / GitHub via Supabase Auth
+  // -------------------------------------------------------------------------
+  const socialLogin = async (provider) => {
+    if (!isSupabaseConfigured() || !supabase) {
+      showToast(t('auth.socialSoon'), 'info');
+      return;
+    }
+    setLoading(true);
+    try {
+      const redirectTo = `${window.location.origin}/register`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo }
+      });
+      if (error) {
+        showToast(error.message || t('auth.socialError'), 'error');
+        setLoading(false);
+      }
+      // On success the browser will navigate away (redirect to provider)
+    } catch (err) {
+      showToast(t('auth.socialError'), 'error');
+      setLoading(false);
+    }
+  };
 
   const openLegal = (section) => (e) => {
     e.preventDefault();
@@ -103,7 +210,8 @@ export default function GameAuth({ initialMode }) {
       name: tErr(nameKey(name)),
       username: tErr(usernameKey(username)),
       email: tErr(emailKey(email)),
-      password: tErr(passwordKey(password)),
+      // OAuth users have no password — skip that validation
+      password: isSocialFlow ? '' : tErr(passwordKey(password)),
     };
     setFieldErrors(errors);
     if (errors.name || errors.username || errors.email || errors.password) return;
@@ -120,13 +228,13 @@ export default function GameAuth({ initialMode }) {
     setStep(3);
   };
 
-  const submitRegister = () => {
+  const submitRegister = async () => {
     if (!favoriteGenres.length || !disciplines.length) {
       setStepError(t('auth.chooseAtLeastOne'));
       return;
     }
     setLoading(true);
-    const result = register({
+    const result = await register({
       name: name.trim(),
       username: username.replace(/^@/, '').trim(),
       email: email.trim().toLowerCase(),
@@ -153,7 +261,7 @@ export default function GameAuth({ initialMode }) {
     navigate('/perfil');
   };
 
-  const submitLogin = (event) => {
+  const submitLogin = async (event) => {
     event.preventDefault();
     const errors = {
       loginIdentifier: tErr(requiredKey(loginIdentifier)),
@@ -162,7 +270,7 @@ export default function GameAuth({ initialMode }) {
     setFieldErrors(errors);
     if (errors.loginIdentifier || errors.loginPassword) return;
     setLoading(true);
-    const user = login(loginIdentifier.trim(), loginPassword);
+    const user = await login(loginIdentifier.trim(), loginPassword);
     setLoading(false);
     if (!user) {
       setStepError(t('toast.loginError'));
@@ -184,15 +292,19 @@ export default function GameAuth({ initialMode }) {
 
   const oauthRow = (
     <div className="game-auth-oauth">
-      <button type="button" className="oauth-btn" onClick={social}>
+      <button type="button" className="oauth-btn" onClick={() => socialLogin('google')} disabled={loading}>
         <GoogleMark />
         <span>{t('auth.google')}</span>
       </button>
-      <button type="button" className="oauth-btn" onClick={social}>
+      <button type="button" className="oauth-btn" onClick={() => socialLogin('github')} disabled={loading}>
         <GitHubMark />
         <span>{t('auth.github')}</span>
       </button>
     </div>
+  );
+
+  const oauthDivider = (
+    <div className="game-auth-or" aria-hidden="true"><span>{t('auth.orContinueWith')}</span></div>
   );
 
   const passwordToggleLabel = showPassword ? t('auth.hidePassword') : t('auth.showPassword');
@@ -236,38 +348,50 @@ export default function GameAuth({ initialMode }) {
             </div>
             {stepError && <p className="game-auth-error" role="alert">{stepError}</p>}
             {step === 1 && (
-              <form onSubmit={continueAccount} className="game-auth-form" noValidate>
-                <div className="game-auth-row">
-                  <Field label={t('register.name')} htmlFor="ga-name" error={fieldErrors.name} required>
-                    <input value={name} onChange={event => setName(event.target.value)} placeholder={t('register.namePh')} autoComplete="name" />
+              <>
+                {/* OAuth quick-register buttons */}
+                {oauthRow}
+                {oauthDivider}
+                <form onSubmit={continueAccount} className="game-auth-form" noValidate>
+                  {isSocialFlow && (
+                    <p className="game-auth-social-notice" role="status">
+                      <span aria-hidden="true">✓</span> {t('auth.socialPrefilled')}
+                    </p>
+                  )}
+                  <div className="game-auth-row">
+                    <Field label={t('register.name')} htmlFor="ga-name" error={fieldErrors.name} required>
+                      <input value={name} onChange={event => setName(event.target.value)} placeholder={t('register.namePh')} autoComplete="name" />
+                    </Field>
+                    <Field label={t('register.username')} htmlFor="ga-username" error={fieldErrors.username} required>
+                      <input value={username} onChange={event => setUsername(event.target.value)} placeholder={t('register.usernamePh')} autoComplete="username" />
+                    </Field>
+                  </div>
+                  <Field label={t('login.email')} htmlFor="ga-email" error={fieldErrors.email} required>
+                    <input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder={t('auth.emailPh')} autoComplete="email" readOnly={isSocialFlow} />
                   </Field>
-                  <Field label={t('register.username')} htmlFor="ga-username" error={fieldErrors.username} required>
-                    <input value={username} onChange={event => setUsername(event.target.value)} placeholder={t('register.usernamePh')} autoComplete="username" />
-                  </Field>
-                </div>
-                <Field label={t('login.email')} htmlFor="ga-email" error={fieldErrors.email} required>
-                  <input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder={t('auth.emailPh')} autoComplete="email" />
-                </Field>
-                <Field label={t('login.password')} htmlFor="ga-password" error={fieldErrors.password} required>
-                  <span className="game-auth-password">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={event => setPassword(event.target.value)}
-                      placeholder={t('register.passwordPh')}
-                      autoComplete="new-password"
-                    />
-                    <button type="button" onClick={() => setShowPassword(value => !value)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
-                      {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                    </button>
-                  </span>
-                </Field>
-                <button className="game-auth-primary" type="submit" disabled={loading} aria-busy={loading}>
-                  {loading && <Spinner />}
-                  {loading ? t('auth.creating') : t('auth.continue')}
-                </button>
-                {legalRow}
-              </form>
+                  {!isSocialFlow && (
+                    <Field label={t('login.password')} htmlFor="ga-password" error={fieldErrors.password} required>
+                      <span className="game-auth-password">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={event => setPassword(event.target.value)}
+                          placeholder={t('register.passwordPh')}
+                          autoComplete="new-password"
+                        />
+                        <button type="button" onClick={() => setShowPassword(value => !value)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
+                          {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                        </button>
+                      </span>
+                    </Field>
+                  )}
+                  <button className="game-auth-primary" type="submit" disabled={loading} aria-busy={loading}>
+                    {loading && <Spinner />}
+                    {loading ? t('auth.creating') : t('auth.continue')}
+                  </button>
+                  {legalRow}
+                </form>
+              </>
             )}
             {step === 2 && (
               <div className="game-auth-step">

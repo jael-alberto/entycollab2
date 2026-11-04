@@ -1,7 +1,8 @@
 // backend/src/middleware/auth.js
 // Middleware de autenticación JWT
 
-import { verifyAuthToken, supabaseAdmin } from '../config/supabase.js';
+import { verifyAuthToken } from '../config/supabase.js';
+import { prisma } from '../config/prisma.js';
 
 // Middleware: requiere autenticación (inyecta req.user)
 export async function requireAuth(req, res, next) {
@@ -90,14 +91,12 @@ export function requireGroupRole(groupIdParam, allowedRoles = ['owner', 'admin']
         });
       }
       
-      const { data: membership, error } = await supabaseAdmin
-        .from('group_members')
-        .select('role')
-        .eq('group_id', groupId)
-        .eq('user_id', req.user.id)
-        .single();
+      const membership = await prisma.groupMember.findUnique({
+        where: { groupId_userId: { groupId, userId: req.user.id } },
+        select: { role: true }
+      });
       
-      if (error || !membership || !allowedRoles.includes(membership.role)) {
+      if (!membership || !allowedRoles.includes(membership.role)) {
         return res.status(403).json({ 
           error: 'Prohibido', 
           message: 'No tienes permisos en este grupo' 

@@ -16,10 +16,15 @@ const games = [
 const filters = [['all', 'Todos'], ['rpg', 'Action RPG'], ['rogue', 'Roguelite & Arcade'], ['engine', 'Motores & Voxel']];
 
 export default function Landing() {
-  const { user } = useApp();
+  const { user, selectGroup } = useApp();
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const destination = user ? '/dashboard' : '/register';
+
+  // Clear any persisted selected-group state when landing page loads
+  useEffect(() => {
+    selectGroup(null);
+  }, [selectGroup]);
   const exploreTarget = user ? '/proyectos' : '#explorar';
 
   const visibleGames = useMemo(() => games.filter(game => {

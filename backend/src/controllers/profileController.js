@@ -1,137 +1,141 @@
 // backend/src/controllers/profileController.js
-// Controlador de perfiles
+// Controlador de perfiles (Prisma)
 
+import { prisma } from '../config/prisma.js';
 import { supabaseAdmin } from '../config/supabase.js';
-import { asyncHandler, NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../middleware/errorHandler.js';
+import {
+  serializeProfile,
+  serializeRating,
+  serializeProject,
+  profileInputToPrisma
+} from '../utils/serializers.js';
+import {
+  asyncHandler,
+  NotFoundError,
+  ConflictError,
+  ForbiddenError,
+  ValidationError
+} from '../middleware/errorHandler.js';
 
-// Campos públicos de perfiles (email nunca se expone a terceros)
-const PUBLIC_PROFILE_FIELDS = `
-  id, username, name, bio, skills, categories,
-  github_url, portfolio_url, avatar, available,
-  game_types, languages, favorite_genres, disciplines,
-  featured_project_ids, created_at, updated_at
-`;
+function pagination(page, pageSize, total) {
+  return {
+    page: Number(page),
+    pageSize: Number(pageSize),
+    total,
+    totalPages: Math.ceil(total / pageSize)
+  };
+}
 
 // GET /api/profiles
 export const listProfiles = asyncHandler(async (req, res) => {
-  const { page = 1, pageSize = 20, available } = req.query;
-  
-  let query = supabaseAdmin
-    .from('profiles')
-    .select(PUBLIC_PROFILE_FIELDS, { count: 'exact' })
-    .order('created_at', { ascending: false });
-  
-  if (available === 'true') {
-    query = query.eq('available', true);
-  }
-  
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-  query = query.range(from, to);
-  
-  const { data, error, count } = await query;
-  
-  if (error) throw new Error(error.message);
-  
+  const { page, pageSize, available } = req.validated.query;
+
+  const where = available === true ? { available: true } : {};
+
+  const [data, total] = await prisma.$transaction([
+    prisma.profile.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    }),
+    prisma.profile.count({ where })
+  ]);
+
   res.json({
-    data: data || [],
-    pagination: {
-      page: Number(page),
-      pageSize: Number(pageSize),
-      total: count || 0,
-      totalPages: Math.ceil((count || 0) / pageSize)
-    }
+    data: data.map(profile => serializeProfile(profile)),
+    pagination: pagination(page, pageSize, total)
   });
 });
 
 // GET /api/profiles/search
 export const searchProfiles = asyncHandler(async (req, res) => {
-  const { q, limit = 20 } = req.query;
-  
+  const { q, limit } = req.validated.query;
+
   if (!q || q.length < 2) {
     return res.json({ data: [] });
   }
-  
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select(PUBLIC_PROFILE_FIELDS)
-    .or(`name.ilike.%${q}%,username.ilike.%${q}%,bio->>es.ilike.%${q}%,bio->>en.ilike.%${q}%`)
-    .limit(Number(limit));
-  
-  if (error) throw new Error(error.message);
-  
-  res.json({ data: data || [] });
+
+  const data = await prisma.profile.findMany({
+    where: {
+      OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } },
+        { bio: { path: ['es'], string_contains: q, mode: 'insensitive' } },
+        { bio: { path: ['en'], string_contains: q, mode: 'insensitive' } }
+      ]
+    },
+    // `limit` llega como número gracias a schemas.searchProfiles (Zod).
+    // No volver a convertir directamente una entrada de la solicitud evita
+    // que un parámetro manipulado cambie de tipo antes de llegar a Prisma.
+    take: limit
+  });
+
+  res.json({ data: data.map(profile => serializeProfile(profile)) });
 });
 
 // GET /api/profiles/available
 export const getAvailablePeople = asyncHandler(async (req, res) => {
-  const { 
-    gameTypes, languages, favoriteGenres, disciplines, 
-    completed, rating, page = 1, pageSize = 20 
-  } = req.query;
-  
-  let query = supabaseAdmin
-    .from('profiles')
-    .select(PUBLIC_PROFILE_FIELDS, { count: 'exact' })
-    .eq('available', true);
-  
-  if (gameTypes) query = query.overlaps('game_types', gameTypes.split(','));
-  if (languages) query = query.overlaps('languages', languages.split(','));
-  if (favoriteGenres) query = query.overlaps('favorite_genres', favoriteGenres.split(','));
-  if (disciplines) query = query.overlaps('disciplines', disciplines.split(','));
-  
-  // completed y rating: filtrado usando RPCs por perfil
-  // Los RPCs get_completed_projects_count y get_user_avg_rating existen en la migración 0003
-  // y operan sobre la base de datos por usuario. Aplicamos filtros después de la consulta.
-  
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-  query = query.range(from, to).order('created_at', { ascending: false });
-  
-  const { data, error, count } = await query;
-  
-  if (error) throw new Error(error.message);
-  
-  // Aplicar filtros de completed y rating usando RPCs en lote
-  // Los RPCs get_completed_projects_count y get_user_avg_rating existen en la migración 0003
-  // y operan sobre la base de datos por usuario. Usamos Promise.all para llamar eficientemente.
-  let filtered = data || [];
-  
+  const {
+    gameTypes, languages, favoriteGenres, disciplines,
+    completed, rating, page, pageSize
+  } = req.validated.query;
+
+  const where = { available: true };
+
+  if (gameTypes) where.gameTypes = { hasSome: gameTypes.split(',') };
+  if (languages) where.languages = { hasSome: languages.split(',') };
+  if (favoriteGenres) where.favoriteGenres = { hasSome: favoriteGenres.split(',') };
+  if (disciplines) where.disciplines = { hasSome: disciplines.split(',') };
+
+  const [data, total] = await prisma.$transaction([
+    prisma.profile.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    }),
+    prisma.profile.count({ where })
+  ]);
+
+  let filtered = data;
+
   if (completed) {
-    const minCompleted = Math.min(...completed.split(',').map(Number));
-    // Obtener counts completados para todos los perfiles en paralelo
-    const completedCounts = await Promise.all(
-      (filtered || []).map(profile =>
-        supabaseAdmin.rpc('get_completed_projects_count', { p_user_id: profile.id })
+    const minCompleted = Math.min(...completed.split(',').map(Number).filter(Number.isFinite));
+    const ids = filtered.map(profile => profile.id);
+    const counts = await Promise.all(
+      ids.map(userId =>
+        prisma.project.count({
+          where: {
+            status: 'completed',
+            OR: [
+              { ownerId: userId },
+              { applications: { some: { userId, status: 'accepted' } } }
+            ]
+          }
+        })
       )
     );
-    filtered = filtered.filter((profile, index) => {
-      const count = (completedCounts[index] || {}).count || 0;
-      return count >= minCompleted;
-    });
+    filtered = filtered.filter((_, index) => counts[index] >= minCompleted);
   }
-  
+
   if (rating) {
-    // Obtener ratings promedio para todos los perfiles en paralelo
-    const avgRatings = await Promise.all(
-      (filtered || []).map(profile =>
-        supabaseAdmin.rpc('get_user_avg_rating', { p_user_id: profile.id })
-      )
-    );
-    filtered = filtered.filter((profile, index) => {
-      const avg = (avgRatings[index] || {}).avg || 0;
-      return avg >= rating;
+    const minRating = Number(rating);
+    const ids = filtered.map(profile => profile.id);
+    const averages = await prisma.rating.groupBy({
+      by: ['ratedUserId'],
+      where: { ratedUserId: { in: ids } },
+      _avg: { stars: true }
     });
+    const avgByUser = new Map(
+      averages.map(item => [item.ratedUserId, item._avg.stars || 0])
+    );
+    filtered = filtered.filter(profile => (avgByUser.get(profile.id) || 0) >= minRating);
   }
-  
+
   res.json({
-    data: filtered,
-    pagination: {
-      page: Number(page),
-      pageSize: Number(pageSize),
-      total: count || 0,
-      totalPages: Math.ceil((count || 0) / pageSize)
-    }
+    data: filtered.map(profile => serializeProfile(profile)),
+    pagination: pagination(page, pageSize, total)
   });
 });
 
@@ -139,204 +143,165 @@ export const getAvailablePeople = asyncHandler(async (req, res) => {
 export const getProfile = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
   const currentUserId = req.user?.id;
-  
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single();
-  
-  if (error) {
-    if (error.code === 'PGRST116') throw new NotFoundError('Perfil');
-    throw new Error(error.message);
-  }
-  
-  // Solo exponer email si es el propio usuario solicitante
-  if (data && data.id !== currentUserId) {
-    delete data.email;
-  }
-  
-  res.json({ user: data });
+
+  const profile = await prisma.profile.findUnique({ where: { id } });
+  if (!profile) throw new NotFoundError('Perfil');
+
+  res.json({
+    user: serializeProfile(profile, { includeEmail: profile.id === currentUserId })
+  });
 });
 
 // GET /api/profiles/by-username/:username
 export const getProfileByUsername = asyncHandler(async (req, res) => {
   const { username } = req.params;
   const currentUserId = req.user?.id;
-  
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('username', username)
-    .single();
-  
-  if (error) {
-    if (error.code === 'PGRST116') throw new NotFoundError('Perfil');
-    throw new Error(error.message);
-  }
-  
-  // Solo exponer email si es el propio usuario solicitante
-  if (data && data.id !== currentUserId) {
-    delete data.email;
-  }
-  
-  res.json({ user: data });
+
+  const profile = await prisma.profile.findUnique({ where: { username } });
+  if (!profile) throw new NotFoundError('Perfil');
+
+  res.json({
+    user: serializeProfile(profile, { includeEmail: profile.id === currentUserId })
+  });
 });
 
 // PUT /api/profiles/:id
 export const updateProfile = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  const updateData = { ...req.validated.body };
-  
+  const body = { ...req.validated.body };
+
   // Verificar ownership
   if (id !== req.user.id) {
     throw new ForbiddenError('No puedes editar el perfil de otro usuario');
   }
-  
+
   // Verificar username único
-  if (updateData.username) {
-    const { data: existing } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('username', updateData.username)
-      .neq('id', id)
-      .single();
-    
+  if (body.username) {
+    const existing = await prisma.profile.findFirst({
+      where: { username: body.username, NOT: { id } },
+      select: { id: true }
+    });
     if (existing) throw new ConflictError('Ese nombre de usuario ya está en uso');
   }
-  
+
   // Si cambia email, actualizar en Auth (profiles.email es inmutable por trigger)
-  if (updateData.email) {
-    const { data: existing } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('email', updateData.email)
-      .neq('id', id)
-      .single();
-    
+  if (body.email) {
+    const existing = await prisma.profile.findFirst({
+      where: { email: body.email, NOT: { id } },
+      select: { id: true }
+    });
     if (existing) throw new ConflictError('Ya existe una cuenta con ese correo');
-    
+
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, {
-      email: updateData.email
+      email: body.email
     });
     if (authError) throw new Error(authError.message);
-    delete updateData.email;
+    delete body.email;
   }
-  
+
   // Eliminar columnas inmutables
-  delete updateData.id;
-  delete updateData.email;
-  delete updateData.created_at;
-  
-  // Actualizar perfil
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .update(updateData)
-    .eq('id', id)
-    .select()
-    .single();
-  
-  if (error) throw new Error(error.message);
-  
-  res.json({ user: data });
+  delete body.id;
+  delete body.email;
+  delete body.createdAt;
+
+  const data = profileInputToPrisma(body);
+
+  const profile = Object.keys(data).length > 0
+    ? await prisma.profile.update({ where: { id }, data })
+    : await prisma.profile.findUnique({ where: { id } });
+
+  if (!profile) throw new NotFoundError('Perfil');
+
+  res.json({ user: serializeProfile(profile, { includeEmail: true }) });
 });
 
 // PUT /api/profiles/:id/availability
 export const toggleAvailability = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  
+
   if (id !== req.user.id) {
     throw new ForbiddenError('No puedes cambiar la disponibilidad de otro usuario');
   }
-  
-  const { data: current } = await supabaseAdmin
-    .from('profiles')
-    .select('available')
-    .eq('id', id)
-    .single();
-  
-  const newAvailable = !current?.available;
-  
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .update({ available: newAvailable })
-    .eq('id', id)
-    .select()
-    .single();
-  
-  if (error) throw new Error(error.message);
-  
-  res.json({ user: data, available: newAvailable });
+
+  const current = await prisma.profile.findUnique({
+    where: { id },
+    select: { available: true }
+  });
+  if (!current) throw new NotFoundError('Perfil');
+
+  const newAvailable = !current.available;
+
+  const profile = await prisma.profile.update({
+    where: { id },
+    data: { available: newAvailable }
+  });
+
+  res.json({
+    user: serializeProfile(profile, { includeEmail: true }),
+    available: newAvailable
+  });
 });
 
 // PUT /api/profiles/:id/featured
 export const saveFeaturedProjects = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  const { projectIds } = req.body;
-  
+  const { projectIds } = req.validated.body;
+
   if (id !== req.user.id) {
     throw new ForbiddenError('No puedes editar los proyectos destacados de otro usuario');
   }
-  
+
   if (!Array.isArray(projectIds) || projectIds.length > 5) {
     throw new ValidationError({ projectIds: ['Máximo 5 proyectos destacados'] });
   }
-  
-  // Verificar que los proyectos pertenecen al usuario o participó
-  const { data: projects } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .in('id', projectIds);
-  
-  const validIds = (projects || []).map(p => p.id);
-  
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .update({ featured_project_ids: validIds })
-    .eq('id', id)
-    .select()
-    .single();
-  
-  if (error) throw new Error(error.message);
-  
-  res.json({ user: data });
+
+  // Verificar que los proyectos existen
+  const projects = await prisma.project.findMany({
+    where: { id: { in: projectIds } },
+    select: { id: true }
+  });
+
+  const validIds = projects.map(project => project.id);
+
+  const profile = await prisma.profile.update({
+    where: { id },
+    data: { featuredProjectIds: validIds }
+  });
+
+  res.json({ user: serializeProfile(profile, { includeEmail: true }) });
 });
 
 // GET /api/profiles/:id/stats
 export const getProfileStats = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  
-  // Proyectos creados
-  const { count: createdCount } = await supabaseAdmin
-    .from('projects')
-    .select('*', { count: 'exact', head: true })
-    .eq('owner_id', id);
-  
-  // Colaboraciones (apps aceptadas)
-  const { count: collabsCount } = await supabaseAdmin
-    .from('applications')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', id)
-    .eq('status', 'accepted');
-  
-  // Rating promedio (RPC)
-  const { data: avgRating } = await supabaseAdmin
-    .rpc('get_user_avg_rating', { p_user_id: id });
-  
-  const { data: ratingCount } = await supabaseAdmin
-    .rpc('get_user_rating_count', { p_user_id: id });
-  
-  // Proyectos completados (RPC)
-  const { data: completedCount } = await supabaseAdmin
-    .rpc('get_completed_projects_count', { p_user_id: id });
-  
+
+  const [createdCount, collabsCount, ratingAgg, ratingCount, completedCount] = await Promise.all([
+    prisma.project.count({ where: { ownerId: id } }),
+    prisma.application.count({ where: { userId: id, status: 'accepted' } }),
+    prisma.rating.aggregate({ where: { ratedUserId: id }, _avg: { stars: true } }),
+    prisma.rating.count({ where: { ratedUserId: id } }),
+    prisma.project.count({
+      where: {
+        status: 'completed',
+        OR: [
+          { ownerId: id },
+          { applications: { some: { userId: id, status: 'accepted' } } }
+        ]
+      }
+    })
+  ]);
+
+  const avg = ratingAgg._avg.stars
+    ? Number(Number(ratingAgg._avg.stars).toFixed(2))
+    : 0;
+
   res.json({
     stats: {
-      projectsCreated: createdCount || 0,
-      collaborations: collabsCount || 0,
-      avgRating: avgRating || 0,
-      ratingCount: ratingCount || 0,
-      completedProjects: completedCount || 0
+      projectsCreated: createdCount,
+      collaborations: collabsCount,
+      avgRating: avg,
+      ratingCount,
+      completedProjects: completedCount
     }
   });
 });
@@ -344,52 +309,77 @@ export const getProfileStats = asyncHandler(async (req, res) => {
 // GET /api/profiles/:id/history
 export const getProfileHistory = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  
-  // Proyectos creados
-  const { data: created } = await supabaseAdmin
-    .from('projects')
-    .select('id, title, category, status, created_at, image')
-    .eq('owner_id', id);
-  
-  // Proyectos participados
-  const { data: participated } = await supabaseAdmin
-    .from('applications')
-    .select(`
-      project_role,
-      project:projects(id, title, category, status, created_at, image, owner_id)
-    `)
-    .eq('user_id', id)
-    .eq('status', 'accepted');
-  
-  const participatedProjects = (participated || [])
-    .map(p => ({ ...p.project, role: p.project_role, participationType: 'participant' }))
-    .filter(Boolean);
-  
-  const createdProjects = (created || []).map(p => ({ ...p, participationType: 'creator' }));
-  
+
+  const [created, participated] = await Promise.all([
+    prisma.project.findMany({
+      where: { ownerId: id },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        status: true,
+        createdAt: true,
+        image: true
+      }
+    }),
+    prisma.application.findMany({
+      where: { userId: id, status: 'accepted' },
+      select: {
+        projectRole: true,
+        project: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            status: true,
+            createdAt: true,
+            image: true,
+            ownerId: true
+          }
+        }
+      }
+    })
+  ]);
+
+  const participatedProjects = participated
+    .filter(item => item.project)
+    .map(item => ({
+      ...serializeProject(item.project),
+      role: item.projectRole,
+      participationType: 'participant'
+    }));
+
+  const createdProjects = created.map(project => ({
+    ...serializeProject(project),
+    participationType: 'creator'
+  }));
+
   // Combinar y deduplicar
   const all = [...createdProjects, ...participatedProjects];
-  const unique = all.filter((p, i, self) => self.findIndex(x => x.id === p.id) === i);
+  const unique = all.filter(
+    (project, index, self) => self.findIndex(item => item.id === project.id) === index
+  );
   unique.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  
+
   res.json({ history: unique });
 });
 
 // GET /api/profiles/:id/ratings
 export const getProfileRatings = asyncHandler(async (req, res) => {
   const { id } = req.validated.params;
-  
-  const { data, error } = await supabaseAdmin
-    .from('ratings')
-    .select(`
-      *,
-      project:projects(id, title, category, image, owner_id),
-      rated_by_profile:profiles!rated_by(id, name, username, avatar)
-    `)
-    .eq('rated_user_id', id)
-    .order('created_at', { ascending: false });
-  
-  if (error) throw new Error(error.message);
-  
-  res.json({ ratings: data || [] });
+
+  const ratings = await prisma.rating.findMany({
+    where: { ratedUserId: id },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      project: {
+        select: { id: true, title: true, category: true, image: true, ownerId: true }
+      },
+      rater: {
+        select: { id: true, name: true, username: true, avatar: true }
+      }
+    }
+  });
+
+  res.json({ ratings: ratings.map(rating => serializeRating(rating)) });
 });

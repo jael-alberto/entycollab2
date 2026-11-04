@@ -14,7 +14,7 @@
     "build:backend": "npm --prefix backend run build",
     "preview": "npm --prefix frontend run preview",
     "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
-    "setup": "npm --prefix frontend install && npm --prefix backend install",
+    "setup": "npm install && npm --prefix frontend install && npm --prefix backend install",
     "start:backend": "npm --prefix backend start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

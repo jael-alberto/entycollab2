@@ -9,6 +9,12 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# El workflow solo necesita leer el repositorio para instalar, compilar y
+# analizar el frontend. Declararlo evita que el token predeterminado tenga
+# permisos de escritura innecesarios.
+permissions:
+  contents: read
+
 jobs:
   build:
 
