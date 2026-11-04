@@ -20,7 +20,18 @@ export const STORAGE_KEYS = {
 
 export function getData(key) {
   try {
-    return JSON.parse(localStorage.getItem(key)) || [];
+    const data = JSON.parse(localStorage.getItem(key)) || [];
+    // Sanitize sensitive data: remove password fields from user objects
+    if (key === STORAGE_KEYS.users && Array.isArray(data)) {
+      return data.map(item => {
+        if (item && typeof item === 'object') {
+          const { password: _clearText, ...safeUser } = item;
+          return safeUser;
+        }
+        return item;
+      });
+    }
+    return data;
   } catch {
     return [];
   }
