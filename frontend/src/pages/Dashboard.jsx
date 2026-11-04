@@ -41,8 +41,8 @@ export default function Dashboard() {
     return g.name.toLowerCase().includes(q) || g.description?.toLowerCase().includes(q);
   };
 
-  const filteredMine = useMemo(() => myGroups.filter(matchGroup), [myGroups, groupSearch]);
-  const filteredOther = useMemo(() => otherGroups.filter(matchGroup), [otherGroups, groupSearch]);
+  const filteredMine = useMemo(() => myGroups.filter(matchGroup), [myGroups, groupSearch, matchGroup]);
+  const filteredOther = useMemo(() => otherGroups.filter(matchGroup), [otherGroups, groupSearch, matchGroup]);
 
   const openGroup = (groupId) => {
     // Solo se activa como grupo de trabajo si el usuario es miembro; los
