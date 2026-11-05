@@ -5,49 +5,19 @@ import { useModals } from '../context/ModalManager.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import PersonCard from '../components/PersonCard.jsx';
 import PeopleDirectory from '../components/PeopleDirectory.jsx';
-import { Avatar, GroupAvatar, EmptyState, Icon } from '../components/common.jsx';
+import { Avatar, EmptyState, Icon } from '../components/common.jsx';
 import { scoreProject, escapeHTML, getUserAvgRating } from '../lib/helpers.js';
+import { completedProjectsCount } from '../lib/talent.js';
 import { l10nValue } from '../lib/i18n.js';
 
 const availableUsers = (users) => users.filter(u => u.available === true);
-const projectsOfGroup = (projects, groupId) => projects.filter(p => p.groupId === groupId);
 
 export default function Dashboard() {
   const { user, projects, applications, users, ratings, groups, lang, t, l10n, selectGroup, activeGroup } = useApp();
   const { openCreate } = useModals();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [groupSearch, setGroupSearch] = useState('');
   const view = searchParams.get('view') === 'global' ? 'global' : 'welcome';
-
-  const myGroups = useMemo(
-    () => groups.filter(g => g.members?.some(m => m.userId === user.id)),
-    [groups, user.id]
-  );
-
-  const otherGroups = useMemo(
-    () => groups.filter(g => !g.members?.some(m => m.userId === user.id)),
-    [groups, user.id]
-  );
-
-  const matchGroup = (g) => {
-    if (!groupSearch.trim()) return true;
-    const q = groupSearch.trim().toLowerCase();
-    return g.name.toLowerCase().includes(q) || g.description?.toLowerCase().includes(q);
-  };
-
-  const filteredMine = useMemo(() => myGroups.filter(matchGroup), [myGroups, groupSearch]);
-  const filteredOther = useMemo(() => otherGroups.filter(matchGroup), [otherGroups, groupSearch]);
-
-  const openGroup = (groupId) => {
-    selectGroup(groupId);
-    navigate(`/grupos/${groupId}`);
-  };
-
-  const openGlobal = () => {
-    selectGroup(null);
-    setSearchParams({ view: 'global' });
-  };
 
   const backHome = () => {
     selectGroup(null);
@@ -65,97 +35,6 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-layout">
-      {view !== 'global' && (
-      <aside className="dashboard-sidebar">
-        <div className="sidebar-user-block">
-        </div>
-
-        <div className="sidebar-search">
-          <label className="sidebar-search-field">
-            <Icon name="search" size={16} />
-            <input
-              type="text"
-              placeholder={t('dash.searchGroups')}
-              value={groupSearch}
-              onChange={e => setGroupSearch(e.target.value)}
-            />
-          </label>
-        </div>
-
-        <nav className="sidebar-nav">
-          <button className={`sidebar-nav-item ${view === 'global' && !activeGroup ? 'active' : ''}`} onClick={openGlobal}>
-            <Icon name="globe" size={17} />
-            <span>{t('dash.global')}</span>
-          </button>
-
-          <div className="sidebar-nav-heading">
-            <span>{t('dash.yourGroups')}</span>
-            <span className="sidebar-count">{myGroups.length}</span>
-          </div>
-
-          {myGroups.length === 0 ? (
-            <p className="sidebar-empty-text">{t('dash.noGroups')}</p>
-          ) : filteredMine.length === 0 ? (
-            <p className="sidebar-empty-text">{t('dash.noMatch')}</p>
-          ) : (
-            filteredMine.map(group => {
-              const isActive = activeGroup?.id === group.id;
-              return (
-                <button
-                  key={group.id}
-                  className={`sidebar-nav-item group-item ${isActive ? 'active' : ''}`}
-                  onClick={() => openGroup(group.id)}
-                >
-                  <GroupAvatar group={group} size="sm" />
-                  <span className="group-item-text">
-                    <span className="group-item-name">{escapeHTML(group.name)}</span>
-                    <span className="group-item-meta">
-                      {group.members?.length || 0} {t('dash.membersShort')} · {projectsOfGroup(projects, group.id).length} {t('dash.projectsShort')}
-                    </span>
-                  </span>
-                </button>
-              );
-            })
-          )}
-
-          {otherGroups.length > 0 && (
-            <>
-              <div className="sidebar-nav-heading">
-                <span>{t('dash.exploreGroups')}</span>
-                <span className="sidebar-count">{otherGroups.length}</span>
-              </div>
-              {(filteredOther.length === 0 ? [] : filteredOther.slice(0, 5)).map(group => {
-                const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
-                return (
-                  <button
-                    key={group.id}
-                    className="sidebar-nav-item group-item muted"
-                    disabled={pending}
-                    onClick={() => openGroup(group.id)}
-                  >
-                    <GroupAvatar group={group} size="sm" />
-                    <span className="group-item-text">
-                      <span className="group-item-name">{escapeHTML(group.name)}</span>
-                      <span className="group-item-meta">
-                        {pending ? t('dash.pending') : `${group.members?.length || 0} ${t('dash.membersShort')}`}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          )}
-        </nav>
-
-        <div className="sidebar-footer">
-          <button className="btn btn-primary btn-block" onClick={explore}>
-            <Icon name="compass" size={16} />
-            {t('dash.exploreGroups')}
-          </button>
-        </div>
-      </aside>
-      )}
-
       <main className="dashboard-main">
         {view === 'global' ? (
           <GlobalView
@@ -173,9 +52,14 @@ export default function Dashboard() {
           <>
             <section className="dash-hero">
               <div className="dash-hero-text">
-                <h1>{t('dash.welcome', { name: user.name.split(' ')[0] })}</h1>
-                <p>{t('dash.sub')}</p>
+                <p className="dash-hero-eyebrow">{t('dash.eyebrow')}</p>
+                <h1>{t('dash.heroTitle', { name: user.name.split(' ')[0] })}</h1>
+                <p className="dash-hero-lead">{t('dash.heroLead')}</p>
               </div>
+              <button type="button" className="btn btn-primary dash-hero-cta" onClick={openCreate}>
+                <Icon name="plus" size={16} />
+                {t('dash.publishCta')}
+              </button>
             </section>
             <MyActivity
               user={user}
@@ -226,16 +110,34 @@ function MyActivity({ user, projects, applications, users, ratings, activeGroup,
     [applications, myProjectIds]
   );
 
-  // Por calificar: aceptados en mis proyectos en curso/finalizados sin rating.
-  const toRate = useMemo(() => {
-    const ratedKeys = new Set(ratings.map(r => `${r.projectId}|${r.ratedUserId}`));
-    return applications.filter(a => {
-      if (a.status !== 'accepted' || !myProjectIds.has(a.projectId)) return false;
+  // Proyectos propios en curso (los que cuentan como "en desarrollo").
+  const inDev = useMemo(
+    () => myProjects.filter(p => p.status === 'in-progress'),
+    [myProjects]
+  );
+
+  // Actividad reciente: los movimientos mas recientes de la cuenta.
+  const recentActivity = useMemo(() => {
+    const items = [];
+    sentApps.slice(0, 3).forEach(a => {
       const p = projects.find(pp => pp.id === a.projectId);
-      if (!p || (p.status !== 'in-progress' && p.status !== 'completed')) return false;
-      return !ratedKeys.has(`${a.projectId}|${a.userId}`);
+      if (!p) return;
+      const when = a.appliedAt ? new Date(a.appliedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : null;
+      items.push({
+        id: `app-${a.id}`,
+        text: `${t('dash.activityApplied')} ${l10n(p.title)}${when ? ` · ${when}` : ''}`
+      });
     });
-  }, [applications, myProjectIds, projects, ratings]);
+    receivedPending.slice(0, 2).forEach(a => {
+      const p = projects.find(pp => pp.id === a.projectId);
+      if (!p) return;
+      items.push({
+        id: `rec-${a.id}`,
+        text: `${t('dash.activityReceived')} ${l10n(p.title)}`
+      });
+    });
+    return items.slice(0, 4);
+  }, [sentApps, receivedPending, projects, t, l10n]);
 
   const sentProjects = useMemo(
     () => sentApps
@@ -246,92 +148,125 @@ function MyActivity({ user, projects, applications, users, ratings, activeGroup,
     [sentApps, projects]
   );
 
+  const avgRating = getUserAvgRating(user.id, ratings);
+  const completed = completedProjectsCount(user.id, projects, applications);
+
   return (
     <>
       <section className="dash-kpis" aria-label={t('dash.summarySub')}>
         <div className="dash-kpi">
-          <span className="dash-kpi-value">{myProjects.length}</span>
           <span className="dash-kpi-label">{t('dash.kpiMyProjects')}</span>
+          <span className="dash-kpi-value">{myProjects.length}</span>
         </div>
         <div className="dash-kpi">
-          <span className="dash-kpi-value">{pendingSent.length}</span>
+          <span className="dash-kpi-label">{t('dash.kpiInDev')}</span>
+          <span className="dash-kpi-value">{inDev.length}</span>
+        </div>
+        <div className="dash-kpi">
           <span className="dash-kpi-label">{t('dash.kpiPendingApps')}</span>
+          <span className="dash-kpi-value">{pendingSent.length}</span>
         </div>
         <div className="dash-kpi">
-          <span className="dash-kpi-value">{toRate.length}</span>
-          <span className="dash-kpi-label">{t('dash.kpiToRate')}</span>
+          <span className="dash-kpi-label">{t('dash.kpiRating')}</span>
+          <span className="dash-kpi-value">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</span>
         </div>
       </section>
+      <div className="dash-body-grid">
+        <div className="dash-body-main">
+          <section className="dash-section">
+            <header className="dash-section-head">
+              <h2>{t('dash.myProjectsSec')}<span className="dash-count">{myProjects.length}</span></h2>
+              <Link className="btn btn-outline btn-sm" to="/proyectos/mis-proyectos">{t('dash.viewAll')}</Link>
+            </header>
+            {myProjects.length === 0 ? (
+              <EmptyState
+                icon="folder"
+                title={t('empty.myProjects')}
+                sub={t('empty.myProjectsSub')}
+                action={<button className="btn btn-primary btn-sm" onClick={onCreate}>{t('dash.publishCta')}</button>}
+              />
+            ) : (
+              <div className="projects-grid projects-grid-dense">
+                {myProjects.slice(0, 3).map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
+              </div>
+            )}
+          </section>
 
-      <section className="dash-section">
-        <header className="dash-section-head">
-          <h2>{t('dash.myProjectsSec')}<span className="dash-count">{myProjects.length}</span></h2>
-          <Link className="btn btn-outline btn-sm" to="/proyectos/mis-proyectos">{t('dash.viewAll')}</Link>
-        </header>
-        {myProjects.length === 0 ? (
-          <EmptyState
-            icon="folder"
-            title={t('empty.myProjects')}
-            sub={t('empty.myProjectsSub')}
-            action={<button className="btn btn-primary btn-sm" onClick={onCreate}>{t('dash.publishCta')}</button>}
-          />
-        ) : (
-          <div className="projects-grid projects-grid-dense">
-            {myProjects.slice(0, 3).map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
-          </div>
-        )}
-      </section>
+          <section className="dash-section">
+            <header className="dash-section-head">
+              <h2>{t('dash.sentSec')}<span className="dash-count">{sentApps.length}</span></h2>
+              <Link className="btn btn-outline btn-sm" to="/proyectos/postulaciones">{t('dash.viewAll')}</Link>
+            </header>
+            {sentApps.length === 0 ? (
+              <EmptyState
+                icon="inbox"
+                title={t('empty.myApps')}
+                sub={t('empty.myAppsSub')}
+                action={<button className="btn btn-outline btn-sm" onClick={onExplore}>{t('dash.exploreProjects')}</button>}
+              />
+            ) : (
+              <div className="projects-grid projects-grid-dense">
+                {sentProjects.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
+              </div>
+            )}
+          </section>
+        </div>
 
-      <section className="dash-section">
-        <header className="dash-section-head">
-          <h2>{t('dash.sentSec')}<span className="dash-count">{sentApps.length}</span></h2>
-          <Link className="btn btn-outline btn-sm" to="/proyectos/postulaciones">{t('dash.viewAll')}</Link>
-        </header>
-        {sentApps.length === 0 ? (
-          <EmptyState
-            icon="inbox"
-            title={t('empty.myApps')}
-            sub={t('empty.myAppsSub')}
-            action={<button className="btn btn-outline btn-sm" onClick={onExplore}>{t('dash.exploreProjects')}</button>}
-          />
-        ) : (
-          <div className="projects-grid projects-grid-dense">
-            {sentProjects.map(p => <ProjectCard key={p.id} project={p} currentUser={user} />)}
-          </div>
-        )}
-      </section>
+        <aside className="dash-body-side" aria-label={t('dash.sideTitle')}>
+          <section className="dash-side-card">
+            <h3 className="dash-side-title">{t('dash.profileTitle')}</h3>
+            <div className="dash-profile">
+              <Avatar user={user} cls="person-avatar person-avatar-card" />
+              <div className="dash-profile-id">
+                <strong>{escapeHTML(user.name)}</strong>
+                <span>@{escapeHTML(user.username)}</span>
+              </div>
+            </div>
+            {/* Rol y valoracion en una sola linea de chips: antes eran dos
+                lineas mas y la valoracion repetia la KPI de arriba. */}
+            <div className="dash-profile-chips">
+              <span className="meta-chip">{user.role || t('profile.roleProgrammer')}</span>
+              <span className="meta-chip">
+                <Icon name="star" size={13} />
+                {avgRating > 0 ? avgRating.toFixed(1) : '—'}
+              </span>
+            </div>
+            <div className="dash-profile-stats">
+              <span><b>{completed}</b> {t('profile.statCompleted')}</span>
+              <span><b>{(user.skills || []).length}</b> {t('profile.statTech')}</span>
+            </div>
+            <label className="dash-available">
+              <input type="checkbox" checked={user.available === true} readOnly />
+              <span>{t('profile.availableToggle')}</span>
+            </label>
+            <Link className="btn btn-outline btn-block" to="/perfil">{t('person.viewMyProfile')}</Link>
+          </section>
 
-      <section className="dash-section">
-        <header className="dash-section-head">
-          <h2>{t('dash.receivedSec')}<span className="dash-count">{receivedPending.length}</span></h2>
-          <Link className="btn btn-outline btn-sm" to="/proyectos/mis-proyectos">{t('dash.viewAll')}</Link>
-        </header>
-        {receivedPending.length === 0 ? (
-          <EmptyState
-            icon="inbox"
-            title={t('empty.applicantsNone')}
-            sub={t('empty.applicantsNoneSub')}
-          />
-        ) : (
-          <ul className="dash-received-list">
-            {receivedPending.slice(0, 5).map(a => {
-              const p = projects.find(pp => pp.id === a.projectId);
-              const applicant = users.find(u => u.id === a.userId);
-              if (!p) return null;
-              return (
-                <li key={a.id} className="dash-received-row">
-                  <Avatar user={applicant} cls="person-avatar-card" />
-                  <span className="dash-received-info">
-                    <strong>{applicant ? escapeHTML(applicant.name) : '—'}</strong>
-                    <small>{escapeHTML(l10n(p.title))}</small>
-                  </span>
-                  <Link className="btn btn-ghost btn-sm" to={`/proyectos/${p.id}/gestionar`}>{t('card.manageBtn')}</Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+          <section className="dash-side-card">
+            <h3 className="dash-side-title">{t('dash.activityTitle')}</h3>
+            {recentActivity.length === 0 ? (
+              <p className="dash-side-empty">{t('dash.activityEmpty')}</p>
+            ) : (
+              <ul className="dash-activity">
+                {recentActivity.map(item => (
+                  <li key={item.id}>
+                    <span className="dash-activity-dot" aria-hidden="true" />
+                    <span>{item.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="dash-side-card dash-side-community">
+            <h3 className="dash-side-title">{t('dash.communityTitle')}</h3>
+            <p>{t('dash.communityLead')}</p>
+            <Link className="btn btn-ghost btn-sm" to="/grupos">
+              {t('dash.communityCta')} <span aria-hidden="true">↗</span>
+            </Link>
+          </section>
+        </aside>
+      </div>
     </>
   );
 }

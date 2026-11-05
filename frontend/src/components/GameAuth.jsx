@@ -9,19 +9,13 @@ import { emailKey, nameKey, passwordKey, requiredKey, usernameKey } from '../lib
 
 function ChoiceGrid({ items, selected, onChange, label, describedBy }) {
   return (
-    <div className="game-auth-choice-grid" role="group" aria-label={label} aria-describedby={describedBy}>
+    <div className="ga-grid" role="group" aria-label={label} aria-describedby={describedBy}>
       {items.map(item => {
         const val = item.value || item;
         const active = selected.includes(val);
         return (
-          <button
-            key={val}
-            type="button"
-            className={active ? 'selected' : ''}
-            aria-pressed={active}
-            onClick={() => onChange(val)}
-          >
-            <i aria-hidden="true">{active ? '✓' : ''}</i>
+          <button key={val} type="button" className={active ? 'is-active' : ''} aria-pressed={active} onClick={() => onChange(val)}>
+            <i aria-hidden="true">{active ? <Icon name="check" size={12} /> : ''}</i>
             {item.label || item}
           </button>
         );
@@ -52,7 +46,7 @@ function GitHubMark() {
 }
 
 export default function GameAuth({ initialMode }) {
-  const { login, register, t, lang } = useApp();
+  const { login, register, t, lang, theme, toggleTheme, toggleLang } = useApp();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -65,9 +59,9 @@ export default function GameAuth({ initialMode }) {
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [gameTypes, setGameTypes] = useState([]);
-  const [languages, setLanguages] = useState([]);
   const [favoriteGenres, setFavoriteGenres] = useState([]);
   const [disciplines, setDisciplines] = useState([]);
+  const [available, setAvailable] = useState(true);
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [stepError, setStepError] = useState('');
@@ -76,23 +70,11 @@ export default function GameAuth({ initialMode }) {
   const toggle = (setter, selected, value) =>
     setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]);
 
-  // Solo UI brandeada: no hay OAuth real implementado.
   const social = () => showToast(t('auth.socialSoon'), 'info');
 
   const openLegal = (section) => (e) => {
     e.preventDefault();
     setLegal(section);
-  };
-
-  const tabKeyDown = (e) => {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-    e.preventDefault();
-    const target = e.key === 'ArrowRight' ? '/register' : '/login';
-    navigate(target);
-    window.setTimeout(() => {
-      const active = document.querySelector('.game-auth-tabs [aria-selected="true"]');
-      if (active && typeof active.focus === 'function') active.focus();
-    }, 0);
   };
 
   const tErr = (key, replacements) => (key ? t(key, replacements) : '');
@@ -111,17 +93,8 @@ export default function GameAuth({ initialMode }) {
     setStep(2);
   };
 
-  const continueExperience = () => {
-    if (!gameTypes.length || !languages.length) {
-      setStepError(t('auth.chooseAtLeastOne'));
-      return;
-    }
-    setStepError('');
-    setStep(3);
-  };
-
   const submitRegister = () => {
-    if (!favoriteGenres.length || !disciplines.length) {
+    if (!gameTypes.length || !favoriteGenres.length) {
       setStepError(t('auth.chooseAtLeastOne'));
       return;
     }
@@ -131,12 +104,13 @@ export default function GameAuth({ initialMode }) {
       username: username.replace(/^@/, '').trim(),
       email: email.trim().toLowerCase(),
       password,
-      skills: [...new Set([...languages, ...disciplines.map(value => disciplineLabel(lang, value))])],
+      skills: [...new Set(disciplines.map(value => disciplineLabel(lang, value)))],
       bio: '',
       gameTypes,
       favoriteGenres,
       disciplines,
-      languages
+      languages: [],
+      available
     });
     setLoading(false);
     if (result === 'email') {
@@ -174,7 +148,7 @@ export default function GameAuth({ initialMode }) {
   };
 
   const legalRow = (
-    <p className="auth-legal">
+    <p className="ga-legal">
       {t('auth.legalAgree')}{' '}
       <a href="/legal/privacidad" onClick={openLegal('privacy')}>{t('auth.privacy')}</a>
       {' · '}
@@ -183,12 +157,12 @@ export default function GameAuth({ initialMode }) {
   );
 
   const oauthRow = (
-    <div className="game-auth-oauth">
-      <button type="button" className="oauth-btn" onClick={social}>
+    <div className="ga-social">
+      <button type="button" className="ga-social-btn" onClick={social}>
         <GoogleMark />
         <span>{t('auth.google')}</span>
       </button>
-      <button type="button" className="oauth-btn" onClick={social}>
+      <button type="button" className="ga-social-btn" onClick={social}>
         <GitHubMark />
         <span>{t('auth.github')}</span>
       </button>
@@ -197,156 +171,163 @@ export default function GameAuth({ initialMode }) {
 
   const passwordToggleLabel = showPassword ? t('auth.hidePassword') : t('auth.showPassword');
 
+  const visual = (
+    <div className="ga-visual ga-visual--art" aria-hidden="true">
+      <img className="ga-visual-img" src="/img/antrio-space.jpg" alt="" />
+    </div>
+  );
+
+  const notice = (
+    <div className="ga-notice" role="note">
+      <Icon name="alert" size={16} />
+      <span>Prototipo visual. No introduzcas contraseñas reales. Cuenta demo: <b>maria@demo.com</b> / <b>123456</b>.</span>
+    </div>
+  );
+
   return (
-    <div className="game-auth-page">
-      <SkipLink targetId="game-auth-main" />
-      <header className="game-auth-header">
-        <div className="game-auth-header-inner">
-          <Link className="game-auth-back" to="/">← {t('auth.backHome')}</Link>
-          <Link className="game-auth-logo" to="/"><span aria-hidden="true"><Icon name="gamepad" size={16} /></span> ENTYTEC<b>OLLAB</b></Link>
-          <div className="game-auth-tabs" role="tablist" aria-label={`${t('nav.login')} / ${t('nav.register')}`} onKeyDown={tabKeyDown}>
-            <Link role="tab" aria-selected={!isRegister} tabIndex={!isRegister ? 0 : -1} className={!isRegister ? 'active' : ''} to="/login">{t('nav.login')}</Link>
-            <Link role="tab" aria-selected={isRegister} tabIndex={isRegister ? 0 : -1} className={isRegister ? 'active register' : ''} to="/register">{t('nav.register')}</Link>
+    <div className="ga-page">
+      <SkipLink targetId="ga-main" />
+      <div className="ga-split">
+        {visual}
+        <main className="ga-panel" id="ga-main" tabIndex={-1}>
+          <div className="ga-panel-top">
+            <Link className="ga-back" to="/">{t('auth.backHome')}</Link>
+            <div className="ga-panel-controls">
+              <button
+                type="button"
+                className="ga-control-btn"
+                onClick={toggleLang}
+                title={lang === 'es' ? 'Switch to English' : 'Cambiar a español'}
+                aria-label={lang === 'es' ? 'Switch to English' : 'Cambiar a español'}
+              >
+                {lang === 'es' ? 'ES' : 'EN'}
+              </button>
+              <button
+                type="button"
+                className="ga-control-btn"
+                onClick={toggleTheme}
+                title={theme ? t('auth.themeToggleLight') : t('auth.themeToggleDark')}
+                aria-label={theme ? t('auth.themeToggleLight') : t('auth.themeToggleDark')}
+                aria-pressed={!!theme}
+              >
+                <Icon name={theme ? 'sun' : 'moon'} size={16} />
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
-      <main className="game-auth-main" id="game-auth-main" tabIndex={-1}>
-        {isRegister ? (
-          <section className="game-auth-register" aria-labelledby="game-auth-register-title">
-            <div className="game-auth-title">
-              <h1 id="game-auth-register-title">{t('register.title')}</h1>
-              <p>{t('register.subtitle')}</p>
-            </div>
-            <div className="game-auth-progress">
-              <div>
-                <span>{t('auth.stepOf', { step })}</span>
-                <span>{step === 1 ? t('auth.stepAccount') : step === 2 ? t('auth.stepExperience') : t('auth.stepPrefs')}</span>
-              </div>
-              <ol aria-label={t('auth.stepOf', { step })}>
-                {[1, 2, 3].map(number => (
-                  <li
-                    key={number}
-                    aria-current={number === step ? 'step' : undefined}
-                    className={`${step >= number ? 'active' : ''} ${step > number ? 'completed' : ''}`}
-                  >
-                    <span aria-hidden="true">{number}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            {stepError && <p className="game-auth-error" role="alert">{stepError}</p>}
-            {step === 1 && (
-              <form onSubmit={continueAccount} className="game-auth-form" noValidate>
-                <div className="game-auth-row">
+
+          {isRegister ? (
+            <section className="ga-form-wrap" aria-labelledby="ga-register-title">
+              <p className="ga-eyebrow">BIENVENIDO A ENTYTEC COLLAB</p>
+              <h1 id="ga-register-title">Crea tu cuenta demo</h1>
+              <p className="ga-lead">Crea tu cuenta y empieza a construir con la comunidad.</p>
+              {stepError && <p className="ga-error" role="alert">{stepError}</p>}
+
+              {step === 1 && (
+                <form onSubmit={continueAccount} className="ga-form" noValidate>
                   <Field label={t('register.name')} htmlFor="ga-name" error={fieldErrors.name} required>
-                    <input value={name} onChange={event => setName(event.target.value)} placeholder={t('register.namePh')} autoComplete="name" />
+                    <input value={name} onChange={e => setName(e.target.value)} placeholder={t('register.namePh')} autoComplete="name" />
                   </Field>
-                  <Field label={t('register.username')} htmlFor="ga-username" error={fieldErrors.username} required>
-                    <input value={username} onChange={event => setUsername(event.target.value)} placeholder={t('register.usernamePh')} autoComplete="username" />
+                  <div className="ga-row">
+                    <Field label={t('register.username')} htmlFor="ga-username" error={fieldErrors.username} required>
+                      <input value={username} onChange={e => setUsername(e.target.value)} placeholder={t('register.usernamePh')} autoComplete="username" />
+                    </Field>
+                    <Field label={t('register.email')} htmlFor="ga-email" error={fieldErrors.email} required>
+                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('auth.emailPh')} autoComplete="email" />
+                    </Field>
+                  </div>
+                  <Field label={t('register.password')} htmlFor="ga-password" error={fieldErrors.password} required>
+                    <span className="ga-password">
+                      <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('register.passwordPh')} autoComplete="new-password" />
+                      <button type="button" onClick={() => setShowPassword(v => !v)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
+                        <Icon name={showPassword ? 'x' : 'search'} size={15} />
+                      </button>
+                    </span>
                   </Field>
-                </div>
-                <Field label={t('login.email')} htmlFor="ga-email" error={fieldErrors.email} required>
-                  <input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder={t('auth.emailPh')} autoComplete="email" />
-                </Field>
-                <Field label={t('login.password')} htmlFor="ga-password" error={fieldErrors.password} required>
-                  <span className="game-auth-password">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={event => setPassword(event.target.value)}
-                      placeholder={t('register.passwordPh')}
-                      autoComplete="new-password"
-                    />
-                    <button type="button" onClick={() => setShowPassword(value => !value)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
-                      {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                    </button>
-                  </span>
-                </Field>
-                <button className="game-auth-primary" type="submit" disabled={loading} aria-busy={loading}>
-                  {loading && <Spinner />}
-                  {loading ? t('auth.creating') : t('auth.continue')}
-                </button>
-                {legalRow}
-              </form>
-            )}
-            {step === 2 && (
-              <div className="game-auth-step">
-                <section aria-labelledby="ga-gt-title">
-                  <h2 id="ga-gt-title">{t('filters.gameTypes')}</h2>
-                  <p id="ga-gt-hint">{t('filters.languagesHint')}</p>
-                  <ChoiceGrid label={t('filters.gameTypes')} describedBy="ga-gt-hint" items={GAME_TYPES.map(item => ({ ...item, label: gameTypeLabel(lang, item.value) }))} selected={gameTypes} onChange={value => toggle(setGameTypes, gameTypes, value)} />
-                </section>
-                <section aria-labelledby="ga-lang-title">
-                  <h2 id="ga-lang-title">{t('filters.languages')}</h2>
-                  <p>{t('settings.languagesHintActive')}</p>
-                  <ChoiceGrid label={t('filters.languages')} items={ALL_LANGUAGES} selected={languages} onChange={value => toggle(setLanguages, languages, value)} />
-                </section>
-                <div className="game-auth-next">
-                  <button type="button" onClick={() => { setStepError(''); setStep(1); }}>{t('auth.back')}</button>
-                  <button type="button" className="game-auth-primary" onClick={continueExperience}>{t('auth.continue')}</button>
-                </div>
-              </div>
-            )}
-            {step === 3 && (
-              <div className="game-auth-step">
-                <section aria-labelledby="ga-fg-title">
-                  <h2 id="ga-fg-title">{t('auth.favGenresTitle')}</h2>
-                  <p>{t('auth.favGenresHint')}</p>
-                  <ChoiceGrid label={t('auth.favGenresTitle')} items={FAVORITE_GENRES.map(item => ({ ...item, label: favoriteGenreLabel(lang, item.value) }))} selected={favoriteGenres} onChange={value => toggle(setFavoriteGenres, favoriteGenres, value)} />
-                </section>
-                <section aria-labelledby="ga-disc-title">
-                  <h2 id="ga-disc-title">{t('auth.skillsTitle')}</h2>
-                  <p>{t('auth.skillsHint')}</p>
-                  <ChoiceGrid label={t('auth.skillsTitle')} items={DISCIPLINES.map(item => ({ ...item, label: disciplineLabel(lang, item.value) }))} selected={disciplines} onChange={value => toggle(setDisciplines, disciplines, value)} />
-                </section>
-                <div className="game-auth-next">
-                  <button type="button" onClick={() => { setStepError(''); setStep(2); }}>{t('auth.back')}</button>
-                  <button type="button" className="game-auth-primary" onClick={submitRegister} disabled={loading} aria-busy={loading}>
+                  <label className="ga-check">
+                    <input type="checkbox" required />
+                    <span>{t('auth.legalAgree')} <a href="/legal/privacidad" onClick={openLegal('privacy')}>{t('auth.privacy')}</a> · <a href="/legal/terminos" onClick={openLegal('terms')}>{t('auth.terms')}</a></span>
+                  </label>
+                  <button className="ga-primary" type="submit" disabled={loading} aria-busy={loading}>
                     {loading && <Spinner />}
-                    {loading ? t('auth.creating') : t('register.submit')}
+                    {loading ? t('auth.creating') : t('auth.continue')}
                   </button>
+                </form>
+              )}
+
+              {step === 1 && (
+                <>
+                  <div className="ga-divider" aria-hidden="true"><span>{t('auth.orContinueWith')}</span></div>
+                  {oauthRow}
+                </>
+              )}
+
+              {step === 2 && (
+                <div className="ga-form">
+                  <section aria-labelledby="ga-gt-title">
+                    <h3 id="ga-gt-title">¿Qué te gusta crear?</h3>
+                    <ChoiceGrid items={GAME_TYPES.map(item => ({ ...item, label: gameTypeLabel(lang, item.value) }))} selected={gameTypes} onChange={v => toggle(setGameTypes, gameTypes, v)} label={t('filters.gameTypes')} />
+                  </section>
+                  <section aria-labelledby="ga-fg-title">
+                    <h3 id="ga-fg-title">¿Con qué disciplina colaboras?</h3>
+                    <ChoiceGrid items={FAVORITE_GENRES.map(item => ({ ...item, label: favoriteGenreLabel(lang, item.value) }))} selected={favoriteGenres} onChange={v => toggle(setFavoriteGenres, favoriteGenres, v)} label={t('filters.favGenres')} />
+                    <div className="ga-extra">
+                      <ChoiceGrid items={DISCIPLINES.map(item => ({ ...item, label: disciplineLabel(lang, item.value) }))} selected={disciplines} onChange={v => toggle(setDisciplines, disciplines, v)} label={t('auth.skillsTitle')} />
+                    </div>
+                  </section>
+                  <label className="ga-check">
+                    <input type="checkbox" checked={available} onChange={e => setAvailable(e.target.checked)} />
+                    <span>Disponible para colaborar</span>
+                  </label>
+                  <div className="ga-actions">
+                    <button type="button" className="ga-ghost" onClick={() => { setStepError(''); setStep(1); }}>{t('auth.back')}</button>
+                    <button type="button" className="ga-primary" onClick={submitRegister} disabled={loading} aria-busy={loading}>
+                      {loading && <Spinner />}
+                      {loading ? t('auth.creating') : t('register.submit')} <span aria-hidden="true">→</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-            <p className="game-auth-switch">{t('register.switch')}<Link to="/login">{t('register.switchLink')}</Link></p>
-          </section>
-        ) : (
-          <section className="game-auth-login" aria-labelledby="game-auth-login-title">
-            <div className="game-auth-login-icon" aria-hidden="true"><Icon name="gamepad" size={28} /></div>
-            <h1 id="game-auth-login-title">{t('auth.loginHeading')}</h1>
-            <div className="game-auth-login-card">
-              <form onSubmit={submitLogin} className="game-auth-form" noValidate>
+              )}
+
+              <p className="ga-switch">{t('auth.alreadyHave')} <Link to="/login">{t('auth.logIn')}</Link></p>
+            </section>
+          ) : (
+            <section className="ga-form-wrap" aria-labelledby="ga-login-title">
+              <p className="ga-eyebrow">BIENVENIDO A ENTYTEC COLLAB</p>
+              <h1 id="ga-login-title">Volvamos a crear.</h1>
+              <p className="ga-lead">Entra a tu espacio y sigue dando vida a tus ideas.</p>
+              <form onSubmit={submitLogin} className="ga-form" noValidate>
+                {oauthRow}
+                <div className="ga-divider" aria-hidden="true"><span>{t('auth.orContinueWith')}</span></div>
                 <Field label={t('auth.loginIdLabel')} htmlFor="ga-login-id" error={fieldErrors.loginIdentifier} required>
-                  <input value={loginIdentifier} onChange={event => setLoginIdentifier(event.target.value)} placeholder={t('auth.loginIdPh')} autoComplete="username" />
+                  <input value={loginIdentifier} onChange={e => setLoginIdentifier(e.target.value)} placeholder={t('auth.loginIdPh')} autoComplete="username" />
                 </Field>
                 <Field label={t('login.password')} htmlFor="ga-login-password" error={fieldErrors.loginPassword} required>
-                  <span className="game-auth-password">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={loginPassword}
-                      onChange={event => setLoginPassword(event.target.value)}
-                      placeholder={t('auth.passwordPh')}
-                      autoComplete="current-password"
-                    />
-                    <button type="button" onClick={() => setShowPassword(value => !value)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
-                      {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                  <span className="ga-password">
+                    <input type={showPassword ? 'text' : 'password'} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder={t('auth.passwordPh')} autoComplete="current-password" />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
+                      <Icon name={showPassword ? 'x' : 'search'} size={15} />
                     </button>
                   </span>
                 </Field>
-                {stepError && <p className="game-auth-error" role="alert">{stepError}</p>}
-                <button className="game-auth-primary" type="submit" disabled={loading} aria-busy={loading}>
+                {stepError && <p className="ga-error" role="alert">{stepError}</p>}
+                <div className="ga-remember">
+                  <label className="ga-check">
+                    <input type="checkbox" />
+                    <span>Recordarme</span>
+                  </label>
+                  <a href="/login" onClick={e => { e.preventDefault(); showToast(t('auth.forgotSoon'), 'info'); }}>¿Olvidaste tu contraseña?</a>
+                </div>
+                <button className="ga-primary" type="submit" disabled={loading} aria-busy={loading}>
                   {loading && <Spinner />}
-                  {loading ? t('auth.signingIn') : t('login.submit')}
+                  {loading ? t('auth.signingIn') : t('login.submit')} <span aria-hidden="true">→</span>
                 </button>
-                {legalRow}
               </form>
-              <div className="game-auth-or" aria-hidden="true"><span>{t('auth.orContinueWith')}</span></div>
-              {oauthRow}
-            </div>
-            <div className="game-auth-new">{t('auth.newHere')} <Link to="/register">{t('auth.createOne')}</Link></div>
-          </section>
-        )}
-      </main>
+              <p className="ga-switch">{t('auth.newHere')} <Link to="/register">{t('auth.createOne')}</Link></p>
+              {notice}
+            </section>
+          )}
+        </main>
+      </div>
       <Modal open={!!legal} onClose={() => setLegal(null)} title={legal === 'terms' ? t('auth.terms') : t('auth.privacy')}>
         <LegalContent section={legal} />
       </Modal>

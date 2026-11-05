@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { primaryRoleLabel } from '../components/PersonCard.jsx';
-import { Avatar, SkillTags, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
+import { Avatar, Icon, ProfileLinks, SkillTags, Stars, TalentRow } from '../components/common.jsx';
 import {
   getUserAvgRating, getUserRatingCount, escapeHTML,
   userCategories, getCategoryLabel
@@ -116,10 +116,11 @@ export default function Profile() {
             </li>
             <li className="profile-stat">
               <span className="profile-stat-value">{count > 0 ? avg.toFixed(1) : '—'}</span>
-              <span className="profile-stat-label">★ {t('profile.statRating')}</span>
+              <span className="profile-stat-label"><Icon name="star" size={13} />{t('profile.statRating')}</span>
             </li>
           </ul>
           <Link className="btn btn-ghost btn-sm" to="/ajustes">
+            <Icon name="pencil" size={14} />
             {t('profile.editBtn')}
           </Link>
         </div>
@@ -177,7 +178,7 @@ export default function Profile() {
                     </span>
                   </div>
                   <span className="rating-stars-display" aria-label={`${r.stars}/5`}>
-                    {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
+                    <Stars rating={r.stars} showValue={false} size={12} />
                   </span>
                 </div>
               );

@@ -19,17 +19,27 @@ export default function Groups() {
 }
 
 function GroupsDirectory() {
-  const { user, groups, requestToJoinGroup, createGroup, selectGroup } = useApp();
+  const { user, users, groups, projects, requestToJoinGroup, createGroup, selectGroup } = useApp();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+
+  // El boton "+" de la barra lateral abre este modal via ?new=1.
+  const creating = searchParams.get('new') === '1';
+  const openCreate = () => setSearchParams({ new: '1' });
+  const closeCreate = () => {
+    setSearchParams({});
+    setName('');
+    setDescription('');
+  };
 
   const submit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     const group = createGroup({ name, description });
+    closeCreate();
     showToast('Grupo creado con éxito', 'success');
     navigate(`/grupos/${group.id}`);
   };
@@ -52,46 +62,21 @@ function GroupsDirectory() {
     }
   };
 
-  return (
-    <div className="section-block groups-page">
-      <div className="section-header-row">
-        <div>
-          <h2 className="section-title">Grupos</h2>
-          <p className="groups-intro">Espacios privados para que equipos organicen sus proyectos y miembros.</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => setCreating(v => !v)}>
-          {creating ? 'Cancelar' : 'Crear grupo'}
-        </button>
-      </div>
+  const projectCount = groupId => projects.filter(p => p.groupId === groupId).length;
 
-      {creating && (
-        <form className="group-create-form" onSubmit={submit}>
-          <div className="form-group">
-            <label htmlFor="group-name">Nombre del grupo</label>
-            <input
-              id="group-name"
-              required
-              maxLength="70"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Ej. Estudio Indie, Equipo de Producto..."
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="group-description">Descripción</label>
-            <textarea
-              id="group-description"
-              required
-              maxLength="260"
-              rows="3"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Qué proyectos desarrollan o cuál es el propósito de este equipo"
-            />
-          </div>
-          <button className="btn btn-primary" type="submit">Crear y acceder</button>
-        </form>
-      )}
+  return (
+    <div className="groups-page">
+      <header className="groups-hero">
+        <div className="groups-hero-copy">
+          <p className="groups-eyebrow">ESPACIOS PARA CREAR JUNTOS</p>
+          <h1 className="groups-title">Un equipo. Un espacio. Muchas ideas.</h1>
+          <p className="groups-lead">Organiza tus comunidades y reúne proyectos y personas en un solo lugar.</p>
+        </div>
+        <button type="button" className="btn btn-primary groups-hero-action" onClick={openCreate}>
+          <Icon name="plus" size={16} />
+          Crear grupo
+        </button>
+      </header>
 
       {groups.length === 0 ? (
         <EmptyState icon="users" title="Aún no hay grupos" sub="Crea el primero para empezar a colaborar con tu equipo." />
@@ -100,34 +85,112 @@ function GroupsDirectory() {
           {groups.map(group => {
             const membership = memberFor(group, user.id);
             const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
+            const members = (group.members || [])
+              .map(m => users.find(u => u.id === m.userId))
+              .filter(Boolean)
+              .slice(0, 4);
             return (
               <article className="group-card" key={group.id}>
-                <div className="group-card-icon" aria-hidden="true"><Icon name="users" size={22} /></div>
-                <div>
-                  <h3>{group.name}</h3>
-                  <p>{group.description}</p>
+                {/* Antes: una banda decorativa de 108px con el rotulo en
+                    ingles "BUILD SOMETHING TOGETHER" a 9px que no aportaba
+                    informacion. Ahora el avatar y el nombre abren la tarjeta
+                    y los numeros van en chips. */}
+                <div className="group-card-body">
+                  <div className="group-card-head">
+                    <GroupAvatar group={group} size="lg" />
+                    <div className="group-card-id">
+                      <h3 className="group-card-title">{group.name}</h3>
+                      <div className="group-card-meta">
+                        <span className="meta-chip">
+                          <Icon name="users" size={13} /> {group.members?.length || 0}
+                        </span>
+                        <span className="meta-chip">
+                          <Icon name="folder" size={13} /> {projectCount(group.id)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="group-card-desc">{group.description}</p>
+
+                  {members.length > 0 && (
+                    <div className="group-card-avatars">
+                      {members.map(m => (
+                        <Avatar key={m.id} user={m} cls="group-avatar" />
+                      ))}
+                    </div>
+                  )}
+
+                  {membership ? (
+                    <button type="button" className="btn btn-outline btn-block" onClick={() => open(group)}>
+                      Abrir espacio <span aria-hidden="true">↗</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-block"
+                      disabled={pending}
+                      onClick={() => handleRequest(group.id)}
+                    >
+                      {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
+                    </button>
+                  )}
                 </div>
-                <div className="group-card-meta">
-                  <span>{group.members?.length || 0} miembros</span>
-                  <span>{membership ? (membership.role === 'owner' ? 'Creador' : membership.role === 'admin' ? 'Administrador' : 'Miembro') : 'Grupo privado'}</span>
-                </div>
-                {membership ? (
-                  <button className="btn btn-primary btn-sm" onClick={() => open(group)}>
-                    Entrar al grupo
-                  </button>
-                ) : (
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    disabled={pending}
-                    onClick={() => handleRequest(group.id)}
-                  >
-                    {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
-                  </button>
-                )}
               </article>
             );
           })}
         </div>
+      )}
+
+      <section className="groups-discover">
+        <span className="groups-discover-icon" aria-hidden="true"><Icon name="compass" size={22} /></span>
+        <div className="groups-discover-copy">
+          <h3>Descubre una nueva comunidad</h3>
+          <p>Game Jam LATAM · Un espacio para prototipar, aprender y compartir.</p>
+        </div>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => showToast('Solicitud enviada', 'success')}>
+          Solicitar acceso <span aria-hidden="true">+</span>
+        </button>
+      </section>
+
+      {creating && (
+        <Modal open onClose={closeCreate} title="Crea un espacio para tu equipo" subtitle="Interfaz de demostración. Las acciones no se envían a ningún servidor.">
+          <form className="group-create-form" onSubmit={submit}>
+            <div className="form-group">
+              <label htmlFor="group-name">Nombre del grupo</label>
+              <input
+                id="group-name"
+                required
+                maxLength="70"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="El nombre de tu comunidad"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="group-description">Descripción</label>
+              <textarea
+                id="group-description"
+                required
+                maxLength="260"
+                rows="3"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="¿Qué van a crear juntos?"
+              />
+            </div>
+            <div class="form-group">
+              <label htmlFor="group-visibility">Visibilidad</label>
+              <select id="group-visibility" defaultValue="private">
+                <option value="private">Privado · acceso por invitación</option>
+              </select>
+            </div>
+            <button className="btn btn-primary btn-block" type="submit">
+              <Icon name="plus" size={15} />
+              Crear grupo demo
+            </button>
+          </form>
+        </Modal>
       )}
     </div>
   );

@@ -16,7 +16,7 @@ export default function Footer() {
     <footer className="site-footer">
       <div className="footer-container">
         <div className="footer-brand">
-          <h2>ENTYCOLLAB</h2>
+          <h2>ENTYTEC COLLAB</h2>
           <p>{t('footer.desc')}</p>
         </div>
         <div className="footer-contact">
@@ -31,7 +31,7 @@ export default function Footer() {
         </nav>
       </div>
       <div className="footer-bottom">
-        <p>&copy; 2026 ENTYCOLLAB. <span>{t('footer.rights')}</span></p>
+        <p>&copy; 2026 ENTYTEC COLLAB. <span>{t('footer.rights')}</span></p>
       </div>
       <Modal open={!!legal} onClose={() => setLegal(null)} title={legal === 'terms' ? t('auth.terms') : t('auth.privacy')}>
         <LegalContent section={legal} />

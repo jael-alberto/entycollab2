@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Modal, EmptyState } from '../components/common.jsx';
+import { EmptyState, Icon, Modal } from '../components/common.jsx';
 import { escapeHTML } from '../lib/helpers.js';
 import { availableCategoriesList, availableTechList } from '../lib/filters.js';
 
@@ -72,7 +72,7 @@ export default function SelectFilterModal({ kind }) {
                     className={'featured-proj-card' + (selectedNow ? ' selected' : '')}
                     onClick={() => toggle(value)}
                   >
-                    <span className="featured-proj-tick">{selectedNow ? '★' : '☆'}</span>
+                    <span className="featured-proj-tick">{selectedNow ? <Icon name="star" size={14} /> : <Icon name="star" size={14} cls="is-empty" />}</span>
                     <span className="featured-proj-title">{escapeHTML(label)}</span>
                   </button>
                 );
