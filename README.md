@@ -420,10 +420,12 @@ Marcar solo cuando la prueba se haya ejecutado y el resultado sea el esperado.
 
 ### 11. Despliegue
 
-- [ ] Frontend desplegado en Vercel con Root Directory `frontend`.
+Guía paso a paso de staging (Render + Vercel + Supabase): [`docs/DEPLOY_STAGING.md`](docs/DEPLOY_STAGING.md).
+
+- [ ] Frontend desplegado en Vercel con Root Directory `./` (build definido en el `vercel.json` de la raíz).
 - [ ] Variables `VITE_*` configuradas en Vercel.
-- [ ] `vercel.json` reescribe rutas profundas al `index.html`.
-- [ ] Backend desplegado en un host con Node (Render/Railway/Fly/VPS).
+- [ ] `vercel.json` de la raíz reescribe rutas profundas al `index.html`.
+- [ ] Backend desplegado en Render (staging: `render.staging.yaml`; producción: `render.yaml`).
 - [ ] `DATABASE_URL`, `SUPABASE_*`, `JWT_SECRET`, `FRONTEND_URL` configuradas en el backend.
 - [ ] CORS usa la URL real del frontend.
 - [ ] El backend responde `/health` en producción.

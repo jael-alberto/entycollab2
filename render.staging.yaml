@@ -1,0 +1,43 @@
+# Blueprint de STAGING para Render (rama develop).
+# Se crea una sola vez desde el dashboard:
+#   New + -> Blueprint -> repo -> branch: develop -> Blueprint Path: render.staging.yaml
+# Producción usa render.yaml (rama main) y no se toca hasta validar staging.
+
+services:
+  - type: web
+    name: entycollab-backend-staging
+    runtime: node
+    plan: free
+    region: oregon
+    branch: develop
+    rootDir: backend
+    buildCommand: npm install --include=dev && npx prisma generate
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Temporal: se actualiza con el dominio de Vercel staging tras el primer deploy.
+      # Acepta varios orígenes separados por coma.
+      - key: FRONTEND_URL
+        sync: false
+      # Debe ser la cadena "Session pooler" de Supabase (IPv4).
+      # El host directo db.<ref>.supabase.co es solo IPv6 y Render no lo alcanza.
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      # Permite previews de Vercel (*.vercel.app) mientras se fija el dominio exacto.
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"

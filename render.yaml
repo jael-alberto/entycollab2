@@ -1,9 +1,12 @@
+# Blueprint de PRODUCCIÓN (rama main).
+# Para staging usa render.staging.yaml (rama develop); ver docs/DEPLOY_STAGING.md.
 services:
   - type: web
     name: entycollab-backend
     runtime: node
     plan: free
     region: oregon
+    branch: main
     rootDir: backend
     buildCommand: npm install --include=dev && npx prisma generate
     startCommand: npm start
