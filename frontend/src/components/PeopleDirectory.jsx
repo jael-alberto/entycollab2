@@ -64,8 +64,8 @@ export default function PeopleDirectory() {
 
   // Al cambiar búsqueda, filtros u orden se vuelve a la primera página.
   useEffect(() => {
-    setPage(1);
-  }, [search, filters, sortBy]);
+    if (page !== 1) setPage(1);
+  }, [search, filters, sortBy, page]);
 
   const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);

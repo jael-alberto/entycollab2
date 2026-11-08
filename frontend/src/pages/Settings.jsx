@@ -51,7 +51,7 @@ export default function Settings() {
 
   const tErr = (key) => (key ? t(key) : '');
 
-  const saveAccount = (e) => {
+  const saveAccount = async (e) => {
     e.preventDefault();
     const found = {
       name: tErr(nameKey(acc.name)),
@@ -69,7 +69,7 @@ export default function Settings() {
     }
 
     setSaving(true);
-    const res = updateAccount(acc);
+    const res = await updateAccount(acc);
     if (res === 'incomplete') {
       setSaving(false);
       return showToast(t('settings.incomplete'), 'error');

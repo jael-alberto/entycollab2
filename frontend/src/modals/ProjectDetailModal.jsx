@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Icon, Modal, ProjectBanner, SkillTags, Stars, StatusPill } from '../components/common.jsx';
 import { formatDeadline } from '../components/ProjectCard.jsx';
+import PeekRating from '../components/PeekRating.jsx';
 import {
   getUserAvgRating, getCategoryLabel, escapeHTML
 } from '../lib/helpers.js';
@@ -120,6 +121,9 @@ export default function ProjectDetailModal() {
                   {applicant.skills.map(s => escapeHTML(s)).join(', ')}
                   {rating > 0 && <> · <Stars rating={rating} /></>}
                 </span>
+                {(a.pitch || a.message) && (
+                  <p className="applicant-pitch">{escapeHTML(a.pitch || a.message)}</p>
+                )}
               </div>
               <div className="applicant-actions">
                 {a.status === 'pending' ? (
@@ -158,7 +162,7 @@ export default function ProjectDetailModal() {
                   {a.projectRole && <><strong>{a.projectRole}</strong> · </>}
                   {participant.skills.map(s => escapeHTML(s)).join(', ')}
                   {rating ? (
-                    <> · {t('detail.rated')}: <Stars rating={rating.stars} showValue={false} size={12} /></>
+                    <> · {t('detail.rated')}: <PeekRating value={rating.stars} readOnly size={16} lift={4} magnify={1.05} riseDuration={250} /></>
                   ) : (isOwner && project.status === 'completed' ? <> · {t('detail.unrated')}</> : '')}
                 </span>
               </div>

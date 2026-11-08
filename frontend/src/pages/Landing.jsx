@@ -43,28 +43,18 @@ const steps = [
 ];
 
 export default function Landing() {
-  const { user, theme, toggleTheme } = useApp();
+  const { user, selectGroup } = useApp();
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [step, setStep] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const destination = user ? '/dashboard' : '/register';
 
-  // El menu movil se cierra con Escape y al volver al escritorio, para que no
-  // quede abierto (ni recordado) cuando la barra vuelve a mostrar los enlaces.
+  // Clear any persisted selected-group state when landing page loads
   useEffect(() => {
-    if (!menuOpen) return undefined;
-    const onKey = event => { if (event.key === 'Escape') setMenuOpen(false); };
-    const desktop = window.matchMedia('(min-width: 781px)');
-    const onChange = event => { if (event.matches) setMenuOpen(false); };
-    window.addEventListener('keydown', onKey);
-    desktop.addEventListener('change', onChange);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      desktop.removeEventListener('change', onChange);
-    };
-  }, [menuOpen]);
-
+    selectGroup(null);
+  }, [selectGroup]);
+  const exploreTarget = user ? '/proyectos' : '#explorar';
 
   const visibleGames = useMemo(() => games.filter(game => {
     const term = query.trim().toLowerCase();

@@ -24,14 +24,35 @@ export const STORAGE_KEYS = {
 
 export function getData(key) {
   try {
-    return JSON.parse(localStorage.getItem(key)) || [];
+    const data = JSON.parse(localStorage.getItem(key)) || [];
+    // Sanitize sensitive data: remove password fields from user objects
+    if (key === STORAGE_KEYS.users && Array.isArray(data)) {
+      return data.map(item => {
+        if (item && typeof item === 'object') {
+          const { password: _clearText, ...safeUser } = item;
+          return safeUser;
+        }
+        return item;
+      });
+    }
+    return data;
   } catch {
     return [];
   }
 }
 
 export function setData(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
+  let toStore = data;
+  if (key === STORAGE_KEYS.users && Array.isArray(data)) {
+    toStore = data.map(item => {
+      if (item && typeof item === 'object') {
+        const { password: _clearText, ...safeUser } = item;
+        return safeUser;
+      }
+      return item;
+    });
+  }
+  localStorage.setItem(key, JSON.stringify(toStore));
 }
 
 export function getUsers() { return getData(STORAGE_KEYS.users); }
@@ -40,7 +61,14 @@ export function getApplications() { return getData(STORAGE_KEYS.applications); }
 export function getRatings() { return getData(STORAGE_KEYS.ratings); }
 export function getGroups() { return getData(STORAGE_KEYS.groups); }
 
-export function saveUsers(u) { setData(STORAGE_KEYS.users, u); }
+export function saveUsers(u) {
+  const sanitized = (u || []).map(user => {
+    if (!user) return user;
+    const { password: _clearText, ...safeUser } = user;
+    return safeUser;
+  });
+  setData(STORAGE_KEYS.users, sanitized);
+}
 export function saveProjects(p) { setData(STORAGE_KEYS.projects, p); }
 export function saveApplications(a) { setData(STORAGE_KEYS.applications, a); }
 export function saveRatingsData(r) { setData(STORAGE_KEYS.ratings, r); }
@@ -70,8 +98,30 @@ export function getCurrentUser() {
   return getUsers().find(u => u.id === uid) || null;
 }
 
+export async function hashPassword(plainText) {
+  if (!plainText) return '';
+  const cryptoObj = typeof crypto !== 'undefined' ? crypto : (typeof window !== 'undefined' ? window.crypto : null);
+  if (!cryptoObj?.subtle) {
+    throw new Error('La autenticación local requiere Web Crypto. Usa Supabase/Auth en este navegador.');
+  }
+  const buffer = await cryptoObj.subtle.digest('SHA-256', new TextEncoder().encode(plainText));
+  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  const cryptoObj = typeof crypto !== 'undefined' ? crypto : (typeof window !== 'undefined' ? window.crypto : null);
+  if (typeof cryptoObj?.randomUUID === 'function') {
+    return cryptoObj.randomUUID();
+  }
+  if (typeof cryptoObj?.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    cryptoObj.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // RFC4122 v4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  throw new Error('No hay una fuente criptográficamente segura para generar identificadores.');
 }
 
 export function getTheme() {
@@ -354,6 +404,15 @@ export function migrateLegacyData() {
   });
   if (changed) saveProjects(projects);
 
+  // Grupos viejos sin visibilidad: se marcan públicos, que es el modelo actual.
+  changed = false;
+  const groups = getGroups().map(g => {
+    if (typeof g.isPrivate === 'boolean') return g;
+    changed = true;
+    return { ...g, isPrivate: false };
+  });
+  if (changed) saveGroups(groups);
+
   // Datos demo guardados como texto simple -> contenido bilingüe
   upgradeDemoContent();
 }
@@ -491,7 +550,7 @@ export function seedDemoData() {
       name: 'María García',
       username: 'mariagar',
       email: 'maria@demo.com',
-      password: '123456',
+      passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['JavaScript', 'React', 'Node.js', 'MongoDB'],
       categories: ['web'],
       bio: {
@@ -505,7 +564,7 @@ export function seedDemoData() {
       name: 'Carlos López',
       username: 'carloslop',
       email: 'carlos@demo.com',
-      password: '123456',
+      passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['Python', 'Django', 'PostgreSQL', 'Docker'],
       categories: ['web'],
       bio: {
@@ -520,7 +579,7 @@ export function seedDemoData() {
       name: 'Ana Martínez',
       username: 'anamart',
       email: 'ana@demo.com',
-      password: '123456',
+      passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['TypeScript', 'Vue.js', 'Tailwind CSS', 'Firebase'],
       categories: ['web'],
       bio: {
@@ -608,7 +667,7 @@ export function seedDemoData() {
 export function seedDemoExtraData() {
   const extraUsers = [
     {
-      id: 'demo4', name: 'Luis Ramírez', username: 'luisram', email: 'luis@demo.com', password: '123456',
+      id: 'demo4', name: 'Luis Ramírez', username: 'luisram', email: 'luis@demo.com', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['JavaScript', 'React', 'Next.js', 'Node.js'],
       categories: ['web'],
       bio: {
@@ -618,7 +677,7 @@ export function seedDemoExtraData() {
       available: true, createdAt: '2026-03-20T10:00:00Z'
     },
     {
-      id: 'demo5', name: 'Sofía Herrera', username: 'sofiaher', email: 'sofia@demo.com', password: '123456',
+      id: 'demo5', name: 'Sofía Herrera', username: 'sofiaher', email: 'sofia@demo.com', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['Python', 'Django', 'PostgreSQL', 'AWS'],
       categories: ['web'],
       bio: {
@@ -628,7 +687,7 @@ export function seedDemoExtraData() {
       available: true, createdAt: '2026-04-02T10:00:00Z'
     },
     {
-      id: 'demo6', name: 'Diego Torres', username: 'diegotor', email: 'diego@demo.com', password: '123456',
+      id: 'demo6', name: 'Diego Torres', username: 'diegotor', email: 'diego@demo.com', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['TypeScript', 'Angular', 'CSS', 'MySQL'],
       categories: ['web'],
       bio: {
@@ -638,7 +697,7 @@ export function seedDemoExtraData() {
       available: true, createdAt: '2026-05-11T10:00:00Z'
     },
     {
-      id: 'demo7', name: 'Valentina Rojas', username: 'valerojas', email: 'vale@demo.com', password: '123456',
+      id: 'demo7', name: 'Valentina Rojas', username: 'valerojas', email: 'vale@demo.com', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['Go', 'Docker', 'Kubernetes', 'AWS'],
       categories: ['web'],
       bio: {
@@ -648,7 +707,7 @@ export function seedDemoExtraData() {
       available: true, createdAt: '2026-05-28T10:00:00Z'
     },
     {
-      id: 'demo8', name: 'Mateo Silva', username: 'mateosil', email: 'mateo@demo.com', password: '123456',
+      id: 'demo8', name: 'Mateo Silva', username: 'mateosil', email: 'mateo@demo.com', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['Flutter', 'Dart', 'Firebase'],
       categories: ['mobile'],
       bio: {
@@ -658,7 +717,7 @@ export function seedDemoExtraData() {
       available: true, createdAt: '2026-06-15T10:00:00Z'
     },
     {
-      id: 'demo9', name: 'Andrés Castillo', username: 'andrescas', email: 'andres@demo.com', password: '123456',
+      id: 'demo9', name: 'Andrés Castillo', username: 'andrescas', email: 'andres@demo.com', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['Unity', 'C#', 'Blender', 'Aseprite'],
       categories: ['game'],
       bio: {
@@ -668,7 +727,7 @@ export function seedDemoExtraData() {
       available: true, createdAt: '2026-06-25T10:00:00Z'
     },
     {
-      id: 'demo10', name: 'Camila Ríos', username: 'camilarios', email: 'camila@demo.com', password: '123456',
+      id: 'demo10', name: 'Camila Ríos', username: 'camilarios', email: 'camila@demo.com', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       skills: ['Godot', 'GDScript', 'Aseprite', 'Pixel Art'],
       categories: ['game'],
       bio: {
@@ -847,7 +906,7 @@ export function seedCarlosGroups() {
   const genId = generateId;
 
   // Helper to create group with projects, apps, ratings
-  function createGroup({ name, description, ownerId, memberRoles, projectData, requests = [] }) {
+  function createGroup({ name, description, ownerId, memberRoles, projectData, requests = [], isPrivate = false }) {
     const groupId = genId();
     const createdAt = new Date(now - 60 * day).toISOString();
 
@@ -862,6 +921,7 @@ export function seedCarlosGroups() {
       name,
       description,
       ownerId,
+      isPrivate,
       createdAt,
       members,
       requests: requests.map((req, idx) => ({
@@ -926,7 +986,7 @@ export function seedCarlosGroups() {
             projectId: project.id,
             ratedUserId: app.userId,
             ratedBy: project.ownerId,
-            stars: 4 + (Math.random() > 0.5 ? 1 : 0),
+            stars: 5,
             createdAt: new Date(now - 5 * day).toISOString()
           });
           groupRatings.push({
@@ -934,7 +994,7 @@ export function seedCarlosGroups() {
             projectId: project.id,
             ratedUserId: project.ownerId,
             ratedBy: app.userId,
-            stars: 4 + (Math.random() > 0.5 ? 1 : 0),
+            stars: 4,
             createdAt: new Date(now - 5 * day).toISOString()
           });
         }
@@ -1065,6 +1125,7 @@ export function seedCarlosGroups() {
     name: 'Comunidad Game Dev',
     description: 'Grupo abierto para desarrolladores de videojuegos',
     ownerId: otherUsers[1]?.id,
+    isPrivate: false,
     memberRoles: [
       { userId: otherUsers[1]?.id, role: 'owner' },
       { userId: otherUsers[2]?.id, role: 'admin' },

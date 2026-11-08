@@ -80,16 +80,6 @@ export async function isUsernameAvailable(username, excludeId = null) {
   }
 }
 
-export async function isEmailAvailable(email, excludeId = null) {
-  try {
-    // No hay endpoint directo, usar search
-    const profiles = await searchProfiles(email);
-    return !profiles.some(p => p.email === email && p.id !== excludeId);
-  } catch {
-    return false;
-  }
-}
-
 export async function toggleAvailability(userId) {
   try {
     const { user, available } = await api.profiles.toggleAvailability(userId);

@@ -3,24 +3,24 @@ import { Icon } from '../components/common.jsx';
 
 const ToastContext = createContext(null);
 
-// Icono por tipo: el estado nunca se comunica solo con color.
-const TOAST_ICON = {
-  success: 'check',
-  error: 'alert',
-  info: 'sparkles'
-};
+let _toastId = 0;
 
-const TOAST_LABEL = {
-  success: 'Correcto',
-  error: 'Error',
-  info: 'Aviso'
-};
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
+}
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const dismiss = useCallback((id) => {
-    setToasts(prev => prev.map(t => (t.id === id ? { ...t, leaving: true } : t)));
+  const showToast = useCallback((message, type = 'info') => {
+    const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `toast-${Date.now()}-${++_toastId}`;
+    setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 180);
@@ -61,6 +61,3 @@ export function ToastProvider({ children }) {
   );
 }
 
-export function useToast() {
-  return useContext(ToastContext);
-}

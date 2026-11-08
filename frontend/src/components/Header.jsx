@@ -52,8 +52,10 @@ export function LoggedHeader() {
   const myGroups = groups.filter(group => group.members?.some(member => member.userId === user?.id));
   const isGroupWorkspace = pathname.startsWith('/grupos/');
   const isGlobal = pathname === '/dashboard' && new URLSearchParams(search).get('view') === 'global';
-  const showSiteSwitcher = isGlobal || isGroupWorkspace;
-  const siteLabel = isGroupWorkspace && activeGroup
+  // El selector siempre está junto a la marca cuando la persona pertenece a
+  // algún grupo: así puede cambiar de contexto desde cualquier pantalla.
+  const showSiteSwitcher = myGroups.length > 0 || isGlobal || isGroupWorkspace;
+  const siteLabel = activeGroup
     ? activeGroup.name
     : isGlobal
       ? t('dash.global')
@@ -94,7 +96,7 @@ export function LoggedHeader() {
               aria-haspopup="menu"
               aria-expanded={siteOpen}
             >
-              {isGroupWorkspace && activeGroup
+              {activeGroup
                 ? <GroupAvatar group={activeGroup} size="sm" />
                 : <Icon name={isGlobal ? 'globe' : 'home'} size={16} />}
               <span className="site-switcher-label">{escapeHTML(siteLabel)}</span>
@@ -123,7 +125,7 @@ export function LoggedHeader() {
                   <p className="site-switcher-empty">{t('dash.noGroups')}</p>
                 ) : (
                   myGroups.map(group => {
-                    const isActive = isGroupWorkspace && activeGroup?.id === group.id;
+                    const isActive = activeGroup?.id === group.id;
                     return (
                       <button
                         key={group.id}

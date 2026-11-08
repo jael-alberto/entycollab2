@@ -1,7 +1,7 @@
 import { Children, cloneElement, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profileLinks } from '../lib/helpers.js';
-import { useLeaveTransition } from '../lib/useLeaveTransition.js';
+import PeekRating from './PeekRating.jsx';
 
 // ==========================================================================
 // COMPONENTES UI PEQUEÑOS REUTILIZABLES
@@ -240,19 +240,12 @@ export function ProjectBanner({ project, mode = 'card' }) {
 
 export function Stars({ rating, size = 13, showValue = true }) {
   if (rating <= 0) return null;
-  const full = Math.floor(rating);
-  const half = rating % 1 >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
+  const rounded = Math.round(rating);
   return (
-    <span className="stars-inline" role="img" aria-label={`${rating.toFixed(1)} de 5`}>
-      {Array.from({ length: full }).map((_, i) => (
-        <Icon key={`f${i}`} name="star" size={size} cls="star is-full" />
-      ))}
-      {half ? <Icon key="h" name="star" size={size} cls="star is-half" /> : null}
-      {Array.from({ length: empty }).map((_, i) => (
-        <Icon key={`e${i}`} name="star" size={size} cls="star is-empty" />
-      ))}
-      {showValue && <span className="stars-inline-value">({rating.toFixed(1)})</span>}
+    <span className="stars-inline">
+      <PeekRating value={rounded} readOnly size={18} lift={5} magnify={1.1} riseDuration={280} />
+      {' '}
+      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-dim)' }}>({rating.toFixed(1)})</span>
     </span>
   );
 }

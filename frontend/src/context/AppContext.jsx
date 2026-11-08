@@ -1,12 +1,23 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   getUsers, getProjects, getApplications, getRatings,
-  getGroups, saveUsers, saveProjects, saveApplications, saveRatingsData, saveGroups,
   getCurrentUserId, setCurrentUserId, clearCurrentUserId,
-  getActiveGroupId, setActiveGroupId, generateId, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
+  getActiveGroupId, setActiveGroupId, generateId, hashPassword, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
 } from '../lib/store.js';
+import { listGroups, createGroup as apiCreateGroup, requestToJoinGroup as apiRequestToJoinGroup, decideGroupRequest as apiDecideGroupRequest, updateGroup as apiUpdateGroup, removeGroupMember as apiRemoveGroupMember, setGroupMemberRole as apiSetGroupMemberRole, getGroupMembers, getGroupRequests, listGroupProjects } from '../lib/api/groups.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { getUserAvgRating, userCategories } from '../lib/helpers.js';
+import { isSupabaseConfigured } from '../lib/supabaseClient.js';
+import {
+  fetchSupabaseData,
+  syncProjectToSupabase,
+  syncProfileToSupabase,
+  syncApplicationToSupabase,
+  syncRatingToSupabase,
+  syncGroupToSupabase,
+  supabaseAuthLogin,
+  supabaseAuthRegister
+} from '../lib/supabaseSync.js';
 
 const AppContext = createContext(null);
 
@@ -30,7 +41,7 @@ export function AppProvider({ children }) {
   const activeMembership = activeGroup?.members?.find(m => m.userId === userId) || null;
   const isActiveGroupAdmin = activeMembership?.role === 'owner' || activeMembership?.role === 'admin';
 
-  // Resincronizar los datos tras cada cambio (localStorage siempre gana)
+  // Resincronizar los datos tras cada cambio (con almacenamiento local)
   const refresh = useCallback(() => {
     setUsers(getUsers());
     setProjects(getProjects());
@@ -47,6 +58,82 @@ export function AppProvider({ children }) {
   }, []);
 
   // ========================================================================
+  // SINCRONIZACIÓN INICIAL CON SUPABASE (CUANDO ESTÁ CONFIGURADO EN VERCEL/LOCAL)
+  // ========================================================================
+  useEffect(() => {
+    let isMounted = true;
+    async function initSupabaseData() {
+      if (!isSupabaseConfigured()) return;
+      try {
+        const data = await fetchSupabaseData();
+        if (!isMounted || !data.enabled) return;
+
+        if (Array.isArray(data.projects) && data.projects.length > 0) {
+          setProjects(data.projects);
+          saveProjects(data.projects);
+        }
+        if (Array.isArray(data.profiles) && data.profiles.length > 0) {
+          setUsers(data.profiles);
+          saveUsers(data.profiles);
+        }
+        if (Array.isArray(data.groups) && data.groups.length > 0) {
+          setGroups(data.groups);
+          saveGroups(data.groups);
+        }
+        if (Array.isArray(data.applications) && data.applications.length > 0) {
+          setApplications(data.applications);
+          saveApplications(data.applications);
+        }
+        if (Array.isArray(data.ratings) && data.ratings.length > 0) {
+          setRatings(data.ratings);
+          saveRatingsData(data.ratings);
+        }
+      } catch (err) {
+        console.warn('[AppContext] No se pudieron sincronizar datos con Supabase:', err);
+      }
+    }
+
+    initSupabaseData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // ========================================================================
+  // OBTENER GRUPOS DEL BACKEND PRISMA (siempre que haya API disponible)
+  // ========================================================================
+  useEffect(() => {
+    async function fetchGroupsFromBackend() {
+      try {
+        const result = await listGroups();
+        if (Array.isArray(result.data) && result.data.length > 0) {
+          setGroups(result.data);
+          saveGroups(result.data);
+        } else {
+          // Si la API falla o está vacía, mantener localStorage/Supabase como fallback
+          if (!isSupabaseConfigured()) {
+            const localGroups = getGroups();
+            if (localGroups.length > 0) {
+              setGroups(localGroups);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[AppContext] No se pudieron cargar grupos del backend:', err);
+        // Mantener datos locales si la API falla
+        if (!isSupabaseConfigured()) {
+          const localGroups = getGroups();
+          if (localGroups.length > 0) {
+            setGroups(localGroups);
+          }
+        }
+      }
+    }
+
+    fetchGroupsFromBackend();
+  }, []);
+
+// ========================================================================
   // I18N / THEME
   // ========================================================================
   const t = useCallback((key, replacements) => i18nT(lang, key, replacements), [lang]);
@@ -75,36 +162,74 @@ export function AppProvider({ children }) {
   // ========================================================================
   // AUTH
   // ========================================================================
-  const login = useCallback((identifier, password) => {
+  const login = useCallback(async (identifier, password) => {
     const cleanIdentifier = String(identifier || '').trim().toLowerCase().replace(/^@/, '');
-    const found = getUsers().find(u => (u.email.toLowerCase() === cleanIdentifier || u.username.toLowerCase() === cleanIdentifier) && u.password === password);
+
+    // 1. Si Supabase está configurado, intentar autenticación con Supabase
+    if (isSupabaseConfigured()) {
+      const supaUser = await supabaseAuthLogin(cleanIdentifier, password);
+      if (supaUser) {
+        const current = getUsers();
+        const existingIdx = current.findIndex(u => u.id === supaUser.id);
+        if (existingIdx >= 0) {
+          current[existingIdx] = { ...current[existingIdx], ...supaUser };
+        } else {
+          current.push(supaUser);
+        }
+        saveUsers(current);
+        setUsers(current);
+        setUserInStore(supaUser.id);
+        return supaUser;
+      }
+    }
+
+    // 2. Fallback a usuarios locales
+    const pHash = password ? await hashPassword(password) : '';
+    const localUsers = getUsers();
+    const found = localUsers.find(u => {
+      const matchIdentity = u.email.toLowerCase() === cleanIdentifier || u.username.toLowerCase() === cleanIdentifier;
+      if (!matchIdentity) return false;
+      if (u.passwordHash) return u.passwordHash === pHash;
+      if (u.password) return u.password === password || u.password === pHash;
+      return false;
+    });
     if (!found) return null;
+    // Migrate legacy local accounts: remove any plaintext password the next
+    // time the user list is persisted. New accounts store only passwordHash.
+    if (Object.hasOwn(found, 'password')) saveUsers(localUsers);
     setUserInStore(found.id);
     return found;
   }, [setUserInStore]);
 
-  const register = useCallback((data) => {
+  const register = useCallback(async (data) => {
     const current = getUsers();
     if (current.find(u => u.email === data.email)) return 'email';
     if (current.find(u => u.username === data.username)) return 'username';
-    const newUser = {
+
+    let supaProfile = null;
+    if (isSupabaseConfigured()) {
+      supaProfile = await supabaseAuthRegister(data);
+      if (supaProfile === 'email') return 'email';
+    }
+
+    const hashedPassword = data.password ? await hashPassword(data.password) : '';
+
+    const newUser = supaProfile || {
       id: generateId(),
       name: data.name,
       username: data.username,
       email: data.email,
-      password: data.password,
+      passwordHash: hashedPassword,
       skills: data.skills,
       categories: userCategories({ skills: data.skills }),
       bio: data.bio,
-      // Perfil de talento: arranca vacío. Las cuentas nuevas no aparecen en
-      // los filtros hasta que completan tipo de juego y habilidad, y Ajustes
-      // avisa de ello. Las estrellas vienen de las reseñas, no se editan aquí.
       languages: (data.languages || []).slice(),
       disciplines: (data.disciplines || []).slice(),
       gameTypes: (data.gameTypes || []).slice(),
       favoriteGenres: (data.favoriteGenres || []).slice(),
       createdAt: new Date().toISOString()
     };
+
     current.push(newUser);
     saveUsers(current);
     setUsers(current);
@@ -140,13 +265,12 @@ export function AppProvider({ children }) {
       saveUsers(current);
       setUsers(current);
       refresh();
+      syncProfileToSupabase(current[idx]);
     }
   }, [userId, refresh]);
 
-  // Edita los datos de la cuenta desde Ajustes. El correo y el usuario
-  // siguen siendo únicos, igual que en register(). La contraseña solo se
-  // cambia si viene una nueva.
-  const updateAccount = useCallback(({ name, username, email, password }) => {
+  // Edita los datos de la cuenta desde Ajustes.
+  const updateAccount = useCallback(async ({ name, username, email, password }) => {
     const current = getUsers();
     const idx = current.findIndex(u => u.id === userId);
     if (idx < 0) return 'error';
@@ -163,11 +287,15 @@ export function AppProvider({ children }) {
     target.name = cleanName;
     target.username = cleanUsername;
     target.email = cleanEmail;
-    if (password) target.password = password;
+    if (password) {
+      target.passwordHash = await hashPassword(password);
+      delete target.password;
+    }
 
     saveUsers(current);
     setUsers(current);
     refresh();
+    syncProfileToSupabase(target);
     return 'ok';
   }, [userId, refresh]);
 
@@ -179,6 +307,7 @@ export function AppProvider({ children }) {
       saveUsers(current);
       setUsers(current);
       refresh();
+      syncProfileToSupabase(current[idx]);
     }
   }, [userId, refresh]);
 
@@ -191,6 +320,7 @@ export function AppProvider({ children }) {
     saveUsers(current);
     setUsers(current);
     refresh();
+    syncProfileToSupabase(current[idx]);
     return on;
   }, [userId, refresh]);
 
@@ -202,14 +332,15 @@ export function AppProvider({ children }) {
       saveUsers(current);
       setUsers(current);
       refresh();
+      syncProfileToSupabase(current[idx]);
     }
   }, [userId, refresh]);
 
   // ========================================================================
   // PROJECTS
   // ========================================================================
-  const createProject = useCallback((data) => {
-    if (activeGroup && !isActiveGroupAdmin) return null;
+  const createProject = useCallback(async (data) => {
+    if (activeGroup && !isActiveGroupAdmin) return { error: 'No tienes permisos para crear proyectos en este grupo' };
     const project = {
       id: generateId(),
       ownerId: userId,
@@ -228,92 +359,113 @@ export function AppProvider({ children }) {
       createdAt: new Date().toISOString()
     };
     const current = getProjects();
+    const exists = current.some(p => p.title === data.title && p.ownerId === userId);
+    if (exists) return { error: 'Ya tienes un proyecto con este nombre' };
     current.push(project);
     saveProjects(current);
     setProjects(current);
-    return project;
+    syncProjectToSupabase(project);
+    return { project, success: true };
   }, [userId, activeGroup, isActiveGroupAdmin]);
 
   // ========================================================================
   // GROUPS
-  // Un grupo encapsula su membresía y sus solicitudes. El dueño es el único
-  // que puede nombrar administradores; los administradores gestionan solicitudes
-  // y pueden crear proyectos dentro del contexto del grupo.
   // ========================================================================
   const selectGroup = useCallback((groupId) => {
     setActiveGroupId(groupId);
     setActiveGroupIdState(groupId || null);
   }, []);
 
-  const createGroup = useCallback(({ name, description }) => {
+  const createGroup = useCallback(async ({ name, description, isPrivate = false }) => {
     const group = {
-      id: generateId(), name: name.trim(), description: description.trim(), ownerId: userId,
+      id: generateId(),
+      name: name.trim(),
+      description: description.trim(),
+      ownerId: userId,
+      isPrivate: isPrivate === true,
       createdAt: new Date().toISOString(),
       members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
       requests: []
     };
-    const current = getGroups();
-    current.push(group);
-    saveGroups(current);
-    setGroups(current);
+    const created = await apiCreateGroup(group);
+    setGroups(prev => {
+      const idx = prev.findIndex(g => g.id === created.id);
+      if (idx >= 0) prev[idx] = created;
+      return [...prev];
+    });
     selectGroup(group.id);
-    return group;
+    return created;
   }, [userId, selectGroup]);
 
-  const requestToJoinGroup = useCallback((groupId) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return 'missing';
-    if ((group.members || []).some(m => m.userId === userId)) return 'member';
-    if ((group.requests || []).some(r => r.userId === userId && r.status === 'pending')) return 'pending';
-    group.requests = [...(group.requests || []), { id: generateId(), userId, status: 'pending', requestedAt: new Date().toISOString() }];
-    saveGroups(current); setGroups(current); return 'ok';
-  }, [userId]);
+  const requestToJoinGroup = useCallback(async (groupId) => {
+    try {
+      const res = await apiRequestToJoinGroup(groupId);
+      if (res === 'pending') {
+        showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
+      } else if (res === 'member') {
+        showToast('Ya eres miembro de este grupo', 'info');
+      } else {
+        showToast('Solicitud enviada al administrador', 'success');
+      }
+      setGroups(prev => prev.map(g => {
+        if (g.id !== groupId) return g;
+        const currentReqs = g.requests || [];
+        const alreadyHas = currentReqs.some(r => (r.userId === userId || r.user_id === userId) && r.status === 'pending');
+        if (alreadyHas) return { ...g, hasPendingRequest: true };
+        const newReqObj = (typeof res === 'object' && res?.id) ? res : {
+          id: 'temp-' + Date.now(),
+          groupId,
+          userId,
+          user_id: userId,
+          status: 'pending',
+          requestedAt: new Date().toISOString()
+        };
+        return {
+          ...g,
+          requests: [...currentReqs, newReqObj],
+          hasPendingRequest: true
+        };
+      }));
+      return res;
+    } catch (err) {
+      showToast(err.message || 'Error solicitando ingreso', 'error');
+      return null;
+    }
+  }, [userId, showToast]);
 
-  const decideGroupRequest = useCallback((groupId, requestId, accepted) => {
-    const current = getGroups(); const group = current.find(g => g.id === groupId);
-    const me = group?.members?.find(m => m.userId === userId);
-    if (!group || !me || !['owner', 'admin'].includes(me.role)) return false;
-    const request = group.requests?.find(r => r.id === requestId);
-    if (!request || request.status !== 'pending') return false;
-    request.status = accepted ? 'accepted' : 'rejected';
-    if (accepted) group.members.push({ userId: request.userId, role: 'member', joinedAt: new Date().toISOString() });
-    saveGroups(current); setGroups(current); return true;
-  }, [userId]);
+  const decideGroupRequest = useCallback(async (groupId, requestId, accepted) => {
+    const ok = await apiDecideGroupRequest(groupId, requestId, accepted);
+    if (ok) showToast(accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.', accepted ? 'success' : 'info');
+    refresh();
+    return ok;
+  }, [showToast, refresh]);
 
-  const setGroupMemberRole = useCallback((groupId, memberId, role) => {
-    const current = getGroups(); const group = current.find(g => g.id === groupId);
-    if (!group || group.ownerId !== userId || !['admin', 'member'].includes(role)) return false;
-    const member = group.members?.find(m => m.userId === memberId);
-    if (!member || member.role === 'owner') return false;
-    member.role = role; saveGroups(current); setGroups(current); return true;
-  }, [userId]);
+  const setGroupMemberRole = useCallback(async (groupId, memberId, role) => {
+    const ok = await apiSetGroupMemberRole(groupId, memberId, role);
+    if (ok) {
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.map(m => m.userId === memberId ? { ...m, role } : m) } : g));
+      refresh();
+    }
+    return ok;
+  }, []);
 
-  const updateGroup = useCallback((groupId, { name, description }) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return false;
-    const me = group.members?.find(m => m.userId === userId);
-    if (!me || !['owner', 'admin'].includes(me.role)) return false;
-    if (name && name.trim()) group.name = name.trim();
-    if (description !== undefined) group.description = description.trim();
-    saveGroups(current);
-    setGroups(current);
-    return true;
-  }, [userId]);
+  const updateGroup = useCallback(async (groupId, { name, description, isPrivate }) => {
+    const ok = await apiUpdateGroup(groupId, { name, description, isPrivate });
+    if (ok) {
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, name: name ?? g.name, description: description ?? g.description, isPrivate: isPrivate !== undefined ? isPrivate : g.isPrivate } : g));
+      refresh();
+    }
+    return ok;
+  }, []);
 
-  const removeGroupMember = useCallback((groupId, memberId) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return false;
-    const me = group.members?.find(m => m.userId === userId);
-    if (!me || !['owner', 'admin'].includes(me.role)) return false;
-    if (group.ownerId === memberId) return false;
-    group.members = (group.members || []).filter(m => m.userId !== memberId);
-    saveGroups(current);
-    setGroups(current);
-    return true;
-  }, [userId]);
+  const removeGroupMember = useCallback(async (groupId, memberId) => {
+    const ok = await apiRemoveGroupMember(groupId, memberId);
+    if (ok) {
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.filter(m => m.userId !== memberId) } : g));
+      refresh();
+    }
+    return ok;
+  }, []);
 
   const changeProjectStatus = useCallback((projectId, newStatus) => {
     const current = getProjects();
@@ -326,6 +478,7 @@ export function AppProvider({ children }) {
     current[idx].status = newStatus;
     saveProjects(current);
     setProjects(current);
+    syncProjectToSupabase(current[idx]);
     return current[idx];
   }, []);
 
@@ -342,16 +495,19 @@ export function AppProvider({ children }) {
       if (userRating < project.minRating) return 'minRating';
     }
 
-    current.push({
+    const newApp = {
       id: generateId(),
       projectId,
       userId,
       status: 'pending',
       pitch: String(pitch || ''),
       appliedAt: new Date().toISOString()
-    });
+    };
+
+    current.push(newApp);
     saveApplications(current);
     setApplications(current);
+    syncApplicationToSupabase(newApp);
     return 'ok';
   }, [userId, ratings]);
 
@@ -371,6 +527,7 @@ export function AppProvider({ children }) {
     if (newStatus === 'accepted') current[idx].projectRole = projectRole;
     saveApplications(current);
     setApplications(current);
+    syncApplicationToSupabase(current[idx]);
     const applicant = getUsers().find(u => u.id === current[idx].userId);
     return applicant ? applicant.name : null;
   }, []);
@@ -390,6 +547,7 @@ export function AppProvider({ children }) {
     current[idx].status = action === 'accepted' ? 'accepted' : 'rejected';
     saveApplications(current);
     setApplications(current);
+    syncApplicationToSupabase(current[idx]);
     return action;
   }, []);
 
@@ -402,7 +560,7 @@ export function AppProvider({ children }) {
     const acceptedCount = current.filter(a => a.projectId === projectId && a.status === 'accepted').length;
     if (acceptedCount >= project.slots) return 'slotsFull';
 
-    current.push({
+    const newInvite = {
       id: generateId(),
       projectId,
       userId: targetUserId,
@@ -410,9 +568,12 @@ export function AppProvider({ children }) {
       invitedBy: userId,
       message: message || '',
       appliedAt: new Date().toISOString()
-    });
+    };
+
+    current.push(newInvite);
     saveApplications(current);
     setApplications(current);
+    syncApplicationToSupabase(newInvite);
     return 'ok';
   }, [userId]);
 
@@ -422,6 +583,8 @@ export function AppProvider({ children }) {
   const saveRatings = useCallback((projectId, ratingMap) => {
     const current = getRatings();
     let saved = false;
+    const ratingsToSync = [];
+
     Object.keys(ratingMap).forEach(ratedUserId => {
       const stars = ratingMap[ratedUserId];
       if (!stars) return;
@@ -429,28 +592,34 @@ export function AppProvider({ children }) {
       if (existing >= 0) {
         current[existing].stars = stars;
         current[existing].updatedAt = new Date().toISOString();
+        ratingsToSync.push(current[existing]);
       } else {
-        current.push({
+        const newRating = {
           id: generateId(),
           projectId,
           ratedUserId,
           ratedBy: userId,
           stars,
           createdAt: new Date().toISOString()
-        });
+        };
+        current.push(newRating);
+        ratingsToSync.push(newRating);
       }
       saved = true;
     });
+
     saveRatingsData(current);
     setRatings(current);
+    ratingsToSync.forEach(r => syncRatingToSupabase(r));
     return saved;
   }, [userId]);
 
   const value = {
-    user, users, projects, applications, ratings, groups, activeGroup, activeGroupId, activeMembership, isActiveGroupAdmin,
+    user, users, projects, applications, ratings, groups, setGroups, activeGroup, activeGroupId, activeMembership, isActiveGroupAdmin,
     lang, theme, menuOpen, setMenuOpen,
     selectedCategories, setSelectedCategories,
     selectedTechFilters, setSelectedTechFilters,
+    isSupabase: isSupabaseConfigured(),
     t, l10n, toggleLang, toggleTheme,
     login, register, logout,
     saveProfile, updateAccount, setAvatar, toggleAvailability, saveFeaturedProjects,
