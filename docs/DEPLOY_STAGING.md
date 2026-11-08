@@ -22,6 +22,11 @@ Supabase es Auth (login/OAuth); ningún dato se lee ni se escribe vía
 Ramas: `develop` = staging, `main` = producción. `main` no se toca hasta que
 staging esté validado y lo confirmes.
 
+> **Orden recomendado:** Vercel primero (paso 1) para obtener la URL pública;
+> Render después (paso 2) configurando `FRONTEND_URL` con esa URL. La URL de
+> Render es predecible (`https://entycollab-backend-staging.onrender.com`), así
+> que el frontend puede desplegarse antes de que el backend exista.
+
 ---
 
 ## 0. Antes de empezar
@@ -37,6 +42,8 @@ Ten a mano estos valores:
 | `VITE_SUPABASE_URL` | Igual que `SUPABASE_URL` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Igual que `SUPABASE_PUBLISHABLE_KEY` |
 
+Los valores de `VITE_*` ya están en tu `frontend/.env` local.
+
 > **Importante (IPv6):** el host directo `db.<ref>.supabase.co` resuelve solo a
 > IPv6 y Render no tiene salida IPv6. Usa la cadena **Session pooler**
 > (`aws-0-<region>.pooler.supabase.com:5432`, usuario `postgres.<ref>`), que sí
@@ -45,7 +52,42 @@ Ten a mano estos valores:
 
 ---
 
-## 1. Backend en Render (rama `develop`)
+## 1. Frontend en Vercel (rama `develop`)
+
+1. Vercel → **Add New… → Project** → importa `jael-alberto/entycollab2`.
+2. Project Name: `entycollab-staging`.
+3. **Root Directory: `./`** (raíz del repo; el `vercel.json` de la raíz ya
+   define install, build, output y rewrites).
+4. Verifica en Build & Output Settings:
+   - Install Command: `npm --prefix frontend install`
+   - Build Command: `npm --prefix frontend run build`
+   - Output Directory: `frontend/dist`
+5. Environment Variables (marca Production, Preview y Development):
+
+   | Variable | Valor |
+   | --- | --- |
+   | `VITE_API_URL` | `https://entycollab-backend-staging.onrender.com/api` |
+   | `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
+   | `VITE_SUPABASE_PUBLISHABLE_KEY` | publishable / anon |
+
+   Nunca pongas la `service_role`/secret en Vercel.
+6. Pulsa **Deploy**. El primer deploy sale de `main` (comportamiento por
+   defecto de Vercel); da igual, lo corregimos ahora.
+7. Settings → **Environments** → entorno **Production** → **Branch Tracking**:
+   cambia la rama a **`develop`** y guarda.
+8. Deployments → **Create Deployment** → introduce la rama **`develop`** →
+   **Create Deployment**. Ese build será el de producción y quedará asociado al
+   dominio del proyecto.
+9. Anota el dominio resultante, p. ej. `https://entycollab-staging.vercel.app`
+   (si el nombre estaba ocupado, Vercel añade un sufijo). Ese es el valor que
+   usará Render en `FRONTEND_URL`.
+
+> El frontend cargará, pero las llamadas a la API fallarán hasta que exista el
+> backend del paso 2. Es esperado.
+
+---
+
+## 2. Backend en Render (rama `develop`)
 
 ### Opción recomendada: Blueprint
 
@@ -57,7 +99,7 @@ Ten a mano estos valores:
 
    | Variable | Valor |
    | --- | --- |
-   | `FRONTEND_URL` | `http://localhost:5173` (temporal; se cambia en el paso 3) |
+   | `FRONTEND_URL` | dominio de Vercel del paso 1 (sin `/` final) |
    | `DATABASE_URL` | Session pooler de Supabase |
    | `SUPABASE_URL` | `https://<ref>.supabase.co` |
    | `SUPABASE_SECRET_KEY` | secret / service_role |
@@ -70,6 +112,9 @@ Ten a mano estos valores:
 6. Espera el primer deploy y abre:
    `https://entycollab-backend-staging.onrender.com/health`
    Debe responder `{"status":"ok",...}`.
+
+7. Si Render asignó un subdominio distinto (nombre ocupado), copia la URL real,
+   actualiza `VITE_API_URL` en Vercel y vuelve a desplegar el frontend.
 
 ### Alternativa manual (New → Web Service)
 
@@ -87,38 +132,12 @@ Si prefieres no usar Blueprint:
 
 ---
 
-## 2. Frontend en Vercel (rama `develop`)
+## 3. Cerrar CORS y Auth
 
-1. Vercel → **Add New… → Project** → importa `jael-alberto/entycollab2`.
-2. Project Name: `entycollab-staging`.
-3. **Root Directory: `./`** (raíz del repo; el `vercel.json` de la raíz ya
-   define install, build, output y rewrites).
-4. Verifica en Build & Output Settings:
-   - Install Command: `npm --prefix frontend install`
-   - Build Command: `npm --prefix frontend run build`
-   - Output Directory: `frontend/dist`
-5. Settings → Git → **Production Branch: `develop`**.
-6. Environment Variables (Production, Preview y Development):
-
-   | Variable | Valor |
-   | --- | --- |
-   | `VITE_API_URL` | `https://entycollab-backend-staging.onrender.com/api` |
-   | `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
-   | `VITE_SUPABASE_PUBLISHABLE_KEY` | publishable / anon |
-
-   Nunca pongas la `service_role`/secret en Vercel.
-7. Deploy. Anota el dominio resultante, p. ej.
-   `https://entycollab-staging.vercel.app`.
-
----
-
-## 3. Conectar CORS y Auth
-
-1. **Render** → servicio staging → Environment → edita `FRONTEND_URL` con el
-   dominio de Vercel staging (sin `/` final). Puedes poner varios separados por
-   coma:
+1. **Render** → servicio staging → Environment → `FRONTEND_URL` debe ser el
+   dominio de Vercel staging. Puedes poner varios separados por coma:
    `https://entycollab-staging.vercel.app,http://localhost:5173`
-   Guarda y espera el redeploy.
+   Si lo cambias, guarda y espera el redeploy.
 2. **Supabase** → Authentication → URL Configuration:
    - Site URL: `https://entycollab-staging.vercel.app`
    - Redirect URLs: añade `https://entycollab-staging.vercel.app/**` y
@@ -162,6 +181,7 @@ petición puede tardar ~50 s (cold start). Es esperado.
 | `prisma generate` falla en build | Falta `DATABASE_URL` en el entorno de Render (las env vars están disponibles en build). |
 | 429 Too Many Requests | Rate limit: 100 req / 15 min. Sube `RATE_LIMIT_MAX_REQUESTS` si hace falta. |
 | Login funciona pero datos no cargan | `VITE_API_URL` mal (debe terminar en `/api`) o backend dormido. |
+| El sitio llama a `localhost:3001` | Falta `VITE_API_URL` en Vercel o no se redeployó tras añadirla. |
 
 ---
 
