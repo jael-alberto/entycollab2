@@ -3,22 +3,25 @@
 
 import { api, handleApiError } from './client.js';
 
-export async function applyToProject(projectId) {
+export async function applyToProject(projectId, message = '') {
   try {
-    const { application } = await api.applications.apply(projectId);
+    const { application } = await api.applications.apply(projectId, message);
     return application;
   } catch (error) {
-    if (error.message.includes('ALREADY_APPLIED') || error.message.includes('ya te has postulado')) {
+    if (error.code === 'CONFLICT' || /ya te has postulado/i.test(error.message)) {
       return 'alreadyApplied';
     }
-    if (error.message.includes('MIN_RATING_REQUIRED')) {
+    if (error.code === 'MIN_RATING_REQUIRED') {
       return 'minRating';
     }
-    if (error.message.includes('OWN_PROJECT')) {
+    if (error.code === 'OWN_PROJECT') {
       return 'ownProject';
     }
-    if (error.message.includes('PROJECT_NOT_OPEN')) {
+    if (error.code === 'PROJECT_NOT_OPEN') {
       return 'projectNotOpen';
+    }
+    if (error.code === 'SLOTS_FULL') {
+      return 'slotsFull';
     }
     throw new Error(handleApiError(error, 'Error en la postulación'));
   }
@@ -29,14 +32,20 @@ export async function sendInvite(projectId, targetUserId, message) {
     const { application } = await api.applications.invite({ projectId, targetUserId, message });
     return application;
   } catch (error) {
-    if (error.message.includes('CONFLICT') || error.message.includes('ya está postulada')) {
+    if (error.code === 'CONFLICT' || /ya está postulada|ya te has postulado|invitado/i.test(error.message)) {
       return 'already';
     }
-    if (error.message.includes('SLOTS_FULL') || error.message.includes('No hay cupos')) {
+    if (error.code === 'SLOTS_FULL') {
       return 'slotsFull';
     }
-    if (error.message.includes('FORBIDDEN') || error.message.includes('Solo el owner')) {
+    if (error.code === 'FORBIDDEN') {
       return 'forbidden';
+    }
+    if (error.code === 'OWN_PROJECT') {
+      return 'ownProject';
+    }
+    if (error.code === 'PROJECT_NOT_OPEN') {
+      return 'projectNotOpen';
     }
     throw new Error(handleApiError(error, 'Error enviando invitación'));
   }
@@ -47,11 +56,14 @@ export async function handleApplication(appId, newStatus, projectId, projectRole
     const { application } = await api.applications.handle(appId, { status: newStatus, projectRole });
     return application;
   } catch (error) {
-    if (error.message.includes('SLOTS_FULL') || error.message.includes('No hay cupos')) {
+    if (error.code === 'SLOTS_FULL') {
       return 'slotsFull';
     }
-    if (error.message.includes('INVALID_STATUS_TRANSITION')) {
+    if (error.code === 'INVALID_STATUS_TRANSITION') {
       return 'invalidStatus';
+    }
+    if (error.code === 'PROJECT_CLOSED') {
+      return 'projectClosed';
     }
     throw new Error(handleApiError(error, 'Error gestionando postulación'));
   }
@@ -62,14 +74,17 @@ export async function respondInvite(appId, action) {
     const { application } = await api.applications.respond(appId, action);
     return application;
   } catch (error) {
-    if (error.message.includes('SLOTS_FULL') || error.message.includes('No hay cupos')) {
+    if (error.code === 'SLOTS_FULL') {
       return 'slotsFull';
     }
-    if (error.message.includes('ALREADY_RESPONDED')) {
+    if (error.code === 'ALREADY_RESPONDED') {
       return 'alreadyResponded';
     }
-    if (error.message.includes('NOT_INVITE')) {
+    if (error.code === 'NOT_INVITE') {
       return 'notInvite';
+    }
+    if (error.code === 'PROJECT_CLOSED') {
+      return 'projectClosed';
     }
     throw new Error(handleApiError(error, 'Error respondiendo invitación'));
   }

@@ -7,7 +7,6 @@ import { EmptyState, Avatar, GroupAvatar, Icon, Modal } from '../components/comm
 import ProjectCard from '../components/ProjectCard.jsx';
 import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
-import { getGroups, saveGroups } from '../lib/store.js';
 
 function memberFor(group, userId) {
   return group.members?.find(m => m.userId === userId) || null;
@@ -27,10 +26,11 @@ function GroupsDirectory() {
   const [description, setDescription] = useState('');
   const [selectedGroupModal, setSelectedGroupModal] = useState(null);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const group = createGroup({ name, description });
+    const group = await createGroup({ name, description });
+    if (!group) return;
     showToast('Grupo creado con éxito', 'success');
     navigate(`/grupos/${group.id}`);
   };
@@ -40,15 +40,8 @@ function GroupsDirectory() {
     navigate(`/grupos/${group.id}`);
   };
 
-  const handleRequest = (groupId) => {
-    const res = requestToJoinGroup(groupId);
-    if (res === 'pending') {
-      showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
-    } else if (res === 'member') {
-      showToast('Ya eres miembro de este grupo', 'info');
-    } else {
-      showToast('Solicitud enviada al administrador', 'success');
-    }
+  const handleRequest = async (groupId) => {
+    await requestToJoinGroup(groupId);
   };
 
   return (
@@ -342,7 +335,7 @@ function PublicGroupPreview({ group, owner, memberCount, pending, onRequest, onB
 function GroupWorkspace({ groupId }) {
   const {
     user, users, groups, projects, activeGroup, selectGroup,
-    decideGroupRequest, setGroupMemberRole, updateGroup, removeGroupMember,
+    decideGroupRequest, setGroupMemberRole, updateGroup, deleteGroup, removeGroupMember,
     requestToJoinGroup, sendInvite, lang, t
   } = useApp();
   const { openCreate } = useModals();
@@ -417,11 +410,8 @@ function GroupWorkspace({ groupId }) {
   }
 
   if (!membership) {
-    const handleJoinRequest = () => {
-      const res = requestToJoinGroup(group.id);
-      if (res === 'pending') showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
-      else if (res === 'member') showToast('Ya eres miembro de este grupo', 'info');
-      else showToast('Solicitud enviada al administrador', 'success');
+    const handleJoinRequest = async () => {
+      await requestToJoinGroup(group.id);
     };
 
     return (
@@ -436,35 +426,35 @@ function GroupWorkspace({ groupId }) {
     );
   }
 
-  const handleSaveGroupInfo = (e) => {
+  const handleSaveGroupInfo = async (e) => {
     e.preventDefault();
     if (!editName.trim()) return;
     setSavingInfo(true);
-    const ok = updateGroup(group.id, { name: editName, description: editDesc });
+    const ok = await updateGroup(group.id, { name: editName, description: editDesc });
     setSavingInfo(false);
     if (ok) showToast('Información del grupo actualizada', 'success');
     else showToast('No tienes permisos para editar este grupo', 'error');
   };
 
-  const handleRequestDecision = (requestId, accepted) => {
-    const ok = decideGroupRequest(group.id, requestId, accepted);
+  const handleRequestDecision = async (requestId, accepted) => {
+    const ok = await decideGroupRequest(group.id, requestId, accepted);
     if (ok) showToast(accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.', accepted ? 'success' : 'info');
   };
 
-  const handleRoleChange = (memberId, newRole) => {
-    const ok = setGroupMemberRole(group.id, memberId, newRole);
+  const handleRoleChange = async (memberId, newRole) => {
+    const ok = await setGroupMemberRole(group.id, memberId, newRole);
     if (ok) showToast('Rol de miembro actualizado', 'success');
   };
 
-  const handleRemoveMember = (memberId, memberName) => {
+  const handleRemoveMember = async (memberId, memberName) => {
     if (!window.confirm(`¿Estás seguro de expulsar a ${memberName} del grupo?`)) return;
-    const ok = removeGroupMember(group.id, memberId);
+    const ok = await removeGroupMember(group.id, memberId);
     if (ok) showToast(`${memberName} ha sido removido del grupo`, 'info');
   };
 
-  const handleLeaveGroup = () => {
+  const handleLeaveGroup = async () => {
     if (!window.confirm(t('group.leaveConfirm'))) return;
-    const ok = removeGroupMember(group.id, user.id);
+    const ok = await removeGroupMember(group.id, user.id);
     if (ok) {
       showToast('Has salido del grupo', 'info');
       selectGroup(null);
@@ -472,20 +462,17 @@ function GroupWorkspace({ groupId }) {
     }
   };
 
-  const handleDeleteGroup = () => {
+  const handleDeleteGroup = async () => {
     if (!window.confirm(t('group.deleteConfirm'))) return;
-    const current = getGroups();
-    const idx = current.findIndex(g => g.id === group.id);
-    if (idx >= 0) {
-      current.splice(idx, 1);
-      saveGroups(current);
+    const ok = await deleteGroup(group.id);
+    if (ok) {
       showToast('Grupo eliminado', 'info');
       selectGroup(null);
       navigate('/grupos');
     }
   };
 
-  const handleInviteSubmit = (e) => {
+  const handleInviteSubmit = async (e) => {
     e.preventDefault();
     if (!inviteUsername.trim() || !inviteProjectId) return;
     const cleanSearch = inviteUsername.trim().toLowerCase().replace(/^@/, '');
@@ -497,7 +484,7 @@ function GroupWorkspace({ groupId }) {
       showToast('Usuario no encontrado', 'error');
       return;
     }
-    const res = sendInvite(inviteProjectId, targetUser.id, inviteMessage);
+    const res = await sendInvite(inviteProjectId, targetUser.id, inviteMessage);
     if (res === 'ok') {
       showToast(t('group.inviteSent'), 'success');
       setShowInviteModal(false);

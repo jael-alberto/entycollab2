@@ -181,7 +181,9 @@ export const updateProfile = asyncHandler(async (req, res) => {
     if (existing) throw new ConflictError('Ese nombre de usuario ya está en uso');
   }
 
-  // Si cambia email, actualizar en Auth (profiles.email es inmutable por trigger)
+  // Si cambia email, actualizar en Auth y en profiles para que el login por
+  // correo siga funcionando. El trigger de protección solo bloquea a
+  // anon/authenticated; Prisma escribe como rol de servicio.
   if (body.email) {
     const existing = await prisma.profile.findFirst({
       where: { email: body.email, NOT: { id } },
@@ -190,15 +192,14 @@ export const updateProfile = asyncHandler(async (req, res) => {
     if (existing) throw new ConflictError('Ya existe una cuenta con ese correo');
 
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, {
-      email: body.email
+      email: body.email,
+      email_confirm: true
     });
     if (authError) throw new Error(authError.message);
-    delete body.email;
   }
 
   // Eliminar columnas inmutables
   delete body.id;
-  delete body.email;
   delete body.createdAt;
 
   const data = profileInputToPrisma(body);

@@ -91,11 +91,9 @@ export async function requestToJoinGroup(groupId) {
     const { request } = await api.groups.join(groupId);
     return request;
   } catch (error) {
-    if (error.message.includes('CONFLICT') || error.message.includes('Ya eres miembro')) {
+    if (error.code === 'CONFLICT' || /ya eres miembro|solicitud pendiente/i.test(error.message)) {
+      if (/pendiente/i.test(error.message)) throw new Error('pending');
       throw new Error('member');
-    }
-    if (error.message.includes('pending')) {
-      throw new Error('pending');
     }
     throw new Error(handleApiError(error, 'Error solicitando ingreso'));
   }

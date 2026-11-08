@@ -8,16 +8,16 @@ export async function saveRatings(projectId, ratingMap, ratedBy) {
     const { ratings } = await api.ratings.save(projectId, ratingMap);
     return ratings || [];
   } catch (error) {
-    if (error.message.includes('SELF_RATING')) {
+    if (error.code === 'SELF_RATING') {
       throw new Error('No puedes calificarte a ti mismo');
     }
-    if (error.message.includes('INVALID_RATED_USER')) {
+    if (error.code === 'INVALID_RATED_USER') {
       throw new Error('Usuario no válido para calificar');
     }
-    if (error.message.includes('PROJECT_NOT_COMPLETED')) {
+    if (error.code === 'PROJECT_NOT_COMPLETED') {
       throw new Error('Solo se pueden calificar proyectos completados');
     }
-    if (error.message.includes('FORBIDDEN') || error.message.includes('Solo el owner')) {
+    if (error.code === 'FORBIDDEN') {
       throw new Error('Solo el owner puede calificar');
     }
     throw new Error(handleApiError(error, 'Error guardando calificaciones'));

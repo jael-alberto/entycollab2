@@ -18,6 +18,7 @@ import applicationRoutes from './routes/applicationRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import groupRoutes from './routes/groupRoutes.js';
 import storageRoutes from './routes/storageRoutes.js';
+import bootstrapRoutes from './routes/bootstrapRoutes.js';
 
 const app = express();
 
@@ -31,8 +32,23 @@ app.use(helmet({
 }));
 
 // CORS
+// Permite los dominios configurados en FRONTEND_URL (separados por coma) y,
+// opcionalmente, los preview deployments de Vercel.
+const corsOrigin = (origin, callback) => {
+  if (!origin) return callback(null, true);
+
+  const cleanOrigin = origin.replace(/\/$/, '');
+  if (env.frontendUrls.includes(cleanOrigin)) return callback(null, true);
+
+  if (env.allowVercelPreviews && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(cleanOrigin)) {
+    return callback(null, true);
+  }
+
+  return callback(null, false);
+};
+
 app.use(cors({
-  origin: env.frontendUrl,
+  origin: corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -77,6 +93,7 @@ app.use(`${API_PREFIX}/applications`, applicationRoutes);
 app.use(`${API_PREFIX}/ratings`, ratingRoutes);
 app.use(`${API_PREFIX}/groups`, groupRoutes);
 app.use(`${API_PREFIX}/storage`, storageRoutes);
+app.use(`${API_PREFIX}`, bootstrapRoutes);
 
 // ==========================================================================
 // MANEJO DE ERRORES

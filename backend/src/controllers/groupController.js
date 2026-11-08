@@ -48,6 +48,7 @@ const GROUP_OWNER_SELECT = { id: true, name: true, username: true, avatar: true 
 // GET /api/groups
 export const listGroups = asyncHandler(async (req, res) => {
   const { page = 1, pageSize = 20, search } = req.validated.query;
+  const userId = req.user.id;
 
   // Todos los grupos son públicos: se listan para que cualquiera pueda ver su
   // información principal y solicitar acceso. El contenido completo se valida
@@ -64,7 +65,11 @@ export const listGroups = asyncHandler(async (req, res) => {
       where,
       include: {
         owner: { select: GROUP_OWNER_SELECT },
-        _count: { select: { members: true } }
+        _count: { select: { members: true } },
+        requests: {
+          where: { userId, status: 'pending' },
+          select: { id: true, groupId: true, userId: true, status: true, requestedAt: true }
+        }
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
@@ -149,10 +154,13 @@ export const getGroup = asyncHandler(async (req, res) => {
   const serialized = serializeGroup(group);
 
   if (!isMember) {
-    // Vista pública: información principal + número de miembros. Los proyectos,
-    // la lista de miembros y las solicitudes quedan reservados a miembros.
+    // Vista pública: información principal + número de miembros. Los proyectos
+    // y la lista de miembros quedan reservados a miembros; cada usuario sí puede
+    // ver su propia solicitud pendiente para mostrar el estado en la UI.
     serialized.members = [{ count: group.members.length }];
-    delete serialized.requests;
+    serialized.requests = (serialized.requests || []).filter(
+      request => (request.user_id || request.userId) === userId && request.status === 'pending'
+    );
     delete serialized.projects;
   } else if (!isAdmin) {
     // Un miembro normal solo ve sus propias solicitudes.

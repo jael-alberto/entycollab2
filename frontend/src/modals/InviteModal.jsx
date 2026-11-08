@@ -34,7 +34,7 @@ export default function InviteModal() {
 
   const tErr = (key) => (key ? t(key) : '');
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const found = {
       projectId: tErr(requiredKey(projectId)),
@@ -44,7 +44,7 @@ export default function InviteModal() {
     setErrors(found);
     if (Object.keys(found).length > 0) return;
     setLoading(true);
-    const res = sendInvite(projectId, person.id, message.trim());
+    const res = await sendInvite(projectId, person.id, message.trim());
     setLoading(false);
     if (res === 'already') {
       showToast(t('invite.already'), 'error');

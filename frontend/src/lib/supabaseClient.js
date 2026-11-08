@@ -1,6 +1,7 @@
 // frontend/src/lib/supabaseClient.js
 // Cliente de Supabase para el frontend (utiliza la Anon/Publishable Key)
 import { createClient } from '@supabase/supabase-js';
+import { clearAuthTokens, getRefreshToken, setAuthTokens } from './authToken.js';
 
 // Admite tanto variables con prefijo VITE_ (estándar de Vite) como SUPABASE_
 export const SUPABASE_URL = (
@@ -48,6 +49,7 @@ export function getSupabaseClient() {
 
 // Helper para renovar token usando refresh_token
 export async function refreshAuthToken() {
+  const _refreshToken = getRefreshToken();
   if (!_refreshToken) return false;
   
   try {

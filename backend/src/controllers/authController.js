@@ -4,12 +4,15 @@
 
 import { supabaseAdmin } from '../config/supabase.js';
 import { prisma } from '../config/prisma.js';
-import { serializeProfile } from '../utils/serializers.js';
+import { serializeProfile, profileInputToPrisma } from '../utils/serializers.js';
 import { asyncHandler, UnauthorizedError, ConflictError } from '../middleware/errorHandler.js';
 
 // POST /api/auth/register
 export const register = asyncHandler(async (req, res) => {
-  const { name, username, email, password, bio, skills = [] } = req.validated.body;
+  const {
+    name, username, email, password, bio, skills = [],
+    categories = [], gameTypes = [], languages = [], favoriteGenres = [], disciplines = []
+  } = req.validated.body;
 
   // Verificar si email/username ya existen en profiles
   const [existingEmail, existingUsername] = await Promise.all([
@@ -41,7 +44,11 @@ export const register = asyncHandler(async (req, res) => {
       email,
       bio: bio || { es: '', en: '' },
       skills,
-      categories: []
+      categories,
+      gameTypes,
+      languages,
+      favoriteGenres,
+      disciplines
     },
     create: {
       id: userId,
@@ -50,7 +57,11 @@ export const register = asyncHandler(async (req, res) => {
       email,
       bio: bio || { es: '', en: '' },
       skills,
-      categories: []
+      categories,
+      gameTypes,
+      languages,
+      favoriteGenres,
+      disciplines
     }
   });
 
@@ -153,4 +164,78 @@ export const refresh = asyncHandler(async (req, res) => {
   if (error) throw new UnauthorizedError('Token de renovación inválido');
 
   res.json({ session: data.session });
+});
+
+// PUT /api/auth/password
+// Cambia la contraseña del usuario autenticado en Supabase Auth.
+export const updatePassword = asyncHandler(async (req, res) => {
+  const { password } = req.validated.body;
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, {
+    password
+  });
+
+  if (error) throw new Error(error.message);
+
+  res.json({ message: 'Contraseña actualizada' });
+});
+
+// POST /api/auth/ensure-profile
+// Crea o actualiza el perfil del usuario autenticado. Se usa, por ejemplo,
+// después del login con OAuth para asegurar que exista la fila en profiles.
+export const ensureProfile = asyncHandler(async (req, res) => {
+  const id = req.user.id;
+  const body = req.validated.body || {};
+  const data = profileInputToPrisma(body);
+
+  const existing = await prisma.profile.findUnique({ where: { id } });
+
+  if (existing) {
+    const profile = Object.keys(data).length > 0
+      ? await prisma.profile.update({ where: { id }, data })
+      : existing;
+
+    return res.json({ user: serializeProfile(profile, { includeEmail: true }) });
+  }
+
+  const meta = req.user.user_metadata || {};
+  const email = req.user.email || null;
+  const fallbackName = meta.full_name || meta.name || (email ? email.split('@')[0] : 'Usuario');
+  const fallbackUsername = (meta.user_name || meta.preferred_username || `user_${id.replace(/-/g, '').slice(0, 10)}`)
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '_')
+    .slice(0, 30) || `user_${id.replace(/-/g, '').slice(0, 10)}`;
+
+  const baseData = {
+    id,
+    name: data.name || fallbackName,
+    username: data.username || fallbackUsername,
+    email,
+    avatar: data.avatar ?? meta.avatar_url ?? meta.picture ?? null,
+    bio: data.bio ?? { es: '', en: '' },
+    skills: data.skills ?? [],
+    categories: data.categories ?? [],
+    gameTypes: data.gameTypes ?? [],
+    languages: data.languages ?? [],
+    favoriteGenres: data.favoriteGenres ?? [],
+    disciplines: data.disciplines ?? []
+  };
+
+  let profile;
+  try {
+    profile = await prisma.profile.create({ data: baseData });
+  } catch (error) {
+    // Si el username ya existe, agregamos un sufijo único y reintentamos.
+    if (error?.code === 'P2002') {
+      const suffix = id.replace(/-/g, '').slice(0, 6);
+      profile = await prisma.profile.create({
+        data: { ...baseData, username: `${baseData.username.slice(0, 23)}_${suffix}` }
+      });
+    } else {
+      throw error;
+    }
+  }
+
+  res.json({ user: serializeProfile(profile, { includeEmail: true }) });
 });

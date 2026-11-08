@@ -7,7 +7,9 @@ import './styles/tokens.css';
 import './styles.css';
 import './components/ui/ui.css';
 
-bootstrap();
+// Los datos de demo solo se siembran en desarrollo. En producción todo
+// viene del backend (/api/bootstrap).
+if (import.meta.env.DEV) bootstrap();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -55,21 +55,21 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
   const projectFinished = project.status === 'completed' || project.status === 'closed';
   const ownerRating = owner ? getUserAvgRating(owner.id, ratings) : 0;
 
-  const onStatusChange = (newStatus) => {
-    const res = changeProjectStatus(project.id, newStatus);
+  const onStatusChange = async (newStatus) => {
+    const res = await changeProjectStatus(project.id, newStatus);
     if (res === 'pendingRatings') {
       // Falta calificar: se avisa y se abre el modal de calificación.
       showToast(t('toast.pendingRatings'), 'error');
       openRate(project.id);
       return;
     }
-    if (!res) return;
+    if (!res || typeof res === 'string') return;
     showToast(t('toast.projectUpdated', { status: t(statusLabelKey(newStatus)) }), 'success');
     if (onStatusChanged) onStatusChanged(newStatus);
   };
 
-  const onApplication = (appId, newStatus) => {
-    const name = handleApplication(appId, newStatus, project.id);
+  const onApplication = async (appId, newStatus) => {
+    const name = await handleApplication(appId, newStatus, project.id);
     if (name === 'slotsFull') {
       showToast(t('invite.slotsFull'), 'error');
       return;
@@ -83,8 +83,8 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
     }
   };
 
-  const onApply = () => {
-    const res = applyToProject(project.id);
+  const onApply = async () => {
+    const res = await applyToProject(project.id);
     if (res === 'alreadyApplied') {
       showToast(t('toast.alreadyApplied'), 'error');
     } else if (res === 'minRating') {

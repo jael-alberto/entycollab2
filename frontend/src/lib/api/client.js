@@ -1,6 +1,8 @@
 // frontend/src/lib/api/client.js
 // Cliente API para comunicarse con el backend propio
 
+import { getAuthToken, getRefreshToken, setAuthTokens, clearAuthTokens } from '../authToken.js';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 class ApiError extends Error {
@@ -12,25 +14,67 @@ class ApiError extends Error {
   }
 }
 
-async function request(endpoint, options = {}) {
-  const token = localStorage.getItem('auth_token');
-  
+let refreshPromise = null;
+
+async function refreshSession() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          clearAuthTokens();
+          return false;
+        }
+        const data = await response.json().catch(() => ({}));
+        if (data.session?.access_token) {
+          setAuthTokens(data.session.access_token, data.session.refresh_token);
+          return true;
+        }
+        clearAuthTokens();
+        return false;
+      })
+      .catch(() => {
+        clearAuthTokens();
+        return false;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+}
+
+async function request(endpoint, options = {}, retry = true) {
+  const token = getAuthToken();
+
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers
   };
-  
+
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers
   });
-  
+
+  if (response.status === 401 && retry && getRefreshToken()) {
+    const refreshed = await refreshSession();
+    if (refreshed) return request(endpoint, options, false);
+  }
+
   const data = await response.json().catch(() => ({}));
-  
+
   if (!response.ok) {
     throw new ApiError(
       data.message || 'Error en la petición',
@@ -39,17 +83,24 @@ async function request(endpoint, options = {}) {
       data.details
     );
   }
-  
+
   return data;
 }
 
 export const api = {
+  // Carga inicial
+  bootstrap: {
+    get: () => request('/bootstrap')
+  },
+
   // Auth
   auth: {
     register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
     logout: () => request('/auth/logout', { method: 'POST' }),
     me: () => request('/auth/me'),
+    updatePassword: (data) => request('/auth/password', { method: 'PUT', body: JSON.stringify(data) }),
+    ensureProfile: (data) => request('/auth/ensure-profile', { method: 'POST', body: JSON.stringify(data) }),
     refresh: (refreshToken) => request('/auth/refresh', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }) })
   },
   
@@ -84,7 +135,7 @@ export const api = {
   
   // Applications
   applications: {
-    apply: (projectId) => request('/applications/apply', { method: 'POST', body: JSON.stringify({ projectId }) }),
+    apply: (projectId, message = '') => request('/applications/apply', { method: 'POST', body: JSON.stringify({ projectId, message }) }),
     invite: (data) => request('/applications/invite', { method: 'POST', body: JSON.stringify(data) }),
     handle: (id, data) => request(`/applications/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     respond: (id, action) => request(`/applications/${id}/respond`, { method: 'PUT', body: JSON.stringify({ action }) }),
@@ -131,7 +182,7 @@ export const api = {
     uploadAvatar: async (file) => {
       const formData = new FormData();
       formData.append('avatar', file);
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       const response = await fetch(`${API_BASE}/storage/avatar`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -144,7 +195,7 @@ export const api = {
       const formData = new FormData();
       formData.append('image', file);
       formData.append('projectId', projectId);
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       const response = await fetch(`${API_BASE}/storage/project-image`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },

@@ -47,7 +47,8 @@ export async function changeProjectStatus(projectId, newStatus) {
     const { project } = await api.projects.changeStatus(projectId, newStatus);
     return project;
   } catch (error) {
-    if (error.message.includes('NO_PARTICIPANTS')) return 'noParticipants';
+    if (error.code === 'NO_PARTICIPANTS') return 'noParticipants';
+    if (error.code === 'INVALID_STATUS_TRANSITION') return 'invalidStatus';
     throw new Error(handleApiError(error, 'Error cambiando estado'));
   }
 }

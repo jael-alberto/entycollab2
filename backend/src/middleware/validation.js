@@ -53,7 +53,12 @@ export const schemas = {
       email: z.string().trim().email().transform(v => v.toLowerCase()),
       password: z.string().min(6).max(100),
       bio: z.string().max(500).optional(),
-      skills: z.array(z.string()).max(50).optional()
+      skills: z.array(z.string()).max(50).optional(),
+      categories: z.array(z.string()).max(50).optional(),
+      gameTypes: z.array(z.string()).max(50).optional(),
+      languages: z.array(z.string()).max(50).optional(),
+      favoriteGenres: z.array(z.string()).max(50).optional(),
+      disciplines: z.array(z.string()).max(50).optional()
     })
   }),
 
@@ -70,12 +75,34 @@ export const schemas = {
     })
   }),
 
+  updatePassword: z.object({
+    body: z.object({
+      password: z.string().min(6).max(100)
+    })
+  }),
+
+  ensureProfile: z.object({
+    body: z.object({
+      name: z.string().trim().min(1).max(100).optional(),
+      username: z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/).transform(v => v.toLowerCase()).optional(),
+      avatar: z.string().max(2_000_000).optional().nullable(),
+      bio: z.union([z.string(), z.object({ es: z.string(), en: z.string() })]).optional(),
+      skills: z.array(z.string()).max(50).optional(),
+      categories: z.array(z.string()).max(50).optional(),
+      gameTypes: z.array(z.string()).max(50).optional(),
+      languages: z.array(z.string()).max(50).optional(),
+      favoriteGenres: z.array(z.string()).max(50).optional(),
+      disciplines: z.array(z.string()).max(50).optional()
+    })
+  }),
+
   // Perfil
   updateProfile: z.object({
     body: z.object({
       name: z.string().trim().min(1).max(100).optional(),
       username: z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/).transform(v => v.toLowerCase()).optional(),
       email: z.string().trim().email().transform(v => v.toLowerCase()).optional(),
+      avatar: z.string().max(2_000_000).optional().nullable(),
       bio: z.union([z.string(), z.object({ es: z.string(), en: z.string() })]).optional(),
       skills: z.array(z.string()).max(50).optional(),
       categories: z.array(z.string()).max(50).optional(),
@@ -183,7 +210,7 @@ export const schemas = {
       search: z.string().max(100).optional(),
       sortBy: z.enum(['created_at', 'title', 'status', 'category']).default('created_at'),
       sortOrder: z.enum(['asc', 'desc']).default('desc'),
-      globalOnly: queryBoolean.default(false)
+      globalOnly: queryBoolean.default('false')
     })
   }),
 

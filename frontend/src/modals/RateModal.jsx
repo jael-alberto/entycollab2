@@ -30,14 +30,14 @@ export default function RateModal() {
     if (formError) setFormError('');
   };
 
-  const save = () => {
+  const save = async () => {
     const key = starsKey(selected);
     if (key) {
       setFormError(t(key));
       return;
     }
     setLoading(true);
-    const saved = saveRatings(rateProjectId, selected);
+    const saved = await saveRatings(rateProjectId, selected);
     setLoading(false);
     showToast(saved ? t('toast.ratingsSaved') : t('toast.noRatingsAssigned'), saved ? 'success' : 'info');
     closeRate();

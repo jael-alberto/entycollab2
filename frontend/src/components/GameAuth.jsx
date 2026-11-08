@@ -7,9 +7,9 @@ import { LegalContent } from '../pages/Legal.jsx';
 import { ALL_LANGUAGES, DISCIPLINES, FAVORITE_GENRES, GAME_TYPES, disciplineLabel, favoriteGenreLabel, gameTypeLabel } from '../lib/talent.js';
 import { emailKey, nameKey, passwordKey, requiredKey, usernameKey } from '../lib/validation.js';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
-import { syncProfileToSupabase } from '../lib/supabaseSync.js';
-import { userCategories } from '../lib/helpers.js';
-import { getUsers, saveUsers, setCurrentUserId } from '../lib/store.js';
+import { setAuthTokens } from '../lib/authToken.js';
+import { api } from '../lib/api/client.js';
+import { setCurrentUserId } from '../lib/store.js';
 
 function ChoiceGrid({ items, selected, onChange, label, describedBy }) {
   return (
@@ -77,6 +77,7 @@ export default function GameAuth({ initialMode }) {
   const [stepError, setStepError] = useState('');
   // Tracks if the user came via OAuth (no password required)
   const [isSocialFlow, setIsSocialFlow] = useState(false);
+  const [socialAvatar, setSocialAvatar] = useState(null);
   const isRegister = initialMode === 'register';
 
   const toggle = (setter, selected, value) =>
@@ -95,6 +96,8 @@ export default function GameAuth({ initialMode }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
 
+      setAuthTokens(session.access_token, session.refresh_token);
+
       const u = session.user;
       const meta = u.user_metadata || {};
 
@@ -105,53 +108,31 @@ export default function GameAuth({ initialMode }) {
       const userEmail = u.email || '';
       const avatarUrl = meta.avatar_url || meta.picture || null;
 
-      // Check if this user already exists in the local store
-      const existing = getUsers().find(u2 => u2.email === userEmail || u2.id === u.id);
-      if (existing) {
-        // Already registered → just log in and go to dashboard
-        setCurrentUserId(existing.id);
-        refresh();
-        showToast(t('toast.welcome', { name: existing.username }), 'success');
-        navigate('/dashboard');
-        return;
+      // El perfil vive en el backend. Si ya existe, entramos directo.
+      try {
+        const { user: existing } = await api.auth.me();
+        if (existing?.id) {
+          setCurrentUserId(existing.id);
+          await refresh();
+          showToast(t('toast.welcome', { name: existing.username }), 'success');
+          navigate('/dashboard');
+          return;
+        }
+      } catch {
+        // Sin perfil todavía: el usuario debe completar el registro.
       }
 
       // New OAuth user → pre-fill Step 1 fields, skip to Step 2
       setName(fullName);
       setUsername(rawUsername);
       setEmail(userEmail);
+      setSocialAvatar(avatarUrl);
       setIsSocialFlow(true);
       setFieldErrors({});
       setStepError('');
 
-      // Persist a local profile so the app works even without completing the wizard
-      const newUser = {
-        id: u.id,
-        name: fullName,
-        username: rawUsername,
-        email: userEmail,
-        avatar: avatarUrl,
-        skills: [],
-        categories: userCategories({ skills: [] }),
-        bio: '',
-        gameTypes: [],
-        favoriteGenres: [],
-        disciplines: [],
-        languages: [],
-        createdAt: new Date().toISOString()
-      };
-
-      const current = getUsers();
-      if (!current.find(x => x.id === u.id)) {
-        current.push(newUser);
-        saveUsers(current);
-      }
-
-      if (isSupabaseConfigured()) {
-        syncProfileToSupabase(newUser);
-      }
-
-      // Advance to Step 2 so user can pick their game preferences
+      // Advance to Step 2 so user can pick their game preferences.
+      // El perfil se crea en el backend al enviar el formulario (register).
       setStep(2);
     }
 
@@ -180,7 +161,7 @@ export default function GameAuth({ initialMode }) {
         setLoading(false);
       }
       // On success the browser will navigate away (redirect to provider)
-    } catch (err) {
+    } catch {
       showToast(t('auth.socialError'), 'error');
       setLoading(false);
     }
@@ -241,6 +222,7 @@ export default function GameAuth({ initialMode }) {
       password,
       skills: [...new Set([...languages, ...disciplines.map(value => disciplineLabel(lang, value))])],
       bio: '',
+      avatar: socialAvatar,
       gameTypes,
       favoriteGenres,
       disciplines,

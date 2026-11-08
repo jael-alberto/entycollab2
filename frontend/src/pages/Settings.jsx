@@ -94,7 +94,7 @@ export default function Settings() {
 
     // Habilidades y categorías no se editan acá: se reenvían como están
     // guardadas para no pisar lo que se cambió desde el modal.
-    saveProfile({
+    await saveProfile({
       bio: bio.trim(),
       skills: (user.skills || []).slice(),
       categories,
@@ -119,14 +119,14 @@ export default function Settings() {
       e.target.value = '';
       return;
     }
-    setAvatar(await fileToDataURL(file));
-    showToast(t('toast.photoUpdated'), 'success');
+    const updated = await setAvatar(await fileToDataURL(file));
+    if (updated) showToast(t('toast.photoUpdated'), 'success');
     e.target.value = '';
   };
 
-  const removePhoto = () => {
-    setAvatar(null);
-    showToast(t('toast.photoRemoved'), 'info');
+  const removePhoto = async () => {
+    const updated = await setAvatar(null);
+    if (updated) showToast(t('toast.photoRemoved'), 'info');
   };
 
   return (

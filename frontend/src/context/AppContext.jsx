@@ -1,27 +1,42 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
-  getUsers, getProjects, getApplications, getRatings,
+  getUsers, getProjects, getApplications, getRatings, getGroups,
+  saveUsers, saveProjects, saveApplications, saveRatingsData, saveGroups,
   getCurrentUserId, setCurrentUserId, clearCurrentUserId,
-  getActiveGroupId, setActiveGroupId, generateId, hashPassword, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
+  getActiveGroupId, setActiveGroupId, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
 } from '../lib/store.js';
-import { listGroups, createGroup as apiCreateGroup, requestToJoinGroup as apiRequestToJoinGroup, decideGroupRequest as apiDecideGroupRequest, updateGroup as apiUpdateGroup, removeGroupMember as apiRemoveGroupMember, setGroupMemberRole as apiSetGroupMemberRole, getGroupMembers, getGroupRequests, listGroupProjects } from '../lib/api/groups.js';
+import {
+  createGroup as apiCreateGroup,
+  requestToJoinGroup as apiRequestToJoinGroup,
+  decideGroupRequest as apiDecideGroupRequest,
+  updateGroup as apiUpdateGroup,
+  deleteGroup as apiDeleteGroup,
+  removeGroupMember as apiRemoveGroupMember,
+  setGroupMemberRole as apiSetGroupMemberRole
+} from '../lib/api/groups.js';
+import {
+  createProject as apiCreateProject,
+  changeProjectStatus as apiChangeProjectStatus
+} from '../lib/api/projects.js';
+import {
+  applyToProject as apiApplyToProject,
+  handleApplication as apiHandleApplication,
+  respondInvite as apiRespondInvite,
+  sendInvite as apiSendInvite
+} from '../lib/api/applications.js';
+import { saveRatings as apiSaveRatings } from '../lib/api/ratings.js';
+import { api } from '../lib/api/client.js';
+import { getAuthToken, setAuthTokens, clearAuthTokens } from '../lib/authToken.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { getUserAvgRating, userCategories } from '../lib/helpers.js';
-import { isSupabaseConfigured } from '../lib/supabaseClient.js';
-import {
-  fetchSupabaseData,
-  syncProjectToSupabase,
-  syncProfileToSupabase,
-  syncApplicationToSupabase,
-  syncRatingToSupabase,
-  syncGroupToSupabase,
-  supabaseAuthLogin,
-  supabaseAuthRegister
-} from '../lib/supabaseSync.js';
+import { isSupabaseConfigured, supabase } from '../lib/supabaseClient.js';
+import { useToast } from './ToastContext.jsx';
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
+  const { showToast } = useToast();
   const [users, setUsers] = useState(() => getUsers());
   const [projects, setProjects] = useState(() => getProjects());
   const [applications, setApplications] = useState(() => getApplications());
@@ -41,99 +56,85 @@ export function AppProvider({ children }) {
   const activeMembership = activeGroup?.members?.find(m => m.userId === userId) || null;
   const isActiveGroupAdmin = activeMembership?.role === 'owner' || activeMembership?.role === 'admin';
 
-  // Resincronizar los datos tras cada cambio (con almacenamiento local)
-  const refresh = useCallback(() => {
-    setUsers(getUsers());
-    setProjects(getProjects());
-    setApplications(getApplications());
-    setRatings(getRatings());
-    setGroups(getGroups());
+  // ========================================================================
+  // CARGA DE DATOS DESDE EL BACKEND
+  // El backend es la única capa que habla con Supabase/Prisma.
+  // localStorage se usa solo como caché/fallback para el primer render.
+  // ========================================================================
+  const applyBootstrap = useCallback((data) => {
+    if (!data) return;
+
+    if (Array.isArray(data.projects)) {
+      setProjects(data.projects);
+      saveProjects(data.projects);
+    }
+    if (Array.isArray(data.profiles)) {
+      setUsers(data.profiles);
+      saveUsers(data.profiles);
+    }
+    if (Array.isArray(data.groups)) {
+      setGroups(data.groups);
+      saveGroups(data.groups);
+    }
+    if (Array.isArray(data.applications)) {
+      setApplications(data.applications);
+      saveApplications(data.applications);
+    }
+    if (Array.isArray(data.ratings)) {
+      setRatings(data.ratings);
+      saveRatingsData(data.ratings);
+    }
+  }, []);
+
+  const loadFromBackend = useCallback(async () => {
+    try {
+      const data = await api.bootstrap.get();
+      applyBootstrap(data);
+      return true;
+    } catch (err) {
+      console.warn('[AppContext] No se pudieron cargar los datos del backend:', err);
+      return false;
+    }
+  }, [applyBootstrap]);
+
+  const refresh = useCallback(async () => {
+    const ok = await loadFromBackend();
     setUserId(getCurrentUserId());
     setActiveGroupIdState(getActiveGroupId());
-  }, []);
+    return ok;
+  }, [loadFromBackend]);
 
-  const setUserInStore = useCallback((id) => {
-    setCurrentUserId(id);
-    setUserId(id);
-  }, []);
-
-  // ========================================================================
-  // SINCRONIZACIÓN INICIAL CON SUPABASE (CUANDO ESTÁ CONFIGURADO EN VERCEL/LOCAL)
-  // ========================================================================
+  // Carga inicial: valida la sesión guardada y trae los datos del backend.
   useEffect(() => {
-    let isMounted = true;
-    async function initSupabaseData() {
-      if (!isSupabaseConfigured()) return;
-      try {
-        const data = await fetchSupabaseData();
-        if (!isMounted || !data.enabled) return;
+    let cancelled = false;
 
-        if (Array.isArray(data.projects) && data.projects.length > 0) {
-          setProjects(data.projects);
-          saveProjects(data.projects);
+    async function init() {
+      if (getAuthToken()) {
+        try {
+          const { user: me } = await api.auth.me();
+          if (!cancelled && me?.id) {
+            setCurrentUserId(me.id);
+            setUserId(me.id);
+          }
+        } catch {
+          // Si el refresh automático falló, el token ya se limpió.
+          if (!cancelled && !getAuthToken()) {
+            clearCurrentUserId();
+            setUserId(null);
+          }
         }
-        if (Array.isArray(data.profiles) && data.profiles.length > 0) {
-          setUsers(data.profiles);
-          saveUsers(data.profiles);
-        }
-        if (Array.isArray(data.groups) && data.groups.length > 0) {
-          setGroups(data.groups);
-          saveGroups(data.groups);
-        }
-        if (Array.isArray(data.applications) && data.applications.length > 0) {
-          setApplications(data.applications);
-          saveApplications(data.applications);
-        }
-        if (Array.isArray(data.ratings) && data.ratings.length > 0) {
-          setRatings(data.ratings);
-          saveRatingsData(data.ratings);
-        }
-      } catch (err) {
-        console.warn('[AppContext] No se pudieron sincronizar datos con Supabase:', err);
       }
+
+      if (!cancelled) await loadFromBackend();
     }
 
-    initSupabaseData();
+    init();
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
-  }, []);
+  }, [loadFromBackend]);
 
   // ========================================================================
-  // OBTENER GRUPOS DEL BACKEND PRISMA (siempre que haya API disponible)
-  // ========================================================================
-  useEffect(() => {
-    async function fetchGroupsFromBackend() {
-      try {
-        const result = await listGroups();
-        if (Array.isArray(result.data) && result.data.length > 0) {
-          setGroups(result.data);
-          saveGroups(result.data);
-        } else {
-          // Si la API falla o está vacía, mantener localStorage/Supabase como fallback
-          if (!isSupabaseConfigured()) {
-            const localGroups = getGroups();
-            if (localGroups.length > 0) {
-              setGroups(localGroups);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[AppContext] No se pudieron cargar grupos del backend:', err);
-        // Mantener datos locales si la API falla
-        if (!isSupabaseConfigured()) {
-          const localGroups = getGroups();
-          if (localGroups.length > 0) {
-            setGroups(localGroups);
-          }
-        }
-      }
-    }
-
-    fetchGroupsFromBackend();
-  }, []);
-
-// ========================================================================
   // I18N / THEME
   // ========================================================================
   const t = useCallback((key, replacements) => i18nT(lang, key, replacements), [lang]);
@@ -151,10 +152,19 @@ export function AppProvider({ children }) {
     setThemeState(next);
   }, []);
 
-  // Aplica theme + lang al <html> (igual que applyTheme/applyLanguage del vanilla)
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme);
   }, [theme]);
+
+  // Al volver al inicio se limpia el grupo activo (contexto global).
+  const location = useLocation();
+  useEffect(() => {
+    const path = location.pathname || '';
+    if (path === '/' || path === '/home' || path === '/inicio') {
+      setActiveGroupId(null);
+      setActiveGroupIdState(null);
+    }
+  }, [location.pathname]);
 
   // ========================================================================
   // AUTH
@@ -162,79 +172,97 @@ export function AppProvider({ children }) {
   const login = useCallback(async (identifier, password) => {
     const cleanIdentifier = String(identifier || '').trim().toLowerCase().replace(/^@/, '');
 
-    // 1. Si Supabase está configurado, intentar autenticación con Supabase
-    if (isSupabaseConfigured()) {
-      const supaUser = await supabaseAuthLogin(cleanIdentifier, password);
-      if (supaUser) {
-        const current = getUsers();
-        const existingIdx = current.findIndex(u => u.id === supaUser.id);
-        if (existingIdx >= 0) {
-          current[existingIdx] = { ...current[existingIdx], ...supaUser };
-        } else {
-          current.push(supaUser);
+    try {
+      const data = await api.auth.login({ identifier: cleanIdentifier, password });
+
+      if (data?.session?.access_token) {
+        setAuthTokens(data.session.access_token, data.session.refresh_token);
+      }
+
+      const loggedUser = data?.user;
+      if (!loggedUser?.id) return null;
+
+      setCurrentUserId(loggedUser.id);
+      setUserId(loggedUser.id);
+      setUsers(prev => {
+        const idx = prev.findIndex(u => u.id === loggedUser.id);
+        const next = idx >= 0
+          ? prev.map((u, i) => (i === idx ? { ...u, ...loggedUser } : u))
+          : [...prev, loggedUser];
+        saveUsers(next);
+        return next;
+      });
+
+      await loadFromBackend();
+      return loggedUser;
+    } catch (err) {
+      console.warn('[AppContext] Error de login:', err.message);
+      return null;
+    }
+  }, [loadFromBackend]);
+
+  const register = useCallback(async (data) => {
+    const profilePayload = {
+      name: data.name,
+      username: data.username,
+      bio: data.bio,
+      avatar: data.avatar || null,
+      skills: data.skills || [],
+      categories: data.categories || userCategories({ skills: data.skills || [] }),
+      gameTypes: data.gameTypes || [],
+      languages: data.languages || [],
+      favoriteGenres: data.favoriteGenres || [],
+      disciplines: data.disciplines || []
+    };
+
+    // Usuario que ya inició sesión con OAuth: completar el perfil existente.
+    if (!data.password && getAuthToken()) {
+      try {
+        const { user: synced } = await api.auth.ensureProfile(profilePayload);
+        if (synced?.id) {
+          setCurrentUserId(synced.id);
+          setUserId(synced.id);
+          await loadFromBackend();
+          return 'ok';
         }
-        saveUsers(current);
-        setUsers(current);
-        setUserInStore(supaUser.id);
-        return supaUser;
+      } catch (err) {
+        console.warn('[AppContext] No se pudo completar el perfil OAuth:', err.message);
       }
     }
 
-    // 2. Fallback a usuarios locales
-    const pHash = password ? await hashPassword(password) : '';
-    const localUsers = getUsers();
-    const found = localUsers.find(u => {
-      const matchIdentity = u.email.toLowerCase() === cleanIdentifier || u.username.toLowerCase() === cleanIdentifier;
-      if (!matchIdentity) return false;
-      if (u.passwordHash) return u.passwordHash === pHash;
-      if (u.password) return u.password === password || u.password === pHash;
-      return false;
-    });
-    if (!found) return null;
-    // Migrate legacy local accounts: remove any plaintext password the next
-    // time the user list is persisted. New accounts store only passwordHash.
-    if (Object.hasOwn(found, 'password')) saveUsers(localUsers);
-    setUserInStore(found.id);
-    return found;
-  }, [setUserInStore]);
+    try {
+      const result = await api.auth.register({
+        ...profilePayload,
+        email: data.email,
+        password: data.password
+      });
 
-  const register = useCallback(async (data) => {
-    const current = getUsers();
-    if (current.find(u => u.email === data.email)) return 'email';
-    if (current.find(u => u.username === data.username)) return 'username';
+      if (result?.session?.access_token) {
+        setAuthTokens(result.session.access_token, result.session.refresh_token);
+      }
+      if (result?.user?.id) {
+        setCurrentUserId(result.user.id);
+        setUserId(result.user.id);
+      }
 
-    let supaProfile = null;
-    if (isSupabaseConfigured()) {
-      supaProfile = await supabaseAuthRegister(data);
-      if (supaProfile === 'email') return 'email';
+      await loadFromBackend();
+      return 'ok';
+    } catch (err) {
+      if (err.status === 409) {
+        if (/correo|email/i.test(err.message)) return 'email';
+        if (/usuario|username/i.test(err.message)) return 'username';
+      }
+      console.error('[AppContext] Error de registro:', err);
+      return 'error';
     }
-
-    const hashedPassword = data.password ? await hashPassword(data.password) : '';
-
-    const newUser = supaProfile || {
-      id: generateId(),
-      name: data.name,
-      username: data.username,
-      email: data.email,
-      passwordHash: hashedPassword,
-      skills: data.skills,
-      categories: userCategories({ skills: data.skills }),
-      bio: data.bio,
-      languages: (data.languages || []).slice(),
-      disciplines: (data.disciplines || []).slice(),
-      gameTypes: (data.gameTypes || []).slice(),
-      favoriteGenres: (data.favoriteGenres || []).slice(),
-      createdAt: new Date().toISOString()
-    };
-
-    current.push(newUser);
-    saveUsers(current);
-    setUsers(current);
-    setUserInStore(newUser.id);
-    return 'ok';
-  }, [setUserInStore]);
+  }, [loadFromBackend]);
 
   const logout = useCallback(() => {
+    // Se cierra la sesión en el backend y en Supabase (OAuth), y se limpia
+    // el estado local. La app no guarda datos de negocio en Supabase.
+    api.auth.logout().catch(() => {});
+    if (supabase) supabase.auth.signOut().catch(() => {});
+    clearAuthTokens();
     clearCurrentUserId();
     setActiveGroupId(null);
     setUserId(null);
@@ -245,123 +273,168 @@ export function AppProvider({ children }) {
   // ========================================================================
   // PROFILE
   // ========================================================================
-  const saveProfile = useCallback((data) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx >= 0) {
-      current[idx].bio = data.bio;
-      current[idx].skills = data.skills.slice();
-      if (data.categories) current[idx].categories = data.categories.slice();
-      if (data.githubUrl !== undefined) current[idx].githubUrl = data.githubUrl;
-      if (data.portfolioUrl !== undefined) current[idx].portfolioUrl = data.portfolioUrl;
-      // Perfil de talento: es lo que usa el buscador de Personas
-      current[idx].gameTypes = (data.gameTypes || []).slice();
-      current[idx].languages = (data.languages || []).slice();
-      current[idx].favoriteGenres = (data.favoriteGenres || []).slice();
-      current[idx].disciplines = (data.disciplines || []).slice();
-      saveUsers(current);
-      setUsers(current);
-      refresh();
-      syncProfileToSupabase(current[idx]);
+  const mergeUser = useCallback((updated) => {
+    if (!updated?.id) return;
+    setUsers(prev => {
+      const idx = prev.findIndex(u => u.id === updated.id);
+      const next = idx >= 0
+        ? prev.map((u, i) => (i === idx ? { ...u, ...updated } : u))
+        : [...prev, updated];
+      saveUsers(next);
+      return next;
+    });
+  }, []);
+
+  const saveProfile = useCallback(async (data) => {
+    if (!userId) return null;
+
+    const payload = {
+      bio: data.bio,
+      skills: (data.skills || []).slice(),
+      categories: (data.categories || []).slice(),
+      githubUrl: data.githubUrl,
+      portfolioUrl: data.portfolioUrl,
+      gameTypes: (data.gameTypes || []).slice(),
+      languages: (data.languages || []).slice(),
+      favoriteGenres: (data.favoriteGenres || []).slice(),
+      disciplines: (data.disciplines || []).slice()
+    };
+
+    try {
+      const { user: updated } = await api.profiles.update(userId, payload);
+      mergeUser(updated);
+      return updated;
+    } catch (err) {
+      showToast(err.message || 'Error guardando el perfil', 'error');
+      return null;
     }
-  }, [userId, refresh]);
+  }, [userId, mergeUser, showToast]);
 
   // Edita los datos de la cuenta desde Ajustes.
   const updateAccount = useCallback(async ({ name, username, email, password }) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx < 0) return 'error';
+    if (!userId) return 'error';
 
     const cleanName = String(name || '').trim();
     const cleanUsername = String(username || '').trim();
     const cleanEmail = String(email || '').trim().toLowerCase();
     if (!cleanName || !cleanUsername || !cleanEmail) return 'incomplete';
 
-    if (current.some(u => u.id !== userId && u.email === cleanEmail)) return 'email';
-    if (current.some(u => u.id !== userId && u.username === cleanUsername)) return 'username';
+    try {
+      const { user: updated } = await api.profiles.update(userId, {
+        name: cleanName,
+        username: cleanUsername,
+        email: cleanEmail
+      });
 
-    const target = current[idx];
-    target.name = cleanName;
-    target.username = cleanUsername;
-    target.email = cleanEmail;
-    if (password) {
-      target.passwordHash = await hashPassword(password);
-      delete target.password;
+      if (password) {
+        await api.auth.updatePassword({ password });
+      }
+
+      mergeUser(updated);
+      return 'ok';
+    } catch (err) {
+      if (err.status === 409) {
+        if (/correo|email/i.test(err.message)) return 'email';
+        if (/usuario|username/i.test(err.message)) return 'username';
+      }
+      if (err.status === 400) return 'incomplete';
+      return 'error';
     }
+  }, [userId, mergeUser]);
 
-    saveUsers(current);
-    setUsers(current);
-    refresh();
-    syncProfileToSupabase(target);
-    return 'ok';
-  }, [userId, refresh]);
-
-  const setAvatar = useCallback((avatar) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx >= 0) {
-      current[idx].avatar = avatar;
-      saveUsers(current);
-      setUsers(current);
-      refresh();
-      syncProfileToSupabase(current[idx]);
+  const setAvatar = useCallback(async (avatar) => {
+    if (!userId) return null;
+    try {
+      const { user: updated } = await api.profiles.update(userId, { avatar });
+      mergeUser(updated);
+      return updated;
+    } catch (err) {
+      showToast(err.message || 'Error actualizando la foto', 'error');
+      return null;
     }
-  }, [userId, refresh]);
+  }, [userId, mergeUser, showToast]);
 
-  const toggleAvailability = useCallback(() => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx < 0) return;
-    current[idx].available = !(current[idx].available === true);
-    const on = current[idx].available;
-    saveUsers(current);
-    setUsers(current);
-    refresh();
-    syncProfileToSupabase(current[idx]);
-    return on;
-  }, [userId, refresh]);
-
-  const saveFeaturedProjects = useCallback((projectIds) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx >= 0) {
-      current[idx].featuredProjectIds = projectIds.slice();
-      saveUsers(current);
-      setUsers(current);
-      refresh();
-      syncProfileToSupabase(current[idx]);
+  const toggleAvailability = useCallback(async () => {
+    if (!userId) return false;
+    try {
+      const { user: updated, available } = await api.profiles.toggleAvailability(userId);
+      mergeUser(updated);
+      return available;
+    } catch (err) {
+      showToast(err.message || 'Error cambiando la disponibilidad', 'error');
+      return false;
     }
-  }, [userId, refresh]);
+  }, [userId, mergeUser, showToast]);
+
+  const saveFeaturedProjects = useCallback(async (projectIds) => {
+    if (!userId) return null;
+    try {
+      const { user: updated } = await api.profiles.saveFeatured(userId, projectIds);
+      mergeUser(updated);
+      return updated;
+    } catch (err) {
+      showToast(err.message || 'Error guardando proyectos destacados', 'error');
+      return null;
+    }
+  }, [userId, mergeUser, showToast]);
 
   // ========================================================================
   // PROJECTS
   // ========================================================================
-  const createProject = useCallback((data) => {
+  const createProject = useCallback(async (data) => {
     if (activeGroup && !isActiveGroupAdmin) return null;
-    const project = {
-      id: generateId(),
-      ownerId: userId,
-      title: data.title,
-      category: data.category,
-      slots: data.slots,
-      tech: data.tech,
-      minRating: data.minRating,
-      description: data.description,
-      deadline: data.deadline || null,
-      repo: data.repo || null,
-      image: data.image || null,
-      groupId: activeGroup?.id || null,
-      roles: (data.roles || []).filter(Boolean),
-      status: 'open',
-      createdAt: new Date().toISOString()
-    };
-    const current = getProjects();
-    current.push(project);
-    saveProjects(current);
-    setProjects(current);
-    syncProjectToSupabase(project);
-    return project;
-  }, [userId, activeGroup, isActiveGroupAdmin]);
+
+    try {
+      const project = await apiCreateProject({
+        title: { es: data.title, en: data.title },
+        category: data.category,
+        slots: data.slots,
+        tech: data.tech || [],
+        minRating: data.minRating,
+        description: { es: data.description, en: data.description },
+        deadline: data.deadline || null,
+        repo: data.repo || null,
+        image: data.image || null,
+        roles: (data.roles || []).filter(Boolean),
+        groupId: activeGroup?.id || null
+      });
+
+      if (project?.id) {
+        setProjects(prev => {
+          const next = [project, ...prev.filter(p => p.id !== project.id)];
+          saveProjects(next);
+          return next;
+        });
+      }
+
+      await refresh();
+      return project;
+    } catch (err) {
+      showToast(err.message || 'Error al publicar el proyecto', 'error');
+      return null;
+    }
+  }, [activeGroup, isActiveGroupAdmin, refresh, showToast]);
+
+  const changeProjectStatus = useCallback(async (projectId, newStatus) => {
+    try {
+      const result = await apiChangeProjectStatus(projectId, newStatus);
+
+      if (typeof result === 'string') return result;
+      if (!result?.id) return null;
+
+      setProjects(prev => {
+        const next = prev.map(p => (p.id === projectId ? { ...p, ...result } : p));
+        saveProjects(next);
+        return next;
+      });
+
+      await refresh();
+      return result;
+    } catch (err) {
+      showToast(err.message || 'Error cambiando el estado del proyecto', 'error');
+      return null;
+    }
+  }, [refresh, showToast]);
 
   // ========================================================================
   // GROUPS
@@ -372,215 +445,244 @@ export function AppProvider({ children }) {
   }, []);
 
   const createGroup = useCallback(async ({ name, description, isPrivate = false }) => {
-    const group = {
-      id: generateId(),
-      name: name.trim(),
-      description: description.trim(),
-      ownerId: userId,
-      isPrivate: isPrivate === true,
-      createdAt: new Date().toISOString(),
-      members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
-      requests: []
-    };
-    const created = await apiCreateGroup(group);
-    setGroups(prev => {
-      const idx = prev.findIndex(g => g.id === created.id);
-      if (idx >= 0) prev[idx] = created;
-      return [...prev];
-    });
-    selectGroup(group.id);
-    return created;
-  }, [userId, selectGroup]);
+    try {
+      const created = await apiCreateGroup({
+        name: name.trim(),
+        description: (description || '').trim(),
+        isPrivate: isPrivate === true
+      });
+
+      setGroups(prev => {
+        const next = [created, ...prev.filter(g => g.id !== created.id)];
+        saveGroups(next);
+        return next;
+      });
+
+      selectGroup(created.id);
+      await refresh();
+      return created;
+    } catch (err) {
+      showToast(err.message || 'Error creando el grupo', 'error');
+      return null;
+    }
+  }, [selectGroup, refresh, showToast]);
 
   const requestToJoinGroup = useCallback(async (groupId) => {
-    const res = await apiRequestToJoinGroup(groupId);
-    if (res === 'pending') showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
-    else if (res === 'member') showToast('Ya eres miembro de este grupo', 'info');
-    else showToast('Solicitud enviada al administrador', 'success');
-    refresh();
-    return res;
-  }, [showToast, refresh]);
+    const group = groups.find(item => item.id === groupId);
+    const alreadyMember = group && (
+      group.ownerId === userId ||
+      (group.members || []).some(member => member.userId === userId)
+    );
+    if (alreadyMember) {
+      showToast('Ya eres miembro de este grupo', 'info');
+      return 'member';
+    }
+    if ((group?.requests || []).some(item => item.userId === userId && item.status === 'pending')) {
+      showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
+      return 'pending';
+    }
+
+    let request;
+    try {
+      request = await apiRequestToJoinGroup(groupId);
+    } catch (err) {
+      if (err.message === 'pending') {
+        showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
+        return 'pending';
+      }
+      if (err.message === 'member') {
+        showToast('Ya eres miembro de este grupo', 'info');
+        return 'member';
+      }
+      showToast(err.message || 'No se pudo enviar la solicitud', 'error');
+      return 'error';
+    }
+
+    setGroups(prev => {
+      const next = prev.map(item => item.id === groupId
+        ? {
+            ...item,
+            requests: [
+              ...(item.requests || []).filter(existing =>
+                existing.id !== request.id &&
+                !(existing.userId === userId && existing.status === 'pending')
+              ),
+              request
+            ]
+          }
+        : item);
+      saveGroups(next);
+      return next;
+    });
+
+    await refresh();
+    showToast('Solicitud enviada al administrador', 'success');
+    return 'pending';
+  }, [groups, userId, showToast, refresh]);
 
   const decideGroupRequest = useCallback(async (groupId, requestId, accepted) => {
-    const ok = await apiDecideGroupRequest(groupId, requestId, accepted);
-    if (ok) showToast(accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.', accepted ? 'success' : 'info');
-    refresh();
-    return ok;
+    try {
+      const request = await apiDecideGroupRequest(groupId, requestId, accepted);
+      if (request) {
+        showToast(
+          accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.',
+          accepted ? 'success' : 'info'
+        );
+      }
+      await refresh();
+      return Boolean(request);
+    } catch (err) {
+      showToast(err.message || 'Error gestionando la solicitud', 'error');
+      return false;
+    }
   }, [showToast, refresh]);
 
   const setGroupMemberRole = useCallback(async (groupId, memberId, role) => {
-    const ok = await apiSetGroupMemberRole(groupId, memberId, role);
-    if (ok) {
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.map(m => m.userId === memberId ? { ...m, role } : m) } : g));
-      refresh();
+    try {
+      const member = await apiSetGroupMemberRole(groupId, memberId, role);
+      await refresh();
+      return Boolean(member);
+    } catch (err) {
+      showToast(err.message || 'Error cambiando el rol', 'error');
+      return false;
     }
-    return ok;
-  }, []);
+  }, [showToast, refresh]);
 
   const updateGroup = useCallback(async (groupId, { name, description, isPrivate }) => {
-    const ok = await apiUpdateGroup(groupId, { name, description, isPrivate });
-    if (ok) {
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, name: name ?? g.name, description: description ?? g.description, isPrivate: isPrivate !== undefined ? isPrivate : g.isPrivate } : g));
-      refresh();
+    try {
+      const group = await apiUpdateGroup(groupId, { name, description, isPrivate });
+      await refresh();
+      return Boolean(group);
+    } catch (err) {
+      showToast(err.message || 'Error actualizando el grupo', 'error');
+      return false;
     }
-    return ok;
-  }, []);
+  }, [showToast, refresh]);
 
   const removeGroupMember = useCallback(async (groupId, memberId) => {
-    const ok = await apiRemoveGroupMember(groupId, memberId);
-    if (ok) {
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, members: g.members?.filter(m => m.userId !== memberId) } : g));
-      refresh();
+    try {
+      const ok = await apiRemoveGroupMember(groupId, memberId);
+      await refresh();
+      return Boolean(ok);
+    } catch (err) {
+      showToast(err.message || 'Error eliminando el miembro', 'error');
+      return false;
     }
-    return ok;
-  }, []);
+  }, [showToast, refresh]);
 
-  const changeProjectStatus = useCallback((projectId, newStatus) => {
-    const current = getProjects();
-    const idx = current.findIndex(p => p.id === projectId);
-    if (idx < 0) return null;
-    if (newStatus === 'completed') {
-      const accepted = getApplications().filter(a => a.projectId === projectId && a.status === 'accepted');
-      if (accepted.length === 0) return 'noParticipants';
+  const deleteGroup = useCallback(async (groupId) => {
+    try {
+      const ok = await apiDeleteGroup(groupId);
+      if (activeGroupId === groupId) selectGroup(null);
+      await refresh();
+      return Boolean(ok);
+    } catch (err) {
+      showToast(err.message || 'Error eliminando el grupo', 'error');
+      return false;
     }
-    current[idx].status = newStatus;
-    saveProjects(current);
-    setProjects(current);
-    syncProjectToSupabase(current[idx]);
-    return current[idx];
-  }, []);
+  }, [activeGroupId, selectGroup, refresh, showToast]);
 
   // ========================================================================
   // APPLICATIONS
   // ========================================================================
-  const applyToProject = useCallback((projectId, pitch = '') => {
-    const current = getApplications();
-    if (current.find(a => a.projectId === projectId && a.userId === userId)) return 'alreadyApplied';
+  const applyToProject = useCallback(async (projectId, pitch = '') => {
+    if (!userId) return 'unauthorized';
 
-    const project = getProjects().find(p => p.id === projectId);
+    if (applications.some(a => a.projectId === projectId && a.userId === userId)) {
+      return 'alreadyApplied';
+    }
+
+    const project = projects.find(p => p.id === projectId);
     if (project && project.minRating) {
       const userRating = getUserAvgRating(userId, ratings);
       if (userRating < project.minRating) return 'minRating';
     }
 
-    const newApp = {
-      id: generateId(),
-      projectId,
-      userId,
-      status: 'pending',
-      pitch: String(pitch || ''),
-      appliedAt: new Date().toISOString()
-    };
+    try {
+      const result = await apiApplyToProject(projectId, pitch);
+      if (typeof result === 'string') return result;
+      await refresh();
+      return 'ok';
+    } catch (err) {
+      showToast(err.message || 'Error en la postulación', 'error');
+      return 'error';
+    }
+  }, [applications, projects, ratings, userId, refresh, showToast]);
 
-    current.push(newApp);
-    saveApplications(current);
-    setApplications(current);
-    syncApplicationToSupabase(newApp);
-    return 'ok';
-  }, [userId, ratings]);
+  const handleApplication = useCallback(async (appId, newStatus, projectId, projectRole = '') => {
+    const current = applications.find(a => a.id === appId);
+    const applicant = users.find(u => u.id === current?.userId);
 
-  const handleApplication = useCallback((appId, newStatus, projectId, projectRole = '') => {
-    const current = getApplications();
-    const idx = current.findIndex(a => a.id === appId);
-    if (idx < 0) return null;
-    const project = getProjects().find(p => p.id === projectId);
-    if (!project) return null;
+    try {
+      const result = await apiHandleApplication(appId, newStatus, projectId, projectRole);
+      if (typeof result === 'string') return result;
 
-    if (newStatus === 'accepted') {
-      const acceptedCount = current.filter(a => a.projectId === projectId && a.status === 'accepted').length;
-      if (acceptedCount >= project.slots) return 'slotsFull';
+      await refresh();
+      return applicant?.name || result?.user?.name || '';
+    } catch (err) {
+      showToast(err.message || 'Error gestionando la postulación', 'error');
+      return null;
+    }
+  }, [applications, users, refresh, showToast]);
+
+  const respondInvite = useCallback(async (appId, action) => {
+    try {
+      const result = await apiRespondInvite(appId, action);
+      if (typeof result === 'string') return result;
+      await refresh();
+      return action === 'accepted' ? 'accepted' : 'rejected';
+    } catch (err) {
+      showToast(err.message || 'Error respondiendo la invitación', 'error');
+      return null;
+    }
+  }, [refresh, showToast]);
+
+  const sendInvite = useCallback(async (projectId, targetUserId, message) => {
+    if (applications.some(a => a.projectId === projectId && a.userId === targetUserId)) {
+      return 'already';
     }
 
-    current[idx].status = newStatus;
-    if (newStatus === 'accepted') current[idx].projectRole = projectRole;
-    saveApplications(current);
-    setApplications(current);
-    syncApplicationToSupabase(current[idx]);
-    const applicant = getUsers().find(u => u.id === current[idx].userId);
-    return applicant ? applicant.name : null;
-  }, []);
-
-  const respondInvite = useCallback((appId, action) => {
-    const current = getApplications();
-    const idx = current.findIndex(a => a.id === appId);
-    if (idx < 0) return null;
-    const project = getProjects().find(p => p.id === current[idx].projectId);
-    if (!project) return null;
-
-    if (action === 'accepted') {
-      const acceptedCount = current.filter(a => a.projectId === current[idx].projectId && a.status === 'accepted').length;
-      if (acceptedCount >= project.slots) return 'slotsFull';
+    try {
+      const result = await apiSendInvite(projectId, targetUserId, message);
+      if (typeof result === 'string') return result;
+      await refresh();
+      return 'ok';
+    } catch (err) {
+      showToast(err.message || 'Error enviando la invitación', 'error');
+      return 'error';
     }
-
-    current[idx].status = action === 'accepted' ? 'accepted' : 'rejected';
-    saveApplications(current);
-    setApplications(current);
-    syncApplicationToSupabase(current[idx]);
-    return action;
-  }, []);
-
-  const sendInvite = useCallback((projectId, targetUserId, message) => {
-    const current = getApplications();
-    if (current.find(a => a.projectId === projectId && a.userId === targetUserId)) return 'already';
-
-    const project = getProjects().find(p => p.id === projectId);
-    if (!project) return 'error';
-    const acceptedCount = current.filter(a => a.projectId === projectId && a.status === 'accepted').length;
-    if (acceptedCount >= project.slots) return 'slotsFull';
-
-    const newInvite = {
-      id: generateId(),
-      projectId,
-      userId: targetUserId,
-      status: 'pending',
-      invitedBy: userId,
-      message: message || '',
-      appliedAt: new Date().toISOString()
-    };
-
-    current.push(newInvite);
-    saveApplications(current);
-    setApplications(current);
-    syncApplicationToSupabase(newInvite);
-    return 'ok';
-  }, [userId]);
+  }, [applications, refresh, showToast]);
 
   // ========================================================================
   // RATINGS
   // ========================================================================
-  const saveRatings = useCallback((projectId, ratingMap) => {
-    const current = getRatings();
-    let saved = false;
-    const ratingsToSync = [];
+  const saveRatings = useCallback(async (projectId, ratingMap) => {
+    const hasRatings = Object.values(ratingMap || {}).some(Boolean);
+    if (!hasRatings) return false;
 
-    Object.keys(ratingMap).forEach(ratedUserId => {
-      const stars = ratingMap[ratedUserId];
-      if (!stars) return;
-      const existing = current.findIndex(r => r.projectId === projectId && r.ratedUserId === ratedUserId);
-      if (existing >= 0) {
-        current[existing].stars = stars;
-        current[existing].updatedAt = new Date().toISOString();
-        ratingsToSync.push(current[existing]);
-      } else {
-        const newRating = {
-          id: generateId(),
-          projectId,
-          ratedUserId,
-          ratedBy: userId,
-          stars,
-          createdAt: new Date().toISOString()
-        };
-        current.push(newRating);
-        ratingsToSync.push(newRating);
+    try {
+      const saved = await apiSaveRatings(projectId, ratingMap);
+
+      if (Array.isArray(saved) && saved.length > 0) {
+        setRatings(prev => {
+          const next = [...prev];
+          saved.forEach(rating => {
+            const idx = next.findIndex(r => r.id === rating.id);
+            if (idx >= 0) next[idx] = { ...next[idx], ...rating };
+            else next.push(rating);
+          });
+          saveRatingsData(next);
+          return next;
+        });
       }
-      saved = true;
-    });
 
-    saveRatingsData(current);
-    setRatings(current);
-    ratingsToSync.forEach(r => syncRatingToSupabase(r));
-    return saved;
-  }, [userId]);
+      await refresh();
+      return true;
+    } catch (err) {
+      showToast(err.message || 'Error guardando las calificaciones', 'error');
+      return false;
+    }
+  }, [refresh, showToast]);
 
   const value = {
     user, users, projects, applications, ratings, groups, activeGroup, activeGroupId, activeMembership, isActiveGroupAdmin,
@@ -592,7 +694,7 @@ export function AppProvider({ children }) {
     login, register, logout,
     saveProfile, updateAccount, setAvatar, toggleAvailability, saveFeaturedProjects,
     createProject, changeProjectStatus,
-    selectGroup, createGroup, updateGroup, removeGroupMember, requestToJoinGroup, decideGroupRequest, setGroupMemberRole,
+    selectGroup, createGroup, updateGroup, deleteGroup, removeGroupMember, requestToJoinGroup, decideGroupRequest, setGroupMemberRole,
     applyToProject, handleApplication, respondInvite, sendInvite,
     saveRatings, refresh
   };

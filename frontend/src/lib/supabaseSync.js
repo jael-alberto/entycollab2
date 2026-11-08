@@ -1,6 +1,7 @@
 // frontend/src/lib/supabaseSync.js
 // Capa de sincronización y acceso directo a Supabase
 import { supabase, isSupabaseConfigured } from './supabaseClient.js';
+import { setAuthTokens } from './authToken.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -349,6 +350,10 @@ export async function supabaseAuthLogin(identifier, password) {
       return null;
     }
 
+    if (data.session?.access_token) {
+      setAuthTokens(data.session.access_token, data.session.refresh_token);
+    }
+
     // Cargar perfil completo
     const { data: profile } = await supabase
       .from('profiles')
@@ -392,6 +397,10 @@ export async function supabaseAuthRegister(regData) {
 
     const userId = data.user?.id;
     if (!userId) return null;
+
+    if (data.session?.access_token) {
+      setAuthTokens(data.session.access_token, data.session.refresh_token);
+    }
 
     const newProfile = {
       id: userId,

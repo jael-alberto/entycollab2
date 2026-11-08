@@ -35,18 +35,19 @@ export default function ProjectDetailModal() {
   const slotsFull = accepted.length >= project.slots;
   const ownerRating = owner ? getUserAvgRating(owner.id, ratings) : 0;
 
-  const onStatusChange = (newStatus) => {
-    const res = changeProjectStatus(project.id, newStatus);
+  const onStatusChange = async (newStatus) => {
+    const res = await changeProjectStatus(project.id, newStatus);
     if (res === 'noParticipants') {
       showToast(t('toast.noParticipants'), 'error');
       return;
     }
+    if (!res || typeof res === 'string') return;
     showToast(t('toast.projectUpdated', { status: t(statusLabelKey(newStatus)) }), 'success');
     closeDetail();
   };
 
-  const onApplication = (appId, newStatus) => {
-    const name = handleApplication(appId, newStatus, project.id, rolesByApplication[appId] || 'Colaborador');
+  const onApplication = async (appId, newStatus) => {
+    const name = await handleApplication(appId, newStatus, project.id, rolesByApplication[appId] || 'Colaborador');
     if (name === 'slotsFull') {
       showToast(t('invite.slotsFull'), 'error');
       return;

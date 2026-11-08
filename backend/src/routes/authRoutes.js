@@ -2,7 +2,7 @@
 // Rutas de autenticación
 
 import { Router } from 'express';
-import { register, login, logout, me, refresh } from '../controllers/authController.js';
+import { register, login, logout, me, refresh, updatePassword, ensureProfile } from '../controllers/authController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
 
@@ -22,5 +22,11 @@ router.get('/me', requireAuth, me);
 
 // POST /api/auth/refresh
 router.post('/refresh', validate(schemas.refresh), refresh);
+
+// PUT /api/auth/password
+router.put('/password', requireAuth, validate(schemas.updatePassword), updatePassword);
+
+// POST /api/auth/ensure-profile
+router.post('/ensure-profile', requireAuth, validate(schemas.ensureProfile), ensureProfile);
 
 export default router;

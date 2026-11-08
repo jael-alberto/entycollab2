@@ -35,8 +35,8 @@ export default function FeaturedModal() {
     }
   };
 
-  const save = () => {
-    saveFeaturedProjects(selection);
+  const save = async () => {
+    await saveFeaturedProjects(selection);
     closeFeatured();
     showToast(t('featured.saved'), 'success');
   };

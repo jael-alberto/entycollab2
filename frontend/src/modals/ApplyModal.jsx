@@ -33,7 +33,7 @@ export default function ApplyModal() {
   const meetsRating = !project.minRating || userRating >= project.minRating;
   const isOpen = project.status === 'open';
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const key = pitchKey(pitch);
     if (key) {
@@ -41,7 +41,7 @@ export default function ApplyModal() {
       return;
     }
     setLoading(true);
-    const res = applyToProject(project.id, pitch.trim());
+    const res = await applyToProject(project.id, pitch.trim());
     setLoading(false);
     if (res === 'alreadyApplied') {
       showToast(t('toast.alreadyApplied'), 'error');

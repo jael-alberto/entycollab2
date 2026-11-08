@@ -310,12 +310,13 @@ function MyApplications() {
       });
   }, [applications, projects, user.id, activeGroup]);
 
-  const handleInvite = (appId, action) => {
-    const res = respondInvite(appId, action);
+  const handleInvite = async (appId, action) => {
+    const res = await respondInvite(appId, action);
     if (res === 'slotsFull') {
       showToast(t('invite.slotsFull'), 'error');
       return;
     }
+    if (!res) return;
     setRefreshKey(k => k + 1);
     showToast(
       action === 'accepted' ? t('myApps.joined') : t('myApps.inviteRejected'),

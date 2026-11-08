@@ -5,6 +5,10 @@ import { config } from 'dotenv';
 config();
 
 const isProduction = process.env.NODE_ENV === 'production';
+const frontendUrls = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map((value) => value.trim().replace(/\/$/, ''))
+  .filter(Boolean);
 let supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 let supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -47,7 +51,9 @@ if (!databaseUrl) {
 export const env = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  frontendUrl: frontendUrls[0] || 'http://localhost:5173',
+  frontendUrls,
+  allowVercelPreviews: process.env.ALLOW_VERCEL_PREVIEWS === 'true',
   
   supabase: {
     url: supabaseUrl,

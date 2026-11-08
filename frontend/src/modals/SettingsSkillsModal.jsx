@@ -75,7 +75,7 @@ export default function SettingsSkillsModal() {
     setDraftLanguages(prev => prev.filter(l => allowed.includes(l)));
   };
 
-  const confirm = () => {
+  const confirm = async () => {
     if (draftCats.length === 0) return showToast(t('profile.selectCat'), 'error');
     if (draftSkills.length === 0) return showToast(t('toast.applyTech'), 'error');
     if (draftGameTypes.length === 0) return showToast(t('toast.selectGameTypes'), 'error');
@@ -89,7 +89,7 @@ export default function SettingsSkillsModal() {
 
     // bio y links se reenvían tal como están guardados: este modal solo
     // cambia habilidades y perfil de talento.
-    saveProfile({
+    const saved = await saveProfile({
       bio: user.bio,
       skills: kept,
       categories: draftCats,
@@ -100,6 +100,7 @@ export default function SettingsSkillsModal() {
       favoriteGenres: draftGenres,
       disciplines: draftDisciplines
     });
+    if (!saved) return;
     closeSkillsSettings();
     showToast(t('profile.saved'), 'success');
   };

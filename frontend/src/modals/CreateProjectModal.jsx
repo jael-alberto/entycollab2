@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Field, Modal, Spinner, StarInput } from '../components/common.jsx';
-import { escapeHTML, fileToDataURL, getCategoryLabel, starLabel, techsForCategory } from '../lib/helpers.js';
+import { escapeHTML, fileToDataURL, getCategoryLabel, normalizeLinkUrl, starLabel, techsForCategory } from '../lib/helpers.js';
 import { DESC_MIN, deadlineKey, descKey, slotsKey, techKey, titleKey } from '../lib/validation.js';
 
 export default function CreateProjectModal() {
@@ -62,7 +62,7 @@ export default function CreateProjectModal() {
     setImage(dataUrl);
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const found = validate();
     setErrors(found);
@@ -74,7 +74,7 @@ export default function CreateProjectModal() {
     setLoading(true);
     let finalCategory = category;
     if (category === 'other') finalCategory = customCategory.trim();
-    createProject({
+    const created = await createProject({
       title: title.trim(),
       category: finalCategory,
       slots: parseInt(slots, 10) || 1,
@@ -82,10 +82,12 @@ export default function CreateProjectModal() {
       minRating,
       description: description.trim(),
       deadline: deadline || null,
-      repo: repo.trim() || null,
+      repo: repo.trim() ? normalizeLinkUrl(repo.trim()) : null,
       image,
       roles: rolesText.split(',').map(role => role.trim()).filter(Boolean)
     });
+    setLoading(false);
+    if (!created) return;
     closeCreate();
     showToast(t('toast.published'), 'success');
   };
