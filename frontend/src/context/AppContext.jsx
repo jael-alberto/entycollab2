@@ -477,7 +477,7 @@ export function AppProvider({ children }) {
       showToast('Ya eres miembro de este grupo', 'info');
       return 'member';
     }
-    if ((group?.requests || []).some(item => item.userId === userId && item.status === 'pending')) {
+    if ((group?.requests || []).some(item => (item.userId === userId || item.user_id === userId) && item.status === 'pending')) {
       showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
       return 'pending';
     }
@@ -498,16 +498,37 @@ export function AppProvider({ children }) {
       return 'error';
     }
 
+    if (request === 'pending') {
+      showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
+      return 'pending';
+    }
+    if (request === 'member') {
+      showToast('Ya eres miembro de este grupo', 'info');
+      return 'member';
+    }
+
+    const newRequest = (typeof request === 'object' && request?.id)
+      ? request
+      : {
+          id: 'temp-' + Date.now(),
+          groupId,
+          userId,
+          user_id: userId,
+          status: 'pending',
+          requestedAt: new Date().toISOString()
+        };
+
     setGroups(prev => {
       const next = prev.map(item => item.id === groupId
         ? {
             ...item,
+            hasPendingRequest: true,
             requests: [
               ...(item.requests || []).filter(existing =>
-                existing.id !== request.id &&
-                !(existing.userId === userId && existing.status === 'pending')
+                existing.id !== newRequest.id &&
+                !((existing.userId === userId || existing.user_id === userId) && existing.status === 'pending')
               ),
-              request
+              newRequest
             ]
           }
         : item);
@@ -517,7 +538,7 @@ export function AppProvider({ children }) {
 
     await refresh();
     showToast('Solicitud enviada al administrador', 'success');
-    return 'pending';
+    return newRequest;
   }, [groups, userId, showToast, refresh]);
 
   const decideGroupRequest = useCallback(async (groupId, requestId, accepted) => {
@@ -685,7 +706,7 @@ export function AppProvider({ children }) {
   }, [refresh, showToast]);
 
   const value = {
-    user, users, projects, applications, ratings, groups, activeGroup, activeGroupId, activeMembership, isActiveGroupAdmin,
+    user, users, projects, applications, ratings, groups, setGroups, activeGroup, activeGroupId, activeMembership, isActiveGroupAdmin,
     lang, theme, menuOpen, setMenuOpen,
     selectedCategories, setSelectedCategories,
     selectedTechFilters, setSelectedTechFilters,

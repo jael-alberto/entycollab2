@@ -48,7 +48,6 @@ const GROUP_OWNER_SELECT = { id: true, name: true, username: true, avatar: true 
 // GET /api/groups
 export const listGroups = asyncHandler(async (req, res) => {
   const { page = 1, pageSize = 20, search } = req.validated.query;
-  const userId = req.user.id;
 
   // Todos los grupos son públicos: se listan para que cualquiera pueda ver su
   // información principal y solicitar acceso. El contenido completo se valida
@@ -66,10 +65,12 @@ export const listGroups = asyncHandler(async (req, res) => {
       include: {
         owner: { select: GROUP_OWNER_SELECT },
         _count: { select: { members: true } },
-        requests: {
-          where: { userId, status: 'pending' },
-          select: { id: true, groupId: true, userId: true, status: true, requestedAt: true }
-        }
+        ...(req.user?.id ? {
+          requests: {
+            where: { userId: req.user.id, status: 'pending' },
+            select: { id: true, userId: true, status: true, requestedAt: true }
+          }
+        } : {})
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
@@ -155,19 +156,23 @@ export const getGroup = asyncHandler(async (req, res) => {
 
   if (!isMember) {
     // Vista pública: información principal + número de miembros. Los proyectos
-    // y la lista de miembros quedan reservados a miembros; cada usuario sí puede
-    // ver su propia solicitud pendiente para mostrar el estado en la UI.
+    // y la lista de miembros quedan reservados a miembros.
+    // El usuario autenticado que aún no es miembro debe poder ver sus solicitudes.
     serialized.members = [{ count: group.members.length }];
     serialized.requests = (serialized.requests || []).filter(
-      request => (request.user_id || request.userId) === userId && request.status === 'pending'
+      request => (request.userId === userId || request.user_id === userId)
     );
     delete serialized.projects;
   } else if (!isAdmin) {
     // Un miembro normal solo ve sus propias solicitudes.
     serialized.requests = (serialized.requests || []).filter(
-      request => request.user_id === userId
+      request => (request.userId === userId || request.user_id === userId)
     );
   }
+
+  const userPendingRequest = (serialized.requests || []).find(
+    request => (request.userId === userId || request.user_id === userId) && request.status === 'pending'
+  );
 
   serialized.currentUserMembership = membership
     ? { role: membership.role, joined_at: membership.joinedAt }
@@ -175,6 +180,8 @@ export const getGroup = asyncHandler(async (req, res) => {
   serialized.isMember = isMember;
   serialized.isAdmin = isAdmin;
   serialized.isOwner = isOwner;
+  serialized.hasPendingRequest = Boolean(userPendingRequest);
+  serialized.currentUserRequest = userPendingRequest || null;
 
   res.json({ group: serialized });
 });
@@ -439,6 +446,22 @@ export const getGroupRequests = asyncHandler(async (req, res) => {
   });
 
   res.json({ requests: requests.map(serializeGroupRequest) });
+});
+
+// GET /api/groups/:id/my-request
+export const getMyGroupRequest = asyncHandler(async (req, res) => {
+  const { id } = req.validated.params;
+  const userId = req.user.id;
+
+  const request = await prisma.groupRequest.findFirst({
+    where: { groupId: id, userId, status: 'pending' },
+    orderBy: { requestedAt: 'desc' }
+  });
+
+  res.json({
+    request: serializeGroupRequest(request),
+    hasPendingRequest: Boolean(request)
+  });
 });
 
 // GET /api/groups/:id/projects

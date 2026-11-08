@@ -7,6 +7,7 @@ import { EmptyState, Avatar, GroupAvatar, Icon, Modal } from '../components/comm
 import ProjectCard from '../components/ProjectCard.jsx';
 import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
+import { getGroupById, getGroupRequestStatus } from '../lib/api/groups.js';
 
 function memberFor(group, userId) {
   return group.members?.find(m => m.userId === userId) || null;
@@ -91,7 +92,10 @@ function GroupsDirectory() {
         <div className="groups-grid">
           {groups.map(group => {
             const membership = memberFor(group, user.id);
-            const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
+            const pending = Boolean(
+              group.hasPendingRequest ||
+              group.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
+            );
             return (
               <article className="group-card" key={group.id}>
                 <div className="group-card-header">
@@ -131,13 +135,31 @@ function GroupsDirectory() {
                     <button className="btn btn-ghost btn-sm" onClick={() => open(group)}>
                       Ver grupo
                     </button>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      disabled={pending}
-                      onClick={() => handleRequest(group.id)}
-                    >
-                      {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
-                    </button>
+                    {pending ? (
+                      <span
+                        className="project-status status-in-progress"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontSize: '0.78rem',
+                          padding: '0.35rem 0.65rem',
+                          borderRadius: '4px',
+                          cursor: 'default',
+                          userSelect: 'none'
+                        }}
+                        role="status"
+                      >
+                        <Icon name="clock" size={13} /> Solicitud pendiente
+                      </span>
+                    ) : (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleRequest(group.id)}
+                      >
+                        Solicitar acceso
+                      </button>
+                    )}
                   </div>
                 )}
               </article>
@@ -163,7 +185,10 @@ function GroupsDirectory() {
 
 function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onRequest }) {
   const membership = memberFor(group, currentUser?.id);
-  const pending = group.requests?.some(r => r.userId === currentUser?.id && r.status === 'pending');
+  const pending = Boolean(
+    group.hasPendingRequest ||
+    group.requests?.some(r => (r.userId === currentUser?.id || r.user_id === currentUser?.id) && r.status === 'pending')
+  );
   const owner = users.find(u => u.id === group.ownerId) || (group.members?.[0] ? users.find(u => u.id === group.members[0].userId) : null);
 
   return (
@@ -269,17 +294,36 @@ function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onR
               >
                 Ver grupo
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={pending}
-                onClick={() => {
-                  onRequest(group.id);
-                  onClose();
-                }}
-              >
-                {pending ? 'Solicitud enviada' : 'Solicitar acceso al grupo'}
-              </button>
+              {pending ? (
+                <span
+                  className="project-status status-in-progress"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.5rem 0.95rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    cursor: 'default',
+                    userSelect: 'none'
+                  }}
+                  role="status"
+                >
+                  <Icon name="clock" size={14} /> Solicitud pendiente
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    onRequest(group.id);
+                    onClose();
+                  }}
+                >
+                  Solicitar acceso al grupo
+                </button>
+              )}
             </>
           )}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -322,9 +366,30 @@ function PublicGroupPreview({ group, owner, memberCount, pending, onRequest, onB
           envía una solicitud y espera la aprobación de un administrador.
         </p>
         <div className="group-public-actions">
-          <button className="btn btn-primary" disabled={pending} onClick={onRequest}>
-            {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
-          </button>
+          {pending ? (
+            <span
+              className="project-status status-in-progress"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.55rem 1.15rem',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                cursor: 'default',
+                userSelect: 'none'
+              }}
+              role="status"
+              aria-live="polite"
+            >
+              <Icon name="clock" size={16} /> Solicitud pendiente
+            </span>
+          ) : (
+            <button className="btn btn-primary" onClick={onRequest}>
+              Solicitar acceso
+            </button>
+          )}
           <button className="btn btn-ghost" onClick={onBack}>Volver a grupos</button>
         </div>
       </div>
@@ -336,18 +401,66 @@ function GroupWorkspace({ groupId }) {
   const {
     user, users, groups, projects, activeGroup, selectGroup,
     decideGroupRequest, setGroupMemberRole, updateGroup, deleteGroup, removeGroupMember,
-    requestToJoinGroup, sendInvite, lang, t
+    requestToJoinGroup, sendInvite, lang, t, setGroups
   } = useApp();
   const { openCreate } = useModals();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const group = groups.find(g => g.id === groupId);
-  const membership = group && memberFor(group, user.id);
+  const [groupDetail, setGroupDetail] = useState(null);
+  const [requestStatus, setRequestStatus] = useState(null);
+  const [loadingBackend, setLoadingBackend] = useState(false);
+
+  // Recargar el grupo y el estado de la solicitud desde el backend al abrir/reabrir la página
+  useEffect(() => {
+    let isCancelled = false;
+    async function loadGroupAndRequestState() {
+      if (!groupId) return;
+      try {
+        setLoadingBackend(true);
+        const [freshGroup, reqStatus] = await Promise.all([
+          getGroupById(groupId).catch(() => null),
+          getGroupRequestStatus(groupId).catch(() => null)
+        ]);
+        if (isCancelled) return;
+        if (freshGroup) {
+          setGroupDetail(freshGroup);
+          if (setGroups) {
+            setGroups(prev => {
+              const idx = prev.findIndex(g => g.id === groupId);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = { ...next[idx], ...freshGroup };
+                return next;
+              }
+              return [...prev, freshGroup];
+            });
+          }
+        }
+        if (reqStatus) {
+          setRequestStatus(reqStatus);
+        }
+      } catch (err) {
+        console.warn('[GroupWorkspace] Error recargando estado de grupo/solicitud:', err);
+      } finally {
+        if (!isCancelled) setLoadingBackend(false);
+      }
+    }
+    loadGroupAndRequestState();
+    return () => { isCancelled = true; };
+  }, [groupId, setGroups]);
+
+  const baseGroup = groups.find(g => g.id === groupId);
+  const group = groupDetail ? { ...baseGroup, ...groupDetail } : baseGroup;
+  const membership = group && memberFor(group, user?.id);
   const isOwner = group?.ownerId === user?.id;
   const isAdmin = membership?.role === 'owner' || membership?.role === 'admin';
-  const hasPendingRequest = !!group?.requests?.some(r => r.userId === user.id && r.status === 'pending');
+  const hasPendingRequest = Boolean(
+    requestStatus?.hasPendingRequest ||
+    group?.hasPendingRequest ||
+    group?.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
+  );
 
   const requestedTab = searchParams.get('tab') || (isOwner ? 'overview' : 'projects');
   const activeTab = requestedTab === 'overview' && !isOwner ? 'projects' : requestedTab;
@@ -411,7 +524,23 @@ function GroupWorkspace({ groupId }) {
 
   if (!membership) {
     const handleJoinRequest = async () => {
-      await requestToJoinGroup(group.id);
+      const res = await requestToJoinGroup(group.id);
+      setRequestStatus({ hasPendingRequest: true, request: res });
+      setGroupDetail(prev => ({
+        ...(prev || group),
+        hasPendingRequest: true,
+        requests: [
+          ...((prev || group)?.requests || []),
+          {
+            id: (typeof res === 'object' && res?.id) ? res.id : 'temp-' + Date.now(),
+            groupId: group.id,
+            userId: user?.id,
+            user_id: user?.id,
+            status: 'pending',
+            requestedAt: new Date().toISOString()
+          }
+        ]
+      }));
     };
 
     return (

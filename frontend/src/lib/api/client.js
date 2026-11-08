@@ -173,6 +173,7 @@ export const api = {
     join: (id) => request(`/groups/${id}/join`, { method: 'POST' }),
     decideRequest: (id, requestId, accepted) => request(`/groups/${id}/requests/${requestId}`, { method: 'PUT', body: JSON.stringify({ accepted }) }),
     requests: (id) => request(`/groups/${id}/requests`),
+    myRequest: (id) => request(`/groups/${id}/my-request`),
     projects: (id, params = {}) => request(`/groups/${id}/projects?${new URLSearchParams(params)}`),
     createProject: (id, data) => request(`/groups/${id}/projects`, { method: 'POST', body: JSON.stringify(data) })
   },

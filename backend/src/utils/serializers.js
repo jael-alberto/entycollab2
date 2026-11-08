@@ -233,6 +233,7 @@ export function serializeGroup(group, { memberCount } = {}) {
     result.requests = Array.isArray(group.requests)
       ? group.requests.map(serializeGroupRequest)
       : [];
+    result.has_pending_request = result.requests.some(r => r.status === 'pending');
   }
   if (has(group, 'projects')) {
     result.projects = Array.isArray(group.projects)
@@ -244,7 +245,8 @@ export function serializeGroup(group, { memberCount } = {}) {
     ownerId: 'owner_id',
     isPrivate: 'is_private',
     createdAt: 'created_at',
-    memberCount: 'member_count'
+    memberCount: 'member_count',
+    hasPendingRequest: 'has_pending_request'
   });
 }
 

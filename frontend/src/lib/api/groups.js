@@ -27,8 +27,21 @@ export async function getGroupById(id) {
     const { group } = await api.groups.get(id);
     return group;
   } catch (error) {
-    if (error.message.includes('404')) return null;
+    if (error.message && error.message.includes('404')) return null;
     throw new Error(handleApiError(error, 'Error cargando grupo'));
+  }
+}
+
+export async function getGroupRequestStatus(groupId) {
+  try {
+    const data = await api.groups.myRequest(groupId);
+    return {
+      request: data?.request || null,
+      hasPendingRequest: Boolean(data?.hasPendingRequest || data?.request)
+    };
+  } catch (error) {
+    console.warn('[groups API] Error consultando solicitud de usuario:', error);
+    return { request: null, hasPendingRequest: false };
   }
 }
 
@@ -91,10 +104,10 @@ export async function requestToJoinGroup(groupId) {
     const { request } = await api.groups.join(groupId);
     return request;
   } catch (error) {
-    if (error.code === 'CONFLICT' || /ya eres miembro|solicitud pendiente/i.test(error.message)) {
-      if (/pendiente/i.test(error.message)) throw new Error('pending');
-      throw new Error('member');
-    }
+    const msg = error?.message || '';
+    if (error?.code === 'CONFLICT' && /pendiente|pending/i.test(msg)) return 'pending';
+    if (/pendiente/i.test(msg) || msg.toLowerCase().includes('pending')) return 'pending';
+    if (error?.code === 'CONFLICT' || /ya eres miembro/i.test(msg)) return 'member';
     throw new Error(handleApiError(error, 'Error solicitando ingreso'));
   }
 }

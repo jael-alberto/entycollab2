@@ -65,7 +65,10 @@ export const searchProfiles = asyncHandler(async (req, res) => {
         { bio: { path: ['en'], string_contains: q, mode: 'insensitive' } }
       ]
     },
-    take: Number(limit)
+    // `limit` llega como número gracias a schemas.searchProfiles (Zod).
+    // No volver a convertir directamente una entrada de la solicitud evita
+    // que un parámetro manipulado cambie de tipo antes de llegar a Prisma.
+    take: limit
   });
 
   res.json({ data: data.map(profile => serializeProfile(profile)) });
