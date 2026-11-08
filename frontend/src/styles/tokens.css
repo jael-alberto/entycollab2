@@ -1,8 +1,16 @@
 /* ==========================================================================
-   DESIGN TOKENS — ENTYCOLLAB (Agente A: tokens + base UI)
-   Light-first: el modo CLARO es el default. El modo oscuro es opt-in y solo
-   se activa con la clase `dark` en <html> (`:root.dark`), vía el toggle de
-   AppContext (theme=false → light, theme=true → dark).
+   DESIGN TOKENS — ENTYTEC COLLAB
+   Tema por defecto: GRAFITO OSCURO + NARANJA.
+
+   Este archivo es la ÚNICA fuente de tokens del proyecto. `styles.css` ya no
+   define su propio `:root` (ver nota al pie de ese archivo).
+
+   - `:root`        -> tema oscuro (base). Es lo que se pinta en el primer
+                       frame, así que no hay flash de tema claro.
+   - `:root.light`  -> tema claro opcional (toggle del shell).
+   - `:root.dark`   -> alias explícito del tema oscuro. Se mantiene porque
+                       styles.css contiene overrides `:root.dark <selector>`
+                       (p.ej. el bloque de auth) que deben seguir aplicando.
 
    Importar ANTES que styles.css (ver src/main.jsx):
      import './styles/tokens.css';
@@ -12,63 +20,74 @@
 :root {
   /* ---- Marca naranja ----------------------------------------------------
      REGLA DE USO (accesibilidad):
-     - brand-500 (#F97316): SOLO como fondo de CTA con texto blanco, bold y
-       GRANDE (≥18px bold / ≥24px regular). Ratio blanco/#F97316 = 2.80:1
-       (no llega a AA ni siquiera para texto grande: el umbral large es 3:1).
-       Por eso el hover del CTA oscurece a brand-600 (#EA580c, 3.56:1, sí
-       pasa AA-large) y el texto del CTA siempre es bold + grande.
-     - brand-700 (#C2410C) y brand-ink (#9A3412): ÚNICOS tonos naranja
-       permitidos para TEXTO sobre fondo claro (pasan WCAG AA 4.5:1).
-     - NUNCA usar #F97316 / #FB923C / #EA580C como color de texto normal.
+     - brand-500 (#E8541F): SOLO como fondo de CTA con texto blanco, bold y
+       GRANDE (>=18px bold / >=24px regular). El hover oscurece a brand-600
+       (#CE4415) y el texto del CTA siempre es bold + grande.
+     - brand-700 (#C2410C) / brand-ink (#9A3412): únicos tonos permitidos
+       para TEXTO naranja sobre fondo claro.
+     - En oscuro, el acento legible es #FB923C (accent).
   ------------------------------------------------------------------------ */
-  --color-brand-500: #F97316; /* CTA bg only. Blanco encima: 2.80:1 (solo texto grande bold + hover a 600) */
-  --color-brand-600: #EA580C; /* Hover de CTA. Blanco encima: 3.56:1 (pasa AA texto grande ≥3:1) */
-  --color-brand-700: #C2410C; /* Texto naranja sobre claro: 5.18:1 — PASA AA (≥4.5:1) */
-  --color-brand-ink: #9A3412; /* Texto naranja sobre claro: 7.31:1 — PASA AA/AAA */
+  --color-brand-500: #E8541F; /* fondo de CTA */
+  --color-brand-600: #CE4415; /* hover de CTA */
+  --color-brand-700: #C2410C; /* texto naranja (modo claro) */
+  --color-brand-ink: #9A3412; /* texto naranja fuerte (modo claro) */
 
-  /* ---- Superficies claras ------------------------------------------------ */
-  --color-bg: #FFFFFF;
-  --color-bg-alt: #FAFAF9;
-  --color-surface: #FFFFFF;
-  --color-surface-raised: #FFF7ED; /* tint cálido, solo para realzar */
-  --color-surface-hover: #FFF7ED;
+  /* ---- Superficies (grafito) ---------------------------------------------
+     El fondo es MÁS OSCURO que las superficies: la separación se consigue
+     por diferencia de luminosidad entre capas (bg -> surface -> raised),
+     no por un borde tenue. Antes bg #0F1117 / surface #171A22 (2% de delta)
+     hacian que todo se leyera como un solo bloque plano. */
+  --color-bg: #0A0C11;
+  --color-bg-alt: #0F1218;
+  --color-bg-translucent: rgba(10, 12, 17, .92);
+  --color-surface: #171B24;
+  --color-surface-raised: #1F242F;
+  --color-surface-hover: #272D3A;
 
-  /* ---- Texto sobre claro (ratios verificados sobre #FFFFFF) --------------- */
-  --color-text-main: #1C1917;  /* 17.49:1 — PASA AAA */
-  --color-text-muted: #57534E; /* 7.63:1 — PASA AAA */
-  --color-text-light: #44403C; /* ~10.4:1 — PASA AAA */
-  --color-text-dim: #A8A29E;   /* ~2.5:1 — SOLO decorativo/placeholders, nunca texto informativo */
+  /* ---- Texto sobre oscuro ------------------------------------------------ */
+  --color-text-main: #F4F5F7;  /* 17.4:1 — AAA */
+  --color-text-muted: #A9B0BD; /* 8.4:1  — AA (incluso AAA en cuerpo) */
+  --color-text-light: #CFD4DC; /* 12.6:1 — AAA */
+  --color-text-dim: #89919E;   /* 5.6:1  — texto secundario real */
 
-  /* ---- Bordes claros ------------------------------------------------------ */
-  --color-border: #E7E5E4;
-  --color-border-light: #FED7AA; /* acento cálido para borde de CTA/realces */
+  /* ---- Bordes ------------------------------------------------------------- */
+  --color-border: #2C3342;
+  --color-border-light: #3E4759;
+
+  /* ---- Chips (metadatos compactos) ---------------------------------------- */
+  --color-chip-bg: rgba(255, 255, 255, .045);
+  --color-chip-border: #333B4B;
 
   /* ---- Foco visible (único glow permitido) -------------------------------- */
   --focus-ring-width: 2px;
-  --color-focus: #C2410C; /* anillo visible sobre claro, 5.18:1 */
-  --shadow-focus: 0 0 0 3px rgba(194, 65, 12, 0.28);
+  --color-focus: #FB923C;
+  --shadow-focus: 0 0 0 3px rgba(251, 146, 60, 0.35);
 
-  /* ---- Semáforo (fondos suaves + texto oscuro propio, no naranja) --------- */
-  --color-success: #16A34A;
-  --color-success-ink: #15803D;
-  --color-warning: #B45309; /* oscurecido desde #F59E0B para pasar AA sobre claro */
-  --color-warning-ink: #92400E;
-  --color-danger: #DC2626;
-  --color-danger-ink: #B91C1C;
-  --color-info: #1D4ED8; /* oscurecido desde #2563EB para pasar AA sobre claro */
-  --color-info-ink: #1E40AF;
+  /* ---- Semáforo ----------------------------------------------------------- */
+  --color-success: #22C55E;
+  --color-success-ink: #86EFAC;
+  --color-warning: #F59E0B;
+  --color-warning-ink: #FCD34D;
+  --color-danger: #EF4444;
+  --color-danger-ink: #FCA5A5;
+  --color-info: #60A5FA;
+  --color-info-ink: #93C5FD;
 
-  /* ---- Tipografía (Inter) -------------------------------------------------- */
-  --font-primary: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* ---- Tipografía ---------------------------------------------------------
+     Workspace / UI: Manrope. Titulares: Bricolage Grotesque.
+     Etiquetas pequeñas: JetBrains Mono. Fuentes autoalojadas en /fonts.
+  -------------------------------------------------------------------------- */
+  --font-primary: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Manrope', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --text-display-xl: 40px;  /* hero / display */
-  --text-display-lg: 32px;  /* h1 */
-  --text-display-md: 24px;  /* h2 */
-  --text-display-sm: 18px;  /* h3 / CTA text mínimo */
-  --text-body: 15px;
-  --text-body-sm: 13px;
-  --text-caption: 12px;
+  --text-display-xl: 40px;
+  --text-display-lg: 32px;
+  --text-display-md: 24px;
+  --text-display-sm: 18px;
+  --text-body: 16px;
+  --text-body-sm: 14px;
+  --text-caption: 13px;
   --text-mono: 12px;
 
   --leading-tight: 1.2;
@@ -83,54 +102,118 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  /* ---- Radios --------------------------------------------------------------- */
+  /* ---- Radios -------------------------------------------------------------- */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-full: 999px;
 
-  /* ---- Sombras sutiles (SIN glow; el único resplandor vive en :focus) ------- */
-  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.06);
-  --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.08);
-  --shadow-lg: 0 12px 32px rgba(28, 25, 23, 0.12);
-  /* NOTA: --shadow-glow se eliminó a propósito. No reintroducir salvo foco. */
+  /* ---- Sombras (sin glow; el único resplandor vive en :focus) -------------- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.55);
 
   --transition: all 0.25s ease;
+
+  /* ---- Motion: curvas con pegada (Emil). ease-out = entrar/responder,
+         ease-in-out = mover en pantalla. UI siempre < 300ms. ----------------- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
   /* ---- Aliases legacy (los usa styles.css / componentes existentes) --------- */
   --color-primary: var(--color-brand-500);
   --color-primary-light: #FB923C; /* solo fondos/gradientes, NUNCA texto */
   --color-primary-dark: var(--color-brand-600);
   --color-primary-deep: var(--color-brand-700);
-  --color-accent: var(--color-brand-700); /* links/texto acento: AA seguro */
-  --color-accent-soft: var(--color-surface-raised);
-  --color-accent-border: var(--color-border-light);
-  --color-label-strong: var(--color-text-main);
+  --color-primary-glow: rgba(232, 84, 31, 0.4); /* SOLO anillos de foco */
+  --color-accent: #FB923C; /* acento legible sobre grafito */
+  --color-accent-soft: #2A1F17; /* relleno cálido de acento */
+  --color-accent-border: #5C3A1E;
+  --color-label-strong: #FFFFFF;
   --color-star: #FBBF24;
+  --color-star-empty: #5B5B66;
+}
+
+/* ==========================================================================
+   MODO CLARO (opt-in) — se activa con <html class="light">.
+   ========================================================================== */
+:root.light {
+  --color-brand-500: #E8541F;
+  --color-brand-600: #CE4415;
+  --color-brand-700: #C2410C;
+  --color-brand-ink: #9A3412;
+
+  --color-bg: #FFFFFF;
+  --color-bg-alt: #F7F8FA;
+  --color-bg-translucent: rgba(255, 255, 255, .92);
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #F4F6F8;
+  --color-surface-hover: #ECEEF2;
+
+  --color-text-main: #1C1917;  /* 17.49:1 — AAA */
+  --color-text-muted: #565B66; /* 7.1:1  — AAA */
+  --color-text-light: #44403C; /* ~10.4:1 — AAA */
+  --color-text-dim: #858B96;   /* ~3.6:1 — texto secundario real */
+
+  --color-border: #E3E6EB;
+  --color-border-light: #C9CFD8;
+
+  --color-chip-bg: rgba(15, 17, 23, .04);
+  --color-chip-border: #DFE3E9;
+
+  --color-focus: #C2410C;
+  --shadow-focus: 0 0 0 3px rgba(194, 65, 12, 0.28);
+
+  --color-success: #16A34A;
+  --color-success-ink: #15803D;
+  --color-warning: #B45309;
+  --color-warning-ink: #92400E;
+  --color-danger: #DC2626;
+  --color-danger-ink: #B91C1C;
+  --color-info: #1D4ED8;
+  --color-info-ink: #1E40AF;
+
+  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.06);
+  --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.08);
+  --shadow-lg: 0 12px 32px rgba(28, 25, 23, 0.12);
+
+  --color-primary-glow: rgba(249, 115, 22, 0.35);
+  --color-accent: var(--color-brand-700); /* texto acento AA sobre claro */
+  --color-accent-soft: #FFF7ED;
+  --color-accent-border: #FED7AA;
+  --color-label-strong: #1C1917;
   --color-star-empty: #E7E5E4;
 }
 
 /* ==========================================================================
-   MODO OSCURO (opt-in): solo con <html class="dark"> vía toggleTheme().
-   Sin la clase, el primer paint siempre es claro.
+   ALIAS EXPLÍCITO DEL TEMA OSCURO
+   `:root` ya trae los valores oscuros; este bloque los repite para que los
+   overrides `:root.dark <selector>` de styles.css (auth, switches, etc.)
+   sigan aplicando sin reescribirlos.
    ========================================================================== */
 :root.dark {
-  --color-bg: #101014;
-  --color-bg-alt: #17171D;
-  --color-surface: #1B1B22;
-  --color-surface-raised: #22222B;
-  --color-surface-hover: #2D2D38;
+  --color-bg: #0A0C11;
+  --color-bg-alt: #0F1218;
+  --color-bg-translucent: rgba(10, 12, 17, .92);
+  --color-surface: #171B24;
+  --color-surface-raised: #1F242F;
+  --color-surface-hover: #272D3A;
 
-  --color-text-main: #F5F5F4;
-  --color-text-muted: #A8A29E;
-  --color-text-light: #E7E5E4;
-  --color-text-dim: #7C7877;
+  --color-text-main: #F4F5F7;
+  --color-text-muted: #A9B0BD;
+  --color-text-light: #CFD4DC;
+  --color-text-dim: #89919E;
 
-  --color-border: #33333D;
-  --color-border-light: #45454F;
+  --color-border: #2C3342;
+  --color-border-light: #3E4759;
 
-  --color-accent: #FB923C; /* sobre oscuro sí contrasta */
+  --color-chip-bg: rgba(255, 255, 255, .045);
+  --color-chip-border: #333B4B;
+
+  --color-accent: #FB923C;
+  --color-accent-soft: #2A1F17;
+  --color-accent-border: #5C3A1E;
   --color-focus: #FB923C;
   --shadow-focus: 0 0 0 3px rgba(251, 146, 60, 0.35);
 

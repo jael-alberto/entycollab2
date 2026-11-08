@@ -15,7 +15,11 @@ export const STORAGE_KEYS = {
   currentUser: 'devcollab_current_user',
   activeGroup: 'devcollab_active_group',
   theme: 'devcollab_theme',
-  lang: 'devcollab_lang'
+  lang: 'devcollab_lang',
+  // Preferencia de idioma EXPLICITA. La clave `lang` anterior guardaba el
+  // idioma detectado del navegador, asi que un 'en' auto-detectado dejaba el
+  // workspace entero en ingles. Solo cuenta lo que el usuario elige.
+  langPref: 'devcollab_lang_pref'
 };
 
 export function getData(key) {
@@ -121,7 +125,7 @@ export function generateId() {
 }
 
 export function getTheme() {
-  return localStorage.getItem(STORAGE_KEYS.theme) === 'dark';
+  return localStorage.getItem(STORAGE_KEYS.theme) !== 'light';
 }
 
 export function setTheme(dark) {
@@ -129,11 +133,11 @@ export function setTheme(dark) {
 }
 
 export function getLang() {
-  return localStorage.getItem(STORAGE_KEYS.lang) || (navigator.language.startsWith('en') ? 'en' : 'es');
+  return localStorage.getItem(STORAGE_KEYS.langPref) === 'en' ? 'en' : 'es';
 }
 
 export function setLang(lang) {
-  localStorage.setItem(STORAGE_KEYS.lang, lang);
+  localStorage.setItem(STORAGE_KEYS.langPref, lang);
 }
 
 // ==========================================================================
@@ -304,9 +308,9 @@ function completedRuns() {
           en: 'Demo project already finished. It only exists to give volume to the person\'s history so the completed-projects facet has results.'
         },
         minRating: 1,
-        deadline: null,
-        repo: null,
-        image: null,
+      deadline: null,
+      repo: null,
+      image: '/img/games/aetheria.jpg',
         status: 'completed',
         createdAt: '2026-03-10T10:00:00Z'
       });
@@ -1049,8 +1053,8 @@ export function seedCarlosGroups() {
         description: { es: 'Pipeline CI/CD para builds automáticos de todos los proyectos', en: 'CI/CD pipeline for automated builds of all projects' },
         minRating: 1,
         deadline: '2026-11-30',
-        repo: 'https://github.com/carlos/build-system',
-        image: null,
+      repo: 'https://github.com/carlos/build-system',
+      image: '/img/games/valhalla.jpg',
         roles: ['DevOps'],
         status: 'completed'
       }
@@ -1106,9 +1110,9 @@ export function seedCarlosGroups() {
         tech: ['Node.js', 'Firebase', 'Redis', 'WebSocket'],
         description: { es: 'Sistema unificado de notificaciones para web y móvil', en: 'Unified notification system for web and mobile' },
         minRating: 2,
-        deadline: '2026-12-01',
-        repo: null,
-        image: null,
+      deadline: '2026-12-01',
+      repo: null,
+      image: '/img/games/neon-drifter.jpg',
         roles: ['Backend', 'Mobile'],
         status: 'completed'
       }
@@ -1169,8 +1173,8 @@ export function seedCarlosGroups() {
         description: { es: 'Librería para networking fácil en juegos indie', en: 'Easy networking library for indie games' },
         minRating: 3,
         deadline: '2027-02-01',
-        repo: 'https://github.com/carlos/net-lib',
-        image: null,
+      repo: 'https://github.com/carlos/net-lib',
+      image: '/img/games/voxelforge.jpg',
         roles: ['Network Programmer', 'Backend', 'Testing'],
         status: 'open'
       },

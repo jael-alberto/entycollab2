@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Modal, EmptyState } from '../components/common.jsx';
+import { EmptyState, Icon, Modal } from '../components/common.jsx';
 import { escapeHTML, userCategories } from '../lib/helpers.js';
 import { availablePeopleCategoriesList, availablePeopleTechList } from '../lib/filters.js';
 import {
@@ -31,7 +31,7 @@ function OptionGrid({ options, selected, onToggle, renderLabel }) {
             className={'featured-proj-card' + (selectedNow ? ' selected' : '')}
             onClick={() => onToggle(value)}
           >
-            <span className="featured-proj-tick">{selectedNow ? '★' : '☆'}</span>
+            <span className="featured-proj-tick">{selectedNow ? <Icon name="star" size={14} /> : <Icon name="star" size={14} cls="is-empty" />}</span>
             <span className="featured-proj-title">{escapeHTML(renderLabel ? renderLabel(opt) : value)}</span>
           </button>
         );

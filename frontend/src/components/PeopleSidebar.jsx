@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
+import { useLeaveTransition } from '../lib/useLeaveTransition.js';
 import {
   COMPLETED_BUCKETS,
   DISCIPLINES,
@@ -18,6 +19,10 @@ const PREVIEW = 8;
 // aria-controls para que el teclado y el lector sepan qué pasa.
 function Facet({ id, title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
+  // Solo se anima tras una accion del usuario: en el primer render las
+  // facetas abiertas por defecto no deben entrar con un fade.
+  const [toggled, setToggled] = useState(false);
+  const { leaving, close } = useLeaveTransition(open, () => setOpen(false), 180);
   const bodyId = `${id}-body`;
   return (
     <section className="facet" aria-labelledby={`${id}-title`}>
@@ -27,13 +32,17 @@ function Facet({ id, title, children, defaultOpen = true }) {
         id={`${id}-title`}
         aria-expanded={open}
         aria-controls={bodyId}
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          setToggled(true);
+          if (open) close();
+          else setOpen(true);
+        }}
       >
         <span className="facet-title">{title}</span>
         <span className="facet-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
       </button>
-      {open && (
-        <div className="facet-body" id={bodyId} role="group" aria-label={title}>
+      {(open || leaving) && (
+        <div className={`facet-body${toggled ? ' facet-body--anim' : ''}${leaving ? ' is-leaving' : ''}`} id={bodyId} role="group" aria-label={title}>
           {children}
         </div>
       )}
@@ -116,7 +125,7 @@ export function TalentFacets({ filters, counts, onChange }) {
 
   return (
     <>
-      <Facet id="facet-gametypes" title={t('filters.gameTypes')}>
+      <Facet id="facet-gametypes" title={t('people.facetGameTypes')}>
         <OptionList
           options={GAME_TYPES}
           selected={filters.gameTypes}
@@ -126,7 +135,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet id="facet-languages" title={t('filters.languages')}>
+      <Facet id="facet-languages" title={t('people.facetEngines')}>
         {filters.gameTypes.length === 0 && (
           <p className="facet-hint">{t('filters.languagesHint')}</p>
         )}
@@ -138,7 +147,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet id="facet-genres" title={t('filters.favoriteGenres')}>
+      <Facet id="facet-genres" title={t('people.facetGenres')}>
         <OptionList
           options={FAVORITE_GENRES}
           selected={filters.favoriteGenres}
@@ -148,7 +157,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet id="facet-disciplines" title={t('filters.disciplines')}>
+      <Facet id="facet-disciplines" title={t('people.facetSkills')}>
         <OptionList
           options={DISCIPLINES}
           selected={filters.disciplines}
@@ -158,7 +167,7 @@ export function TalentFacets({ filters, counts, onChange }) {
         />
       </Facet>
 
-      <Facet id="facet-completed" title={t('filters.completed')}>
+      <Facet id="facet-completed" title={t('people.facetCompleted')}>
         <div className="facet-options">
           {COMPLETED_BUCKETS.map(min => (
             <FacetOption
@@ -172,12 +181,12 @@ export function TalentFacets({ filters, counts, onChange }) {
         </div>
       </Facet>
 
-      <Facet id="facet-rating" title={t('filters.rating')} defaultOpen={false}>
+      <Facet id="facet-rating" title={t('people.facetRating')} defaultOpen={false}>
         <div className="facet-options">
           {RATING_BUCKETS.map(min => (
             <FacetOption
               key={min}
-              label={min === 0 ? t('filters.noRating') : `★ ${min}+`}
+              label={min === 0 ? t('filters.noRating') : `${min}+`}
               count={counts.rating[min] || 0}
               checked={filters.rating.includes(min)}
               onChange={() => toggle('rating', min)}
@@ -198,16 +207,15 @@ export default function PeopleSidebar({ filters, counts, shown, total, onChange 
     <aside className="people-sidebar" aria-label={t('people.filters')}>
       <div className="people-sidebar-head">
         <h3 className="people-sidebar-title">{t('people.filters')}</h3>
-        {activeCount > 0 && (
-          <button
-            type="button"
-            className="people-sidebar-clear"
-            onClick={() => onChange(emptyFilters())}
-            aria-label={`${t('people.clearAll')} (${activeCount})`}
-          >
-            {t('people.clearAll')}
-          </button>
-        )}
+        <button
+          type="button"
+          className="people-sidebar-clear"
+          onClick={() => onChange(emptyFilters())}
+          disabled={activeCount === 0}
+          aria-label={activeCount > 0 ? `${t('people.clearAll')} (${activeCount})` : t('people.clearAll')}
+        >
+          {t('people.clearAll')}
+        </button>
       </div>
 
       <TalentFacets filters={filters} counts={counts} onChange={onChange} />

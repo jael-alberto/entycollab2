@@ -152,8 +152,11 @@ export function AppProvider({ children }) {
   }, []);
 
   // Aplica theme + lang al <html> (igual que applyTheme/applyLanguage del vanilla)
+  // `dark` y `light` son excluyentes: `dark` mantiene vivos los overrides
+  // `:root.dark <selector>` de styles.css; `light` restaura la paleta clara.
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme);
+    document.documentElement.classList.toggle('light', !theme);
   }, [theme]);
 
   // ========================================================================
