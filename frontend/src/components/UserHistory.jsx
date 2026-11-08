@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Icon, ProjectBanner, StatusPill } from './common.jsx';
+import { ProjectBanner, StatusPill } from './common.jsx';
 import { userHistoryItems, getStatusLabel, escapeHTML } from '../lib/helpers.js';
 
 // Historial de proyectos de un usuario (estilo userHistoryHTML del vanilla).
@@ -37,12 +37,12 @@ function HistoryRow({ it, isFeat, t, l10n, lang, onOpen }) {
       className={'history-item' + (isFeat ? ' featured' : '')}
       onClick={() => onOpen(it.p.id)}
       title={t('card.viewDetail')}
-      aria-label={`${title}: ${it.role}, ${it.statusText}`}
+      aria-label={`${title} — ${it.role}, ${it.statusText}`}
     >
       <ProjectBanner project={it.p} mode="thumb" />
       <div className="history-body">
         <span className="history-project-name">{escapeHTML(title)}</span>
-        {isFeat && <span className="history-featured-badge"><Icon name="star" size={11} />{t('history.featured')}</span>}
+        {isFeat && <span className="history-featured-badge">{t('history.featured')}</span>}
         <span className="history-role">{it.role} · {it.statusText}</span>
       </div>
       <StatusPill status={it.p.status} label={getStatusLabel(lang, it.p.status)} />

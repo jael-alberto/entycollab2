@@ -50,9 +50,9 @@ export default function PeopleDirectory() {
 
   const chips = useMemo(() => activeChips(filters, lang), [filters, lang]);
 
-  // El contador de proyectos de la tarjeta sale siempre del store: es el dato
-  // que hace decidir junto a la valoracion.
-  const showCompleted = true;
+  // El contador de proyectos de la tarjeta solo sale cuando se está
+  // mirando esa faceta: con el filtro de historial marcado o con una búsqueda.
+  const showCompleted = filters.completed.length > 0 || search.trim() !== '';
 
   // Qué etiquetas se revelan en cada tarjeta: solo las opciones que esa
   // persona tiene y que coinciden con los filtros o con lo escrito.
@@ -95,8 +95,7 @@ export default function PeopleDirectory() {
 
   return (
     <>
-      {/* ====== BUSCADOR + ORDEN ====== */}
-      <div className="people-searchbar">
+      {/* ====== BÚSQUEDA ====== */}
       <div className="people-search" role="search">
         <label className="b2-visually-hidden" htmlFor="people-search-input">
           {t('people.searchPh')}
@@ -118,21 +117,6 @@ export default function PeopleDirectory() {
         )}
       </div>
 
-        <label className="people-sort" htmlFor="people-sort-select">
-          <span className="b2-visually-hidden">{t('people.sortLabel')}</span>
-          <select
-            id="people-sort-select"
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            aria-label={t('people.sortLabel')}
-          >
-            {SORT_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       <div className="people-layout">
         <PeopleSidebar
           filters={filters}
@@ -145,20 +129,31 @@ export default function PeopleDirectory() {
         <div className="people-results">
           <div className="people-results-head">
             <p className="people-results-count" aria-live="polite">
-              <b>{results.length}</b> {t('people.resultsTag')}
+              {resultsLabel}
               {totalPages > 1 && <span className="people-page-hint"> · {pageLabel}</span>}
             </p>
-            <span className="people-community-note">{t('people.community')}</span>
+            <label className="people-sort" htmlFor="people-sort-select">
+              <span>{t('people.sortLabel')}</span>
+              <select
+                id="people-sort-select"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                aria-label={t('people.sortLabel')}
+              >
+                {SORT_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {chips.length > 0 && (
             <div className="people-chips" role="group" aria-label={t('people.filters')}>
-              {chips.map((chip, i) => (
+              {chips.map(chip => (
                 <button
                   type="button"
                   key={`${chip.key}:${chip.value}`}
                   className="people-chip"
-                  style={{ '--i': i }}
                   onClick={() => removeChip(chip.key, chip.value)}
                   title={t('invite.cancel')}
                   aria-label={removeFilterLabel(chip)}
@@ -191,6 +186,7 @@ export default function PeopleDirectory() {
                     person={u}
                     me={user}
                     options={optionsByUser.get(u.id)}
+                    showCompleted={showCompleted}
                   />
                 ))}
               </div>
