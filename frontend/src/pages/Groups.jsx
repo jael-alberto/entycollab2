@@ -23,25 +23,15 @@ function GroupsDirectory() {
   const { user, users, groups, requestToJoinGroup, createGroup, selectGroup } = useApp();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedGroupModal, setSelectedGroupModal] = useState(null);
-
-  // El boton "+" de la barra lateral abre este modal via ?new=1.
-  const creating = searchParams.get('new') === '1';
-  const openCreate = () => setSearchParams({ new: '1' });
-  const closeCreate = () => {
-    setSearchParams({});
-    setName('');
-    setDescription('');
-  };
 
   const submit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     const group = createGroup({ name, description });
-    closeCreate();
     showToast('Grupo creado con éxito', 'success');
     navigate(`/grupos/${group.id}`);
   };
@@ -62,8 +52,6 @@ function GroupsDirectory() {
     }
   };
 
-  const projectCount = groupId => projects.filter(p => p.groupId === groupId).length;
-
   return (
     <div className="section-block groups-page">
       <div className="section-header-row">
@@ -71,11 +59,39 @@ function GroupsDirectory() {
           <h2 className="section-title">Grupos</h2>
           <p className="groups-intro">Espacios públicos para descubrir equipos. Cualquiera puede ver su información principal; para acceder a proyectos y miembros hay que solicitar entrada.</p>
         </div>
-        <button type="button" className="btn btn-primary groups-hero-action" onClick={openCreate}>
-          <Icon name="plus" size={16} />
-          Crear grupo
+        <button className="btn btn-primary" onClick={() => setCreating(v => !v)}>
+          {creating ? 'Cancelar' : 'Crear grupo'}
         </button>
-      </header>
+      </div>
+
+      {creating && (
+        <form className="group-create-form" onSubmit={submit}>
+          <div className="form-group">
+            <label htmlFor="group-name">Nombre del grupo</label>
+            <input
+              id="group-name"
+              required
+              maxLength="70"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Ej. Estudio Indie, Equipo de Producto..."
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="group-description">Descripción</label>
+            <textarea
+              id="group-description"
+              required
+              maxLength="260"
+              rows="3"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Qué proyectos desarrollan o cuál es el propósito de este equipo"
+            />
+          </div>
+          <button className="btn btn-primary" type="submit">Crear y acceder</button>
+        </form>
+      )}
 
       {groups.length === 0 ? (
         <EmptyState icon="users" title="Aún no hay grupos" sub="Crea el primero para empezar a colaborar con tu equipo." />

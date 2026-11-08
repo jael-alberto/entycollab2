@@ -1,19 +1,20 @@
 import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Avatar, Icon } from './common.jsx';
+import { Avatar, Stars } from './common.jsx';
 import {
   completedProjectsCount,
   userDisciplines,
   userLanguages
 } from '../lib/talent.js';
-import { getUserAvgRating, escapeHTML } from '../lib/helpers.js';
+import { getUserAvgRating, getUserRatingCount, escapeHTML } from '../lib/helpers.js';
 
-// Cuántas habilidades se muestran. El resto va en "+N" con la lista en el title.
+// Cuántas habilidades y etiquetas coincidentes se muestran. El resto va en
+// "+N" con la lista completa en el title.
 const MAX_SKILLS = 3;
 const MAX_MATCH_TAGS = 3;
 
-// Rol principal de la tarjeta. Se deriva de la primera disciplina del
-// usuario; si no tiene, no se muestra.
+// Rol principal de la tarjeta (badge estilo Wellfound). Se deriva de la
+// primera disciplina del usuario; si no tiene, no se muestra badge.
 const ROLE_SHORT = {
   es: {
     programming: 'Programador',
@@ -38,11 +39,18 @@ export function primaryRoleLabel(user, lang) {
   return map[disciplines[0]] || disciplines[0];
 }
 
-export default function PersonCard({ person, me, options }) {
-  const { ratings, projects, applications, lang, t, l10n } = useApp();
+// Tarjeta de talento (Upwork/Wellfound + ArtStation): avatar 44, nombre,
+// @usuario, badge de rol principal, punto de disponibilidad, valoración
+// ★ promedio (n reseñas) o "Sin valoraciones", N proyectos completados,
+// habilidades máx 3 + +N y CTAs Ver perfil / Invitar.
+// La lógica facetada no cambia: `options` sigue siendo lo que revela
+// talentSearch.revealedOptions y `showCompleted` lo decide PeopleDirectory.
+export default function PersonCard({ person, me, options, showCompleted: _showCompleted }) {
+  const { ratings, projects, applications, lang, t } = useApp();
   const { openUserDetail, openInvite } = useModals();
 
   const rating = getUserAvgRating(person.id, ratings);
+  const ratingCount = getUserRatingCount(person.id, ratings);
   const isSelf = me && person.id === me.id;
   const completed = completedProjectsCount(person.id, projects, applications);
   const role = primaryRoleLabel(person, lang);
@@ -57,49 +65,68 @@ export default function PersonCard({ person, me, options }) {
   const restTags = tags.length - shownTags.length;
   const allTagTitles = tags.map(o => o.text).join(', ');
 
-  const bio = person.bio ? l10n(person.bio) : '';
   const nameId = `person-name-${person.id}`;
 
   return (
     <article className="person-card person-card--talent" aria-labelledby={nameId}>
-      <div className="person-card-top">
+      <div className="person-card-head">
         <Avatar user={person} cls="person-avatar person-avatar-card" />
-        <button
-          type="button"
-          className="person-card-open"
-          onClick={() => openUserDetail(person.id)}
-          aria-label={`${isSelf ? t('person.viewMyProfile') : t('person.viewProfile')}: ${person.name}`}
-        >
-          <span aria-hidden="true">↗</span>
-        </button>
+        <div className="person-card-id">
+          <h3 className="person-name" id={nameId}>{escapeHTML(person.name)}</h3>
+          <div className="person-username">@{escapeHTML(person.username)}</div>
+          {role && <span className="person-role-badge">{escapeHTML(role)}</span>}
+        </div>
+        {person.available === true && !isSelf && (
+          <span className="person-avail" title={t('person.available')}>
+            <span className="person-avail-dot" aria-hidden="true" />
+            <span className="person-avail-text">{t('person.available')}</span>
+          </span>
+        )}
+        {isSelf && (
+          <span className="person-badge self">{t('person.you')}</span>
+        )}
       </div>
 
-      <h3 className="person-name" id={nameId}>{escapeHTML(person.name)}</h3>
-      <div className="person-username">@{escapeHTML(person.username)}</div>
+      <div className="person-card-metrics">
+        <span className="person-metric person-metric-rating">
+          {rating > 0 ? (
+            <>
+              <Stars rating={rating} />
+              {ratingCount > 0 && (
+                <span className="person-metric-count">({ratingCount})</span>
+              )}
+            </>
+          ) : (
+            <span className="person-metric-empty">{t('filters.noRating')}</span>
+          )}
+        </span>
+        {/* Proyectos completados siempre visibles: es el dato que hace
+            decidir junto a la valoración. `showCompleted` se conserva en la
+            firma por compatibilidad. */}
+        <span className="person-metric">
+          <span className="person-metric-value">{completed}</span>
+          <span className="person-metric-label">{t('profile.completedProjects')}</span>
+        </span>
+      </div>
 
-      {role && <p className="person-role">{escapeHTML(role)}</p>}
-
-      {person.available === true && !isSelf && (
-        <p className="person-avail">
-          <span className="person-avail-dot" aria-hidden="true" />
-          <span>{t('person.availableToCollab')}</span>
-        </p>
-      )}
-
-      {isSelf && <span className="person-badge self">{t('person.you')}</span>}
-
-      {bio && <p className="person-bio">{escapeHTML(bio)}</p>}
-
-      {(shownSkills.length > 0 || shownTags.length > 0) && (
-        <div className="person-skills">
+      {shownSkills.length > 0 && (
+        <div
+          className="person-skills"
+          aria-label={`${shownSkills.join(', ')}${restSkills.length > 0 ? `, +${restSkills.length}` : ''}`}
+        >
           {shownSkills.map(s => (
             <span key={s} className="tech-tag">{escapeHTML(s)}</span>
           ))}
-          {restSkills > 0 && (
-            <span className="tech-tag skill-more-tag" title={skills.join(', ')}>
-              +{restSkills}
+          {restSkills.length > 0 && (
+            <span className="tech-tag skill-more-tag" title={restSkills.join(', ')}>
+              +{restSkills.length}
             </span>
           )}
+        </div>
+      )}
+
+      {shownTags.length > 0 && (
+        <div className="person-tags">
           {shownTags.map(o => (
             <span key={`${o.key}:${o.value}`} className="person-chip" title={allTagTitles}>
               {escapeHTML(o.text)}
@@ -111,37 +138,25 @@ export default function PersonCard({ person, me, options }) {
         </div>
       )}
 
-      <div className="person-card-foot">
-        <div className="person-foot-stats">
-          <span className="person-rating">
-            <Icon name="star" size={13} />
-            <b>{rating > 0 ? rating.toFixed(1) : '—'}</b>
-          </span>
-          <span className="person-completed">
-            {completed} {t('people.completedProjects')}
-          </span>
-        </div>
-
-        <div className="person-actions">
+      <div className="person-actions">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => openUserDetail(person.id)}
+          aria-label={`${isSelf ? t('person.viewMyProfile') : t('person.viewProfile')}: ${person.name}`}
+        >
+          {isSelf ? t('person.viewMyProfile') : t('person.viewProfile')}
+        </button>
+        {!isSelf && (
           <button
             type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => openUserDetail(person.id)}
-            aria-label={`${isSelf ? t('person.viewMyProfile') : t('person.viewProfile')}: ${person.name}`}
+            className="btn btn-primary btn-sm"
+            onClick={() => openInvite(person.id)}
+            aria-label={`${t('person.inviteProject')}: ${person.name}`}
           >
-            {isSelf ? t('person.viewMyProfile') : t('person.viewProfile')}
+            {t('person.inviteProject')}
           </button>
-          {!isSelf && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => openInvite(person.id)}
-              aria-label={`${t('person.inviteProject')}: ${person.name}`}
-            >
-              {t('person.inviteProject')}
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </article>
   );

@@ -42,16 +42,12 @@ export function isClickOnScrollbar(e) {
 // `layer` apila un modal sobre otro (detalle de proyecto encima del detalle de
 // usuario, por ejemplo). Todos los overlays comparten el mismo z-index, así que
 // sin esto el que se monte después en el DOM acaba tapando al anterior.
-export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, children, label, footer }) {
+export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, children, label }) {
   const { t } = useApp();
   const isMouseDownOnOverlayRef = useRef(false);
   const isMouseDownOnScrollbarRef = useRef(false);
   const cardRef = useRef(null);
   const prevFocusRef = useRef(null);
-
-  // La salida se anima: el nodo sigue montado mientras corre y solo entonces
-  // se avisa al padre para que lo desmonte.
-  const { leaving, close } = useLeaveTransition(open, onClose, 180);
 
   // Bloquea el scroll del fondo (body) mientras haya al menos un modal abierto
   useEffect(() => {
@@ -73,7 +69,7 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
     if (!open || !onClose) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        close();
+        onClose();
         return;
       }
       if (e.key === 'Tab' && cardRef.current) {
@@ -98,7 +94,7 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, close]);
+  }, [open, onClose]);
 
   // Guarda el foco previo, mueve el foco al abrir y lo restaura al cerrar
   useEffect(() => {
@@ -150,24 +146,24 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
       e.target === e.currentTarget &&
       !isClickOnScrollbar(e)
     ) {
-      if (onClose) close();
+      if (onClose) onClose();
     }
 
     isMouseDownOnOverlayRef.current = false;
   };
 
-  if (!open && !leaving) return null;
+  if (!open) return null;
 
   return (
     <div
-      className={`modal-overlay${leaving ? ' is-leaving' : ''}`}
+      className="modal-overlay"
       style={{ display: 'flex', zIndex: 1000 + layer * 10 }}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
     >
       <div
         ref={cardRef}
-        className={`modal-card${size ? ' ' + size : ''}${leaving ? ' is-leaving' : ''}`}
+        className={`modal-card${size ? ' ' + size : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={label || title || 'Diálogo'}
@@ -177,7 +173,6 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
         {title && <h2 className="auth-title">{title}</h2>}
         {subtitle && <p className="auth-subtitle">{subtitle}</p>}
         {children}
-        {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </div>
   );
@@ -229,16 +224,14 @@ export function ProjectBanner({ project, mode = 'card' }) {
   const meta = getCategoryMeta(project.category);
   const label = getCategoryLabel(lang, project.category);
   return (
-    /* El color de categoria se pasa como variable para teñir la superficie en
-       lugar de pintar un bloque saturado (era el tell mas visible del grid). */
-    <div className={`${cssClass} ${cssClass}-default`} style={{ '--cat': meta.color }}>
+    <div className={`${cssClass} ${cssClass}-default`} style={{ background: meta.color }}>
       <span className={`${cssClass}-icon`}><Icon name={meta.icon || 'gamepad'} size={36} /></span>
       <span className={`${cssClass}-label`}>{label}</span>
     </div>
   );
 }
 
-export function Stars({ rating, size = 13, showValue = true }) {
+export function Stars({ rating }) {
   if (rating <= 0) return null;
   const rounded = Math.round(rating);
   return (
@@ -252,33 +245,68 @@ export function Stars({ rating, size = 13, showValue = true }) {
 
 // Set de iconos SVG en línea (sin dependencias). Reutilizable en toda la app.
 // Sin `label` el icono es decorativo (aria-hidden); con `label` se anuncia.
-import {
-  IconAlertTriangle, IconArrowLeft, IconArrowRight, IconArrowUpRight, IconBox,
-  IconCheck, IconCode, IconCompass, IconDeviceGamepad2, IconDeviceMobile, IconFolder,
-  IconGlobe, IconHome, IconInbox, IconLeaf, IconLock, IconLogout, IconMail, IconMoon,
-  IconBell, IconMenu2, IconChevronDown, IconChevronUp,
-  IconMusic, IconPalette, IconPencil, IconPhoto, IconPlus, IconSearch, IconSend,
-  IconSettings, IconSparkles, IconStar, IconSun, IconTag, IconUserPlus, IconUsers, IconX
-} from '@tabler/icons-react';
-
-const TABLER_ICONS = {
-  globe: IconGlobe, search: IconSearch, users: IconUsers, box: IconBox, star: IconStar,
-  sparkles: IconSparkles, 'arrow-left': IconArrowLeft, compass: IconCompass, plus: IconPlus,
-  settings: IconSettings, home: IconHome, lock: IconLock, mail: IconMail,
-  'user-plus': IconUserPlus, folder: IconFolder, inbox: IconInbox, check: IconCheck,
-  alert: IconAlertTriangle, sun: IconSun, moon: IconMoon, gamepad: IconDeviceGamepad2,
-  image: IconPhoto, logout: IconLogout, x: IconX, send: IconSend, code: IconCode,
-  smartphone: IconDeviceMobile, tag: IconTag, 'arrow-right': IconArrowRight,
-  'arrow-up-right': IconArrowUpRight, palette: IconPalette, music: IconMusic,
-  'chevron-down': IconChevronDown, 'chevron-up': IconChevronUp,
-  pencil: IconPencil, leaf: IconLeaf, menu: IconMenu2, bell: IconBell
-};
-
-export function Icon({ name, size = 18, label, cls }) {
-  const Cmp = TABLER_ICONS[name];
-  if (!Cmp) return null;
-  const common = { size, strokeWidth: 2, ...(cls ? { className: cls } : {}), ...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true }) };
-  return <Cmp {...common} />;
+export function Icon({ name, size = 18, label }) {
+  const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', ...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true }) };
+  switch (name) {
+    case 'globe':
+      return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>;
+    case 'search':
+      return <svg {...common}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>;
+    case 'users':
+      return <svg {...common}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
+    case 'box':
+      return <svg {...common}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><path d="M3.3 7 12 12l8.7-5M12 22V12" /></svg>;
+    case 'star':
+      return <svg {...common}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>;
+    case 'sparkles':
+      return <svg {...common}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" /></svg>;
+    case 'arrow-left':
+      return <svg {...common}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>;
+    case 'compass':
+      return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="m16 8-2.5 5.5L8 16l2.5-5.5z" /></svg>;
+    case 'plus':
+      return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>;
+    case 'settings':
+      return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
+    case 'home':
+      return <svg {...common}><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /></svg>;
+    case 'lock':
+      return <svg {...common}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>;
+    case 'mail':
+      return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>;
+    case 'user-plus':
+      return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>;
+    case 'folder':
+      return <svg {...common}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
+    case 'inbox':
+      return <svg {...common}><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>;
+    case 'check':
+      return <svg {...common}><path d="M20 6 9 17l-5-5" /></svg>;
+    case 'alert':
+      return <svg {...common}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z" /><path d="M12 9v4M12 17h.01" /></svg>;
+    case 'sun':
+      return <svg {...common}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>;
+    case 'moon':
+      return <svg {...common}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg>;
+    case 'gamepad':
+      return <svg {...common}><path d="M6 12h4M8 10v4M15 13h.01M18 11h.01" /><path d="M17.32 5H6.68a4 4 0 0 0-3.98 3.59C2.6 9.42 2 14.46 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.41-1.41A2 2 0 0 1 9.83 16h4.34a2 2 0 0 1 1.41.59L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.54-.6-6.58-.68-7.26A4 4 0 0 0 17.32 5z" /></svg>;
+    case 'image':
+      return <svg {...common}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.08-3.08a2 2 0 0 0-2.83 0L6 21" /></svg>;
+    case 'logout':
+      return <svg {...common}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></svg>;
+    case 'x':
+      return <svg {...common}><path d="M18 6 6 18M6 6l12 12" /></svg>;
+    case 'send':
+      return <svg {...common}><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>;
+    case 'code':
+      return <svg {...common}><path d="m16 18 6-6-6-6M8 6l-6 6 6 6" /></svg>;
+    case 'smartphone':
+      return <svg {...common}><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M12 18h.01" /></svg>;
+    case 'tag':
+      return <svg {...common}><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z" /><circle cx="7" cy="7" r="1.5" /></svg>;
+    default:
+      return null;
+  }
 }
 
 // Avatar cuadrado de grupo (estilo organización de GitHub). Usa un color
@@ -393,7 +421,7 @@ export function StarInput({ value, onChange, title, label }) {
           className={s <= current ? 'active' : ''}
           onClick={() => onChange && onChange(s)}
         >
-          <Icon name="star" size={13} />
+          <span aria-hidden="true">★</span>
         </span>
       ))}
     </span>

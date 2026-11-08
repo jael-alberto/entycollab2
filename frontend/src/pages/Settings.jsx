@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Avatar, Field, Icon, SkillTags, SkipLink, Spinner } from '../components/common.jsx';
+import { Avatar, Field, SkillTags, SkipLink, Spinner } from '../components/common.jsx';
 import { fileToDataURL, userCategories, getCategoryLabel, normalizeLinkUrl, escapeHTML } from '../lib/helpers.js';
 import { emailKey, nameKey, passwordKey, usernameKey } from '../lib/validation.js';
 import {
@@ -139,16 +139,15 @@ export default function Settings() {
       <p className="settings-subtitle">{t('settings.subtitle')}</p>
 
       {/* ====== FOTO DE PERFIL ====== */}
-      <section className="settings-card settings-photo-card" aria-labelledby="settings-photo-title">
+      <section className="settings-card" aria-labelledby="settings-photo-title">
         <header className="settings-card-head">
           <h3 id="settings-photo-title">{t('settings.photoSection')}</h3>
           <p className="form-hint">{t('settings.photoHint')}</p>
         </header>
         <div className="settings-photo-row">
-          <Avatar user={user} cls="profile-avatar profile-avatar--sm" />
+          <Avatar user={user} cls="profile-avatar" />
           <div className="profile-photo-actions">
-            <label className="btn btn-outline btn-sm profile-photo-btn" htmlFor="settings-avatar-input">
-              <Icon name="image" size={15} />
+            <label className="btn btn-ghost btn-sm profile-photo-btn" htmlFor="settings-avatar-input">
               {t('profile.changePhoto')}
             </label>
             <input type="file" id="settings-avatar-input" ref={avatarInputRef} accept="image/*" style={{ display: 'none' }} onChange={handlePhoto} />

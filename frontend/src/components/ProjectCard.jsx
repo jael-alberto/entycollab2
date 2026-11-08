@@ -1,7 +1,7 @@
 import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { ProjectBanner, StatusPill, Stars, SkillTags, Icon } from './common.jsx';
-import { getUserAvgRating, escapeHTML, avatarColorClass } from '../lib/helpers.js';
+import { ProjectBanner, StatusPill, Stars, SkillTags } from './common.jsx';
+import { getUserAvgRating, escapeHTML } from '../lib/helpers.js';
 
 // Etiqueta de estado con el vocabulario del producto:
 // Reclutando (open) · En desarrollo (in-progress) · Finalizado (completed).
@@ -84,39 +84,30 @@ export default function ProjectCard({ project, currentUser }) {
           </h3>
           <StatusPill status={project.status} label={t(statusLabelKey(project.status))} />
         </div>
-        <div className="project-card-owner">
-          {owner && (
-            <span className={`project-card-owner-avatar ${avatarColorClass(owner)}`} aria-hidden="true">
-              {escapeHTML(owner.name.charAt(0).toUpperCase())}
-            </span>
-          )}
-          <span className="project-card-owner-name">
-            {owner ? escapeHTML(owner.name) : t('card.unknown')}
-          </span>
-          {avgRating > 0 && <Stars rating={avgRating} showValue={false} size={13} />}
-        </div>
+        <p className="project-card-owner">
+          {t('card.by')} {owner ? escapeHTML(owner.name) : t('card.unknown')}
+          {avgRating > 0 && <> · <Stars rating={avgRating} /></>}
+        </p>
         <p className="project-card-description project-card-description-clamp2">
           {l10n(project.description) ? escapeHTML(l10n(project.description)) : ''}
         </p>
-        <SkillTags skills={project.tech} limit={3} />
-        <div className="project-card-chips">
-          <span
-            className={`meta-chip${slotsFull ? ' is-full' : ''}`}
-            title={`${t('card.cupos')}: ${accepted}/${project.slots}`}
-          >
-            <Icon name="users" size={13} />
-            {accepted}/{project.slots}
-            {slotsFull ? ` · ${t('card.slotsFull')}` : ''}
-          </span>
-          <span className="meta-chip" title={`${t('card.deadline')}: ${formatDeadline(lang, project.deadline)}`}>
-            <Icon name="tag" size={13} />
-            {formatDeadline(lang, project.deadline)}
-          </span>
-          <span className="meta-chip" title={`${t('card.ratingReq')}: ${project.minRating || 1}`}>
-            <Icon name="star" size={13} />
-            {project.minRating || 1}+
-          </span>
-        </div>
+        <SkillTags skills={project.tech} limit={4} />
+        <dl className="project-card-meta">
+          <div className="project-card-meta-item">
+            <dt>{t('card.cupos')}</dt>
+            <dd className={slotsFull ? 'is-full' : ''}>
+              {accepted}/{project.slots}{slotsFull ? ` · ${t('card.slotsFull')}` : ''}
+            </dd>
+          </div>
+          <div className="project-card-meta-item">
+            <dt>{t('card.deadline')}</dt>
+            <dd>{formatDeadline(lang, project.deadline)}</dd>
+          </div>
+          <div className="project-card-meta-item">
+            <dt>{t('card.ratingReq')}</dt>
+            <dd><span className="min-rating-stars">{'★'.repeat(project.minRating || 1)}</span></dd>
+          </div>
+        </dl>
         <div className="project-card-footer project-card-footer-cta">
           <div className="project-actions">{actions}</div>
         </div>
