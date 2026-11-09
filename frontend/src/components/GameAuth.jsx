@@ -6,6 +6,7 @@ import { Field, Icon, Modal, SkipLink, Spinner } from './common.jsx';
 import { LegalContent } from '../pages/Legal.jsx';
 import { ALL_LANGUAGES, DISCIPLINES, FAVORITE_GENRES, GAME_TYPES, disciplineLabel, favoriteGenreLabel, gameTypeLabel } from '../lib/talent.js';
 import { emailKey, nameKey, passwordKey, requiredKey, usernameKey } from '../lib/validation.js';
+import { supabase } from '../lib/supabaseClient.js';
 
 function ChoiceGrid({ items, selected, onChange, label, describedBy }) {
   return (
@@ -45,6 +46,13 @@ function GitHubMark() {
   );
 }
 
+// ─── Feature flag ────────────────────────────────────────────────────────────
+// Cambia a `true` cuando hayas configurado los proveedores OAuth en Supabase
+// (Google y GitHub). Ver docs/DEPLOY_STAGING.md para los pasos de configuración.
+// No es necesario tocar nada más en el código: todo está implementado.
+const OAUTH_ENABLED = false;
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function GameAuth({ initialMode }) {
   const { login, register, t, lang, theme, toggleTheme, toggleLang } = useApp();
   const { showToast } = useToast();
@@ -70,7 +78,26 @@ export default function GameAuth({ initialMode }) {
   const toggle = (setter, selected, value) =>
     setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]);
 
-  const social = () => showToast(t('auth.socialSoon'), 'info');
+  const signInWithProvider = async (provider) => {
+    if (!supabase) {
+      showToast(t('auth.socialSoon'), 'info');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      if (error) showToast(error.message, 'error');
+    } catch {
+      showToast(t('errors.generic'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openLegal = (section) => (e) => {
     e.preventDefault();
@@ -160,18 +187,18 @@ export default function GameAuth({ initialMode }) {
     </p>
   );
 
-  const oauthRow = (
+  const oauthRow = OAUTH_ENABLED ? (
     <div className="ga-social">
-      <button type="button" className="ga-social-btn" onClick={social}>
+      <button type="button" className="ga-social-btn" onClick={() => signInWithProvider('google')} disabled={loading}>
         <GoogleMark />
         <span>{t('auth.google')}</span>
       </button>
-      <button type="button" className="ga-social-btn" onClick={social}>
+      <button type="button" className="ga-social-btn" onClick={() => signInWithProvider('github')} disabled={loading}>
         <GitHubMark />
         <span>{t('auth.github')}</span>
       </button>
     </div>
-  );
+  ) : null;
 
   const passwordToggleLabel = showPassword ? t('auth.hidePassword') : t('auth.showPassword');
 

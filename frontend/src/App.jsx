@@ -14,6 +14,7 @@ import Profile from './pages/Profile.jsx';
 import Settings from './pages/Settings.jsx';
 import Landing from './pages/Landing.jsx';
 import Groups from './pages/Groups.jsx';
+import AuthCallback from './pages/AuthCallback.jsx';
 
 function AuthLoading() {
   return (
@@ -57,6 +58,7 @@ function AppRoutes({ logged }) {
     <Route path="/grupos/:groupId?" element={<RequireAuth><Groups /></RequireAuth>} />
     <Route path="/perfil" element={<RequireAuth><Profile /></RequireAuth>} />
     <Route path="/ajustes" element={<RequireAuth><Settings /></RequireAuth>} />
+    <Route path="/auth/callback" element={<AuthCallback />} />
     <Route path="/" element={<Landing />} />
     <Route path="*" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
   </Routes>;
