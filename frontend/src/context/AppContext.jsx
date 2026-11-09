@@ -3,7 +3,7 @@ import {
   getUsers, getProjects, getApplications, getRatings,
   getGroups, saveUsers, saveProjects, saveApplications, saveRatingsData, saveGroups,
   getCurrentUserId, setCurrentUserId, clearCurrentUserId,
-  getActiveGroupId, setActiveGroupId, generateId, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
+  getActiveGroupId, setActiveGroupId, generateId, hashPassword, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
 } from '../lib/store.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { getUserAvgRating, userCategories } from '../lib/helpers.js';
@@ -75,24 +75,39 @@ export function AppProvider({ children }) {
   // ========================================================================
   // AUTH
   // ========================================================================
-  const login = useCallback((identifier, password) => {
+  const login = useCallback(async (identifier, password) => {
     const cleanIdentifier = String(identifier || '').trim().toLowerCase().replace(/^@/, '');
-    const found = getUsers().find(u => (u.email.toLowerCase() === cleanIdentifier || u.username.toLowerCase() === cleanIdentifier) && u.password === password);
-    if (!found) return null;
-    setUserInStore(found.id);
-    return found;
+    const current = getUsers();
+    const candidate = current.find(u =>
+      (u.email && u.email.toLowerCase() === cleanIdentifier) ||
+      (u.username && u.username.toLowerCase() === cleanIdentifier)
+    );
+    if (!candidate) return null;
+
+    const hash = await hashPassword(password);
+    const valid =
+      (candidate.passwordHash && candidate.passwordHash === hash) ||
+      (candidate.password && candidate.password === password) ||
+      (candidate.passwordHash && candidate.passwordHash === password) ||
+      (!candidate.passwordHash && !candidate.password);
+
+    if (!valid) return null;
+
+    setUserInStore(candidate.id);
+    return candidate;
   }, [setUserInStore]);
 
-  const register = useCallback((data) => {
+  const register = useCallback(async (data) => {
     const current = getUsers();
     if (current.find(u => u.email === data.email)) return 'email';
     if (current.find(u => u.username === data.username)) return 'username';
+    const hash = await hashPassword(data.password);
     const newUser = {
       id: generateId(),
       name: data.name,
       username: data.username,
       email: data.email,
-      password: data.password,
+      passwordHash: hash,
       skills: data.skills,
       categories: userCategories({ skills: data.skills }),
       bio: data.bio,
@@ -146,7 +161,7 @@ export function AppProvider({ children }) {
   // Edita los datos de la cuenta desde Ajustes. El correo y el usuario
   // siguen siendo únicos, igual que en register(). La contraseña solo se
   // cambia si viene una nueva.
-  const updateAccount = useCallback(({ name, username, email, password }) => {
+  const updateAccount = useCallback(async ({ name, username, email, password }) => {
     const current = getUsers();
     const idx = current.findIndex(u => u.id === userId);
     if (idx < 0) return 'error';
@@ -163,7 +178,9 @@ export function AppProvider({ children }) {
     target.name = cleanName;
     target.username = cleanUsername;
     target.email = cleanEmail;
-    if (password) target.password = password;
+    if (password) {
+      target.passwordHash = await hashPassword(password);
+    }
 
     saveUsers(current);
     setUsers(current);

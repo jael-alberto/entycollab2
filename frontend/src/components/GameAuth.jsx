@@ -93,13 +93,13 @@ export default function GameAuth({ initialMode }) {
     setStep(2);
   };
 
-  const submitRegister = () => {
+  const submitRegister = async () => {
     if (!gameTypes.length || !favoriteGenres.length) {
       setStepError(t('auth.chooseAtLeastOne'));
       return;
     }
     setLoading(true);
-    const result = register({
+    const result = await register({
       name: name.trim(),
       username: username.replace(/^@/, '').trim(),
       email: email.trim().toLowerCase(),
@@ -127,7 +127,7 @@ export default function GameAuth({ initialMode }) {
     navigate('/perfil');
   };
 
-  const submitLogin = (event) => {
+  const submitLogin = async (event) => {
     event.preventDefault();
     const errors = {
       loginIdentifier: tErr(requiredKey(loginIdentifier)),
@@ -136,7 +136,7 @@ export default function GameAuth({ initialMode }) {
     setFieldErrors(errors);
     if (errors.loginIdentifier || errors.loginPassword) return;
     setLoading(true);
-    const user = login(loginIdentifier.trim(), loginPassword);
+    const user = await login(loginIdentifier.trim(), loginPassword);
     setLoading(false);
     if (!user) {
       setStepError(t('toast.loginError'));
