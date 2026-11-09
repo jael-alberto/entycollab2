@@ -59,7 +59,7 @@ export function LoggedHeader() {
     ? activeGroup.name
     : isGlobal
       ? t('dash.global')
-      : 'ENTYCOLLAB';
+      : 'ENTYTEC COLLAB';
 
   const goGlobal = () => {
     selectGroup(null);
@@ -84,7 +84,7 @@ export function LoggedHeader() {
             aria-label={t('dash.backHome')}
             onClick={() => { selectGroup(null); setSiteOpen(false); }}
           >
-            <img src="/img/logo-pg.png" alt="EntyTec" className="header-logo-img" />
+            <img src="/img/collab-logo.png" alt="ENTYTEC COLLAB" className="header-logo-img" />
           </Link>
 
           {showSiteSwitcher && (
@@ -113,7 +113,7 @@ export function LoggedHeader() {
                 >
                   <Icon name="globe" size={16} />
                   <span className="site-switcher-item-name">{t('dash.global')}</span>
-                  {isGlobal && <span className="site-switcher-item-check">✓</span>}
+                  {isGlobal && <span className="site-switcher-item-check"><Icon name="check" size={13} /></span>}
                 </button>
 
                 <div className="site-switcher-sep" />
@@ -136,7 +136,7 @@ export function LoggedHeader() {
                       >
                         <GroupAvatar group={group} size="sm" />
                         <span className="site-switcher-item-name">{escapeHTML(group.name)}</span>
-                        {isActive && <span className="site-switcher-item-check">✓</span>}
+                        {isActive && <span className="site-switcher-item-check"><Icon name="check" size={13} /></span>}
                       </button>
                     );
                   })
@@ -168,7 +168,7 @@ export function LoggedHeader() {
               <UserBubbleAvatar user={user} />
               <span className="user-bubble-name">{user ? user.name.split(' ')[0] : ''}</span>
               <span className="user-bubble-rating">
-                {user ? (avg > 0 ? `★ ${avg.toFixed(1)}` : '☆ 0.0') : '☆ 0.0'}
+                {user ? (avg > 0 ? <><Icon name="star" size={12} />{avg.toFixed(1)}</> : <><Icon name="star" size={12} cls="is-empty" />0.0</>) : <><Icon name="star" size={12} cls="is-empty" />0.0</>}
               </span>
             </button>
             {menuOpen && user && (
@@ -201,8 +201,8 @@ export function PublicHeader() {
     <header className="site-header logged-in-header">
       <div className="header-container header-compact">
         <div className="header-left">
-          <Link to="/" className="header-logo-link" aria-label="ENTYCOLLAB — inicio">
-            <img src="/img/logo-pg.png" alt="EntyTec" className="header-logo-img" />
+          <Link to="/" className="header-logo-link" aria-label="ENTYTEC COLLAB, inicio">
+            <img src="/img/collab-logo.png" alt="ENTYTEC COLLAB" className="header-logo-img" />
           </Link>
         </div>
 

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Modal, EmptyState } from '../components/common.jsx';
+import { EmptyState, Icon, Modal } from '../components/common.jsx';
 import { userProjectsList, escapeHTML } from '../lib/helpers.js';
 import { l10nValue } from '../lib/i18n.js';
 
@@ -61,7 +61,7 @@ export default function FeaturedModal() {
                 className={'featured-proj-card' + (selected ? ' selected' : '')}
                 onClick={() => toggle(p.id)}
               >
-                <span className="featured-proj-tick">{selected ? '★' : '☆'}</span>
+                <span className="featured-proj-tick">{selected ? <Icon name="star" size={14} /> : <Icon name="star" size={14} cls="is-empty" />}</span>
                 <span className="featured-proj-title">{escapeHTML(l10n(p.title))}</span>
                 <span className="featured-proj-desc">{escapeHTML(l10n(p.description))}</span>
                 <span className="featured-proj-creator">{t('featured.creator', { name: owner ? escapeHTML(owner.name) : t('card.unknown') })}</span>

@@ -7,7 +7,7 @@ import { EmptyState, Avatar, GroupAvatar, Icon, Modal } from '../components/comm
 import ProjectCard from '../components/ProjectCard.jsx';
 import GroupPeopleInGroup from '../components/GroupPeopleInGroup.jsx';
 import { l10nValue } from '../lib/i18n.js';
-import { getGroupById, getGroupRequestStatus } from '../lib/api/groups.js';
+import { getGroups, saveGroups } from '../lib/store.js';
 
 function memberFor(group, userId) {
   return group.members?.find(m => m.userId === userId) || null;
@@ -19,72 +19,64 @@ export default function Groups() {
 }
 
 function GroupsDirectory() {
-  const { user, users, groups, requestToJoinGroup, createGroup, selectGroup } = useApp();
+  const { user, users, groups, projects, requestToJoinGroup, createGroup, selectGroup } = useApp();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedGroupModal, setSelectedGroupModal] = useState(null);
 
-  const submit = async (e) => {
+  // El boton "+" de la barra lateral abre este modal via ?new=1.
+  const creating = searchParams.get('new') === '1';
+  const openCreate = () => setSearchParams({ new: '1' });
+  const closeCreate = () => {
+    setSearchParams({});
+    setName('');
+    setDescription('');
+  };
+
+  const submit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const group = await createGroup({ name, description });
-    if (!group) return;
+    const group = createGroup({ name, description });
+    closeCreate();
     showToast('Grupo creado con éxito', 'success');
     navigate(`/grupos/${group.id}`);
   };
 
   const open = (group) => {
-    if (memberFor(group, user.id)) selectGroup(group.id);
-    navigate(`/grupos/${group.id}`);
+    if (memberFor(group, user.id)) {
+      selectGroup(group.id);
+      navigate(`/grupos/${group.id}`);
+    }
   };
 
-  const handleRequest = async (groupId) => {
-    await requestToJoinGroup(groupId);
+  const handleRequest = (groupId) => {
+    const res = requestToJoinGroup(groupId);
+    if (res === 'pending') {
+      showToast('Ya tienes una solicitud pendiente para este grupo', 'info');
+    } else if (res === 'member') {
+      showToast('Ya eres miembro de este grupo', 'info');
+    } else {
+      showToast('Solicitud enviada al administrador', 'success');
+    }
   };
+
+  const projectCount = groupId => projects.filter(p => p.groupId === groupId).length;
 
   return (
-    <div className="section-block groups-page">
-      <div className="section-header-row">
-        <div>
-          <h2 className="section-title">Grupos</h2>
-          <p className="groups-intro">Espacios públicos para descubrir equipos. Cualquiera puede ver su información principal; para acceder a proyectos y miembros hay que solicitar entrada.</p>
+    <div className="groups-page">
+      <header className="groups-hero">
+        <div className="groups-hero-copy">
+          <p className="groups-eyebrow">ESPACIOS PARA CREAR JUNTOS</p>
+          <h1 className="groups-title">Un equipo. Un espacio. Muchas ideas.</h1>
+          <p className="groups-lead">Organiza tus comunidades y reúne proyectos y personas en un solo lugar.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setCreating(v => !v)}>
-          {creating ? 'Cancelar' : 'Crear grupo'}
+        <button type="button" className="btn btn-primary groups-hero-action" onClick={openCreate}>
+          <Icon name="plus" size={16} />
+          Crear grupo
         </button>
-      </div>
-
-      {creating && (
-        <form className="group-create-form" onSubmit={submit}>
-          <div className="form-group">
-            <label htmlFor="group-name">Nombre del grupo</label>
-            <input
-              id="group-name"
-              required
-              maxLength="70"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Ej. Estudio Indie, Equipo de Producto..."
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="group-description">Descripción</label>
-            <textarea
-              id="group-description"
-              required
-              maxLength="260"
-              rows="3"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Qué proyectos desarrollan o cuál es el propósito de este equipo"
-            />
-          </div>
-          <button className="btn btn-primary" type="submit">Crear y acceder</button>
-        </form>
-      )}
+      </header>
 
       {groups.length === 0 ? (
         <EmptyState icon="users" title="Aún no hay grupos" sub="Crea el primero para empezar a colaborar con tu equipo." />
@@ -92,307 +84,114 @@ function GroupsDirectory() {
         <div className="groups-grid">
           {groups.map(group => {
             const membership = memberFor(group, user.id);
-            const pending = Boolean(
-              group.hasPendingRequest ||
-              group.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
-            );
+            const pending = group.requests?.some(r => r.userId === user.id && r.status === 'pending');
+            const members = (group.members || [])
+              .map(m => users.find(u => u.id === m.userId))
+              .filter(Boolean)
+              .slice(0, 4);
             return (
               <article className="group-card" key={group.id}>
-                <div className="group-card-header">
-                  <div className="group-card-icon" aria-hidden="true"><Icon name="users" size={22} /></div>
-                  {membership && (
-                    <span className="group-role-badge-small">
-                      {membership.role === 'owner' ? '👑 Creador' : membership.role === 'admin' ? '🛡️ Admin' : '👤 Miembro'}
-                    </span>
+                {/* Antes: una banda decorativa de 108px con el rotulo en
+                    ingles "BUILD SOMETHING TOGETHER" a 9px que no aportaba
+                    informacion. Ahora el avatar y el nombre abren la tarjeta
+                    y los numeros van en chips. */}
+                <div className="group-card-body">
+                  <div className="group-card-head">
+                    <GroupAvatar group={group} size="lg" />
+                    <div className="group-card-id">
+                      <h3 className="group-card-title">{group.name}</h3>
+                      <div className="group-card-meta">
+                        <span className="meta-chip">
+                          <Icon name="users" size={13} /> {group.members?.length || 0}
+                        </span>
+                        <span className="meta-chip">
+                          <Icon name="folder" size={13} /> {projectCount(group.id)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="group-card-desc">{group.description}</p>
+
+                  {members.length > 0 && (
+                    <div className="group-card-avatars">
+                      {members.map(m => (
+                        <Avatar key={m.id} user={m} cls="group-avatar" />
+                      ))}
+                    </div>
+                  )}
+
+                  {membership ? (
+                    <button type="button" className="btn btn-outline btn-block" onClick={() => open(group)}>
+                      Abrir espacio <span aria-hidden="true">↗</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-block"
+                      disabled={pending}
+                      onClick={() => handleRequest(group.id)}
+                    >
+                      {pending ? 'Solicitud enviada' : 'Solicitar acceso'}
+                    </button>
                   )}
                 </div>
-
-                <div className="group-card-content">
-                  <h3 className="group-card-title">{group.name}</h3>
-                  <p className="group-card-desc-preview">
-                    {group.description || 'Sin descripción detallada.'}
-                  </p>
-                  <button
-                    type="button"
-                    className="btn-group-view-desc"
-                    onClick={() => setSelectedGroupModal(group)}
-                  >
-                    📄 Ver descripción
-                  </button>
-                </div>
-
-                <div className="group-card-meta">
-                  <span>{group.members?.length || 0} miembros</span>
-                  <span>{membership ? (membership.role === 'owner' ? 'Creador' : membership.role === 'admin' ? 'Administrador' : 'Miembro') : 'Público · solicitud para acceder'}</span>
-                </div>
-
-                {membership ? (
-                  <button className="btn btn-primary btn-sm" onClick={() => open(group)}>
-                    Entrar al grupo
-                  </button>
-                ) : (
-                  <div className="group-card-actions">
-                    <button className="btn btn-ghost btn-sm" onClick={() => open(group)}>
-                      Ver grupo
-                    </button>
-                    {pending ? (
-                      <span
-                        className="project-status status-in-progress"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          fontSize: '0.78rem',
-                          padding: '0.35rem 0.65rem',
-                          borderRadius: '4px',
-                          cursor: 'default',
-                          userSelect: 'none'
-                        }}
-                        role="status"
-                      >
-                        <Icon name="clock" size={13} /> Solicitud pendiente
-                      </span>
-                    ) : (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleRequest(group.id)}
-                      >
-                        Solicitar acceso
-                      </button>
-                    )}
-                  </div>
-                )}
               </article>
             );
           })}
         </div>
       )}
 
-      {/* Modal de Detalle / Descripción del Grupo estilo tarjeta de proyecto */}
-      {selectedGroupModal && (
-        <GroupDescriptionModal
-          group={selectedGroupModal}
-          users={users}
-          currentUser={user}
-          onClose={() => setSelectedGroupModal(null)}
-          onOpen={open}
-          onRequest={handleRequest}
-        />
-      )}
-    </div>
-  );
-}
-
-function GroupDescriptionModal({ group, users, currentUser, onClose, onOpen, onRequest }) {
-  const membership = memberFor(group, currentUser?.id);
-  const pending = Boolean(
-    group.hasPendingRequest ||
-    group.requests?.some(r => (r.userId === currentUser?.id || r.user_id === currentUser?.id) && r.status === 'pending')
-  );
-  const owner = users.find(u => u.id === group.ownerId) || (group.members?.[0] ? users.find(u => u.id === group.members[0].userId) : null);
-
-  return (
-    <div
-      className="modal-overlay"
-      style={{ display: 'flex', zIndex: 1100 }}
-      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="modal-card modal-large group-modal-dialog">
-        <button
-          type="button"
-          className="modal-close"
-          onClick={onClose}
-          aria-label="Cerrar ventana"
-        >
-          &times;
+      <section className="groups-discover">
+        <span className="groups-discover-icon" aria-hidden="true"><Icon name="compass" size={22} /></span>
+        <div className="groups-discover-copy">
+          <h3>Descubre una nueva comunidad</h3>
+          <p>Game Jam LATAM · Un espacio para prototipar, aprender y compartir.</p>
+        </div>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => showToast('Solicitud enviada', 'success')}>
+          Solicitar acceso <span aria-hidden="true">+</span>
         </button>
+      </section>
 
-        {/* Banner Superior Destacado */}
-        <div className="group-modal-banner">
-          <div className="group-modal-banner-icon">👥</div>
-          <span className="group-modal-banner-badge">ESPACIO DE EQUIPO</span>
-        </div>
-
-        {/* Encabezado del Grupo */}
-        <div className="group-modal-header">
-          <div className="group-modal-title-row">
-            <h2 className="group-modal-title">{group.name}</h2>
-            <span className={`group-modal-status-badge ${membership ? 'status-joined' : 'status-public'}`}>
-              {membership ? 'MIEMBRO' : 'GRUPO PÚBLICO'}
-            </span>
-          </div>
-
-          <div className="group-modal-meta-bar">
-            <span><strong>Creado por:</strong> {owner?.name || 'Administrador'}</span>
-            <span><strong>Miembros:</strong> {group.members?.length || 1}</span>
-            <span><strong>Fecha:</strong> {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'Reciente'}</span>
-            <span><strong>Rol:</strong> {membership ? (membership.role === 'owner' ? '👑 Creador' : membership.role === 'admin' ? '🛡️ Administrador' : '👤 Miembro') : 'Visitante'}</span>
-          </div>
-        </div>
-
-        {/* Sección Descripción */}
-        <div className="group-modal-section">
-          <h4 className="group-modal-section-heading">DESCRIPCIÓN</h4>
-          <div className="group-modal-description-box">
-            <p>{group.description || 'Este grupo no ha proporcionado una descripción detallada todavía.'}</p>
-          </div>
-        </div>
-
-        {/* Sección Miembros: solo visible para miembros del grupo */}
-        {membership && group.members && group.members.length > 0 && (
-          <div className="group-modal-section">
-            <h4 className="group-modal-section-heading">MIEMBROS ({group.members.length})</h4>
-            <div className="group-modal-members-grid">
-              {group.members.map(m => {
-                const memberUser = users.find(u => u.id === m.userId);
-                return (
-                  <div className="group-modal-member-item" key={m.userId}>
-                    <Avatar user={memberUser} />
-                    <div className="group-modal-member-details">
-                      <span className="group-modal-member-name">{memberUser?.name || 'Usuario'}</span>
-                      <small className="group-modal-member-role">
-                        {m.role === 'owner' ? '👑 Creador' : m.role === 'admin' ? '🛡️ Admin' : '👤 Miembro'}
-                      </small>
-                    </div>
-                  </div>
-                );
-              })}
+      {creating && (
+        <Modal open onClose={closeCreate} title="Crea un espacio para tu equipo" subtitle="Interfaz de demostración. Las acciones no se envían a ningún servidor.">
+          <form className="group-create-form" onSubmit={submit}>
+            <div className="form-group">
+              <label htmlFor="group-name">Nombre del grupo</label>
+              <input
+                id="group-name"
+                required
+                maxLength="70"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="El nombre de tu comunidad"
+              />
             </div>
-          </div>
-        )}
-
-        {!membership && (
-          <div className="group-modal-section">
-            <div className="group-modal-description-box">
-              <p>La lista de miembros y los proyectos del grupo son visibles solo para sus miembros. Envía una solicitud para acceder.</p>
+            <div className="form-group">
+              <label htmlFor="group-description">Descripción</label>
+              <textarea
+                id="group-description"
+                required
+                maxLength="260"
+                rows="3"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="¿Qué van a crear juntos?"
+              />
             </div>
-          </div>
-        )}
-
-        {/* Acciones del Modal */}
-        <div className="group-modal-actions">
-          {membership ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                onClose();
-                onOpen(group);
-              }}
-            >
-              Entrar al grupo →
+            <div class="form-group">
+              <label htmlFor="group-visibility">Visibilidad</label>
+              <select id="group-visibility" defaultValue="private">
+                <option value="private">Privado · acceso por invitación</option>
+              </select>
+            </div>
+            <button className="btn btn-primary btn-block" type="submit">
+              <Icon name="plus" size={15} />
+              Crear grupo demo
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  onClose();
-                  onOpen(group);
-                }}
-              >
-                Ver grupo
-              </button>
-              {pending ? (
-                <span
-                  className="project-status status-in-progress"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    padding: '0.5rem 0.95rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    borderRadius: '6px',
-                    cursor: 'default',
-                    userSelect: 'none'
-                  }}
-                  role="status"
-                >
-                  <Icon name="clock" size={14} /> Solicitud pendiente
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    onRequest(group.id);
-                    onClose();
-                  }}
-                >
-                  Solicitar acceso al grupo
-                </button>
-              )}
-            </>
-          )}
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Vista pública de un grupo para quienes todavía no son miembros: muestra la
-// información principal (nombre, avatar, descripción, creador y nº de miembros)
-// y permite solicitar acceso. Los proyectos y la lista de miembros quedan
-// ocultos hasta que un administrador apruebe la solicitud.
-function PublicGroupPreview({ group, owner, memberCount, pending, onRequest, onBack }) {
-  return (
-    <div className="section-block groups-page group-workspace group-public-preview">
-      <header className="repo-header">
-        <div className="repo-title-row">
-          <GroupAvatar group={group} size="xl" />
-          <div className="repo-title-info">
-            <div className="repo-name-line">
-              <h1 className="repo-name">{group.name}</h1>
-              <span className="repo-visibility"><Icon name="globe" size={13} />Público</span>
-            </div>
-            <p className="repo-desc">{group.description}</p>
-          </div>
-        </div>
-      </header>
-
-      <div className="group-panel" style={{ marginTop: '1.25rem' }}>
-        <div className="group-public-meta">
-          <span><strong>Creador:</strong> {owner?.name || 'Administrador'}</span>
-          <span><strong>Miembros:</strong> {memberCount}</span>
-          <span><strong>Fecha:</strong> {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'Reciente'}</span>
-        </div>
-        <p className="form-hint" style={{ marginTop: '1rem' }}>
-          Este grupo es público: puedes ver su información principal. Para acceder a los proyectos y a la lista de miembros,
-          envía una solicitud y espera la aprobación de un administrador.
-        </p>
-        <div className="group-public-actions">
-          {pending ? (
-            <span
-              className="project-status status-in-progress"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.55rem 1.15rem',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                borderRadius: '6px',
-                cursor: 'default',
-                userSelect: 'none'
-              }}
-              role="status"
-              aria-live="polite"
-            >
-              <Icon name="clock" size={16} /> Solicitud pendiente
-            </span>
-          ) : (
-            <button className="btn btn-primary" onClick={onRequest}>
-              Solicitar acceso
-            </button>
-          )}
-          <button className="btn btn-ghost" onClick={onBack}>Volver a grupos</button>
-        </div>
-      </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -400,67 +199,18 @@ function PublicGroupPreview({ group, owner, memberCount, pending, onRequest, onB
 function GroupWorkspace({ groupId }) {
   const {
     user, users, groups, projects, activeGroup, selectGroup,
-    decideGroupRequest, setGroupMemberRole, updateGroup, deleteGroup, removeGroupMember,
-    requestToJoinGroup, sendInvite, lang, t, setGroups
+    decideGroupRequest, setGroupMemberRole, updateGroup, removeGroupMember,
+    sendInvite, lang, t
   } = useApp();
   const { openCreate } = useModals();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [groupDetail, setGroupDetail] = useState(null);
-  const [requestStatus, setRequestStatus] = useState(null);
-  const [loadingBackend, setLoadingBackend] = useState(false);
-
-  // Recargar el grupo y el estado de la solicitud desde el backend al abrir/reabrir la página
-  useEffect(() => {
-    let isCancelled = false;
-    async function loadGroupAndRequestState() {
-      if (!groupId) return;
-      try {
-        setLoadingBackend(true);
-        const [freshGroup, reqStatus] = await Promise.all([
-          getGroupById(groupId).catch(() => null),
-          getGroupRequestStatus(groupId).catch(() => null)
-        ]);
-        if (isCancelled) return;
-        if (freshGroup) {
-          setGroupDetail(freshGroup);
-          if (setGroups) {
-            setGroups(prev => {
-              const idx = prev.findIndex(g => g.id === groupId);
-              if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = { ...next[idx], ...freshGroup };
-                return next;
-              }
-              return [...prev, freshGroup];
-            });
-          }
-        }
-        if (reqStatus) {
-          setRequestStatus(reqStatus);
-        }
-      } catch (err) {
-        console.warn('[GroupWorkspace] Error recargando estado de grupo/solicitud:', err);
-      } finally {
-        if (!isCancelled) setLoadingBackend(false);
-      }
-    }
-    loadGroupAndRequestState();
-    return () => { isCancelled = true; };
-  }, [groupId, setGroups]);
-
-  const baseGroup = groups.find(g => g.id === groupId);
-  const group = groupDetail ? { ...baseGroup, ...groupDetail } : baseGroup;
-  const membership = group && memberFor(group, user?.id);
+  const group = groups.find(g => g.id === groupId);
+  const membership = group && memberFor(group, user.id);
   const isOwner = group?.ownerId === user?.id;
   const isAdmin = membership?.role === 'owner' || membership?.role === 'admin';
-  const hasPendingRequest = Boolean(
-    requestStatus?.hasPendingRequest ||
-    group?.hasPendingRequest ||
-    group?.requests?.some(r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending')
-  );
 
   const requestedTab = searchParams.get('tab') || (isOwner ? 'overview' : 'projects');
   const activeTab = requestedTab === 'overview' && !isOwner ? 'projects' : requestedTab;
@@ -523,67 +273,47 @@ function GroupWorkspace({ groupId }) {
   }
 
   if (!membership) {
-    const handleJoinRequest = async () => {
-      const res = await requestToJoinGroup(group.id);
-      setRequestStatus({ hasPendingRequest: true, request: res });
-      setGroupDetail(prev => ({
-        ...(prev || group),
-        hasPendingRequest: true,
-        requests: [
-          ...((prev || group)?.requests || []),
-          {
-            id: (typeof res === 'object' && res?.id) ? res.id : 'temp-' + Date.now(),
-            groupId: group.id,
-            userId: user?.id,
-            user_id: user?.id,
-            status: 'pending',
-            requestedAt: new Date().toISOString()
-          }
-        ]
-      }));
-    };
-
     return (
-      <PublicGroupPreview
-        group={group}
-        owner={users.find(u => u.id === group.ownerId)}
-        memberCount={group.members?.length || 0}
-        pending={hasPendingRequest}
-        onRequest={handleJoinRequest}
-        onBack={() => navigate('/grupos')}
-      />
+      <div className="section-block">
+        <EmptyState
+          icon="lock"
+          title="Este grupo es privado"
+          sub="Solicita acceso desde el directorio. Un administrador debe aprobar tu solicitud para ingresar."
+        />
+        <button className="btn btn-ghost" onClick={() => navigate('/grupos')}>Volver a grupos</button>
+      </div>
     );
   }
 
-  const handleSaveGroupInfo = async (e) => {
+  const handleSaveGroupInfo = (e) => {
     e.preventDefault();
     if (!editName.trim()) return;
     setSavingInfo(true);
-    const ok = await updateGroup(group.id, { name: editName, description: editDesc });
+    const ok = updateGroup(group.id, { name: editName, description: editDesc });
     setSavingInfo(false);
     if (ok) showToast('Información del grupo actualizada', 'success');
     else showToast('No tienes permisos para editar este grupo', 'error');
   };
 
-  const handleRequestDecision = async (requestId, accepted) => {
-    const ok = await decideGroupRequest(group.id, requestId, accepted);
+  const handleRequestDecision = (requestId, accepted) => {
+    const ok = decideGroupRequest(group.id, requestId, accepted);
     if (ok) showToast(accepted ? 'Solicitud aceptada. Nuevo miembro agregado.' : 'Solicitud rechazada.', accepted ? 'success' : 'info');
   };
 
-  const handleRoleChange = async (memberId, newRole) => {
-    const ok = await setGroupMemberRole(group.id, memberId, newRole);
+  const handleRoleChange = (memberId, newRole) => {
+    const ok = setGroupMemberRole(group.id, memberId, newRole);
     if (ok) showToast('Rol de miembro actualizado', 'success');
   };
 
-  const handleRemoveMember = async (memberId, memberName) => {
+  const handleRemoveMember = (memberId, memberName) => {
     if (!window.confirm(`¿Estás seguro de expulsar a ${memberName} del grupo?`)) return;
-    const ok = await removeGroupMember(group.id, memberId);
+    const ok = removeGroupMember(group.id, memberId);
     if (ok) showToast(`${memberName} ha sido removido del grupo`, 'info');
   };
 
-  const handleLeaveGroup = async () => {
+  const handleLeaveGroup = () => {
     if (!window.confirm(t('group.leaveConfirm'))) return;
-    const ok = await removeGroupMember(group.id, user.id);
+    const ok = removeGroupMember(group.id, user.id);
     if (ok) {
       showToast('Has salido del grupo', 'info');
       selectGroup(null);
@@ -591,29 +321,28 @@ function GroupWorkspace({ groupId }) {
     }
   };
 
-  const handleDeleteGroup = async () => {
+  const handleDeleteGroup = () => {
     if (!window.confirm(t('group.deleteConfirm'))) return;
-    const ok = await deleteGroup(group.id);
-    if (ok) {
+    const current = getGroups();
+    const idx = current.findIndex(g => g.id === group.id);
+    if (idx >= 0) {
+      current.splice(idx, 1);
+      saveGroups(current);
       showToast('Grupo eliminado', 'info');
       selectGroup(null);
       navigate('/grupos');
     }
   };
 
-  const handleInviteSubmit = async (e) => {
+  const handleInviteSubmit = (e) => {
     e.preventDefault();
     if (!inviteUsername.trim() || !inviteProjectId) return;
-    const cleanSearch = inviteUsername.trim().toLowerCase().replace(/^@/, '');
-    const targetUser = users.find(u => 
-      u.username?.toLowerCase() === cleanSearch || 
-      (u.email && u.email.toLowerCase() === cleanSearch)
-    );
+    const targetUser = users.find(u => u.username.toLowerCase() === inviteUsername.toLowerCase() || u.email.toLowerCase() === inviteUsername.toLowerCase());
     if (!targetUser) {
       showToast('Usuario no encontrado', 'error');
       return;
     }
-    const res = await sendInvite(inviteProjectId, targetUser.id, inviteMessage);
+    const res = sendInvite(inviteProjectId, targetUser.id, inviteMessage);
     if (res === 'ok') {
       showToast(t('group.inviteSent'), 'success');
       setShowInviteModal(false);
@@ -653,7 +382,7 @@ function GroupWorkspace({ groupId }) {
           <div className="repo-title-info">
             <div className="repo-name-line">
               <h1 className="repo-name">{group.name}</h1>
-              <span className="repo-visibility"><Icon name="globe" size={13} />Público</span>
+              <span className="repo-visibility"><Icon name="lock" size={13} />{t('group.private')}</span>
               <span className={`group-role-badge ${roleBadgeClass(membership.role)}`}>{roleLabel(membership.role)}</span>
             </div>
             <p className="repo-desc">{group.description}</p>
@@ -818,7 +547,7 @@ function GroupWorkspace({ groupId }) {
                     Solicitudes de acceso
                     <span className="tab-badge">{requests.length}</span>
                   </h3>
-                  <p>Aspirantes que desean unirse a este espacio de trabajo.</p>
+                  <p>Aspirantes que desean unirse a este espacio de trabajo privado.</p>
                 </div>
               </div>
               <div style={{ marginTop: '1rem' }}>
@@ -909,7 +638,7 @@ function GroupWorkspace({ groupId }) {
 
           <div className="group-panel" style={{ marginBottom: '1.25rem' }}>
             <h3>{t('group.invite')}</h3>
-            <p style={{ color: 'var(--color-text-dim)', margin: '0 0 1rem' }}>Invita a alguien a un proyecto del grupo por nombre de usuario.</p>
+            <p style={{ color: 'var(--color-text-dim)', margin: '0 0 1rem' }}>Invita a alguien a un proyecto del grupo por nombre de usuario o email.</p>
             <button className="btn btn-primary btn-sm" onClick={() => setShowInviteModal(true)}>Invitar miembro</button>
           </div>
 
@@ -952,8 +681,8 @@ function GroupWorkspace({ groupId }) {
         <Modal open onClose={() => setShowInviteModal(false)} title="Invitar a miembro">
           <form onSubmit={handleInviteSubmit}>
             <div className="form-group">
-              <label>Nombre de usuario</label>
-              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario" required />
+              <label>Usuario o email</label>
+              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario o email" required />
             </div>
             <div className="form-group">
               <label>Proyecto (opcional)</label>

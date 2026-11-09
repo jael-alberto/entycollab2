@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Modal, Avatar, Stars, SkillTags, ProfileLinks, TalentRow } from '../components/common.jsx';
+import { Avatar, Icon, Modal, ProfileLinks, SkillTags, Stars, TalentRow } from '../components/common.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { primaryRoleLabel } from '../components/PersonCard.jsx';
 import {
@@ -149,7 +149,7 @@ export default function UserDetailModal() {
                     </span>
                   </div>
                   <span className="rating-stars-display" aria-label={`${r.stars}/5`}>
-                    {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
+                    <Stars rating={r.stars} showValue={false} size={12} />
                   </span>
                 </div>
               );
@@ -191,6 +191,7 @@ export default function UserDetailModal() {
           to="/ajustes"
           onClick={closeUserDetail}
         >
+          <Icon name="pencil" size={14} />
           {t('profile.editBtn')}
         </Link>
       ) : (

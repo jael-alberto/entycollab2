@@ -34,3 +34,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+#Dump Files
+AGENTS.md

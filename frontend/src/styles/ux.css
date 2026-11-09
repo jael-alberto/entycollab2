@@ -1,0 +1,551 @@
+/* ==========================================================================
+   UX LAYER — CAPA DE DISENO (importada DESPUES de styles.css y
+   sec-projects.css, asi que gana en cascada)
+
+   Que resuelve:
+   1. Contraste: sobre fondo grafito, los botones "outline" y "ghost" se
+      perdian (borde #333947 + texto apagado). Aqui tienen borde visible,
+      texto claro y area de contacto de 40px.
+   2. Escala tipografica: en el shell y las tarjetas habia texto de 8/9/10/11px.
+      El minimo legible aqui es 12.5px y el cuerpo 14px.
+   3. Densidad: la tarjeta de proyecto era un formulario de 9 lineas; ahora
+      es un titulo, una linea de autor, dos de descripcion y chips.
+   4. Estados vacios: ocupaban 298px de alto para decir una frase. Ahora son
+      una fila compacta.
+
+   Reglas: se heredan los tokens de tokens.css. No se inventan colores aqui.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. BOTONES
+   ========================================================================== */
+
+.btn {
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  letter-spacing: 0;
+}
+
+.btn-sm {
+  font-size: 13px;
+  min-height: 34px;
+  padding: 7px 14px;
+  font-weight: 700;
+}
+
+/* Outline: era invisible en oscuro (borde 20% mas claro que el fondo). */
+.btn-outline {
+  color: var(--color-text-main);
+  border-color: var(--color-border-light);
+  background: transparent;
+  font-weight: 700;
+}
+
+.btn-outline:hover:not(:disabled) {
+  color: var(--color-text-main);
+  border-color: var(--color-accent);
+  background: var(--color-chip-bg);
+}
+
+.btn-outline:disabled {
+  color: var(--color-text-dim);
+  border-color: var(--color-border);
+  opacity: .75;
+}
+
+/* Ghost: texto claro + fondo al pasar el raton. Antes era indistinguible
+   de un texto normal, imposible de identificar como boton. */
+.btn-ghost {
+  color: var(--color-text-light);
+  background: transparent;
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--color-text-main);
+  background: var(--color-surface-hover);
+}
+
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+.btn:focus-visible,
+.btn-outline:focus-visible,
+.btn-ghost:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   2. SHELL / SIDEBAR
+   ========================================================================== */
+
+/* La rejilla del shell NO se define aqui: la gobierna styles.css
+   (272px expandida / 76px plegada / una sola columna por debajo de 900px).
+   Esta capa carga despues y antes forzaba 248px a cualquier ancho, asi que
+   tambien ganaba en <=900px, donde la barra lateral ya es un panel fijo y
+   sale del flujo de la rejilla: el <main> caia en la primera columna y toda
+   la pagina se quedaba metida en una franja de 248px. */
+
+.ws-sidebar {
+  gap: 14px;
+  padding: 20px 14px;
+  background: var(--color-bg-alt);
+}
+
+.ws-brand-tag {
+  font-size: 10px;
+  letter-spacing: .12em;
+  color: var(--color-text-dim);
+}
+
+.ws-nav-title,
+.ws-groups-head p {
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--color-text-muted);
+}
+
+.ws-nav-link {
+  font-size: 14.5px;
+  padding: 10px 12px;
+  min-height: 42px;
+  color: var(--color-text-light);
+}
+
+.ws-nav-link.active {
+  color: var(--color-text-main);
+}
+
+/* El contador de "Mis proyectos" en la barra lateral. */
+.ws-badge {
+  font-size: 11.5px;
+  color: var(--color-accent);
+  background: rgba(232, 84, 31, .16);
+}
+
+/* Grupos: una sola linea con elipsis. Antes "Equipo Producto Principal"
+   partia en dos lineas y desalineaba la lista. */
+.ws-group {
+  font-size: 14px;
+  padding: 9px 12px;
+  min-height: 40px;
+  color: var(--color-text-light);
+}
+
+.ws-group span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ws-foot-link {
+  font-size: 14px;
+  min-height: 40px;
+  color: var(--color-text-light);
+}
+
+.ws-foot-profile {
+  font-size: 14px;
+  min-height: 42px;
+}
+
+/* El bloque de promo ya no se empuja al fondo: ese `margin-top: auto`
+   dejaba un hueco muerto de ~150px entre "TUS GRUPOS" y el pie. Ahora el
+   hueco va DESPUES del promo (antes del pie de ajustes). */
+.ws-invite {
+  margin-top: 4px;
+  padding: 14px;
+  background: var(--color-surface);
+  border-color: var(--color-border-light);
+}
+
+.ws-invite p {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.ws-invite p b {
+  font-size: 14px;
+  color: var(--color-text-main);
+}
+
+.ws-invite-link {
+  font-size: 12px;
+}
+
+.ws-side-foot {
+  margin-top: auto;
+}
+
+.ws-topbar {
+  min-height: 68px;
+}
+
+.ws-crumbs {
+  font-size: 13.5px;
+}
+
+.ws-community {
+  font-size: 12px;
+}
+
+/* ==========================================================================
+   3. DASHBOARD
+   ========================================================================== */
+
+/* Las KPI se reparten el ancho con un minimo, en vez de estirarse a 4
+   columnas squeezas en cualquier pantalla. */
+.dash-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+/* Etiqueta a la izquierda, cifra a la derecha: el ancho de la tarjeta se
+   usa de verdad. Con la cifra encima, la tarjeta era una caja vacia con un
+   numero suelto. */
+.dash-kpi {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.dash-kpi-label {
+  font-family: var(--font-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.dash-kpi-value {
+  font-size: 32px;
+  color: var(--color-text-main);
+}
+
+.dash-section {
+  margin-bottom: 32px;
+}
+
+.dash-section-head h2 {
+  font-size: 19px;
+}
+
+.dash-count {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 2px 9px;
+  background: var(--color-chip-bg);
+  color: var(--color-text-light);
+  border: 1px solid var(--color-chip-border);
+}
+
+/* Columna lateral: un poco mas ancha para que los chips no se partan. */
+.dash-body-grid {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+}
+
+.dash-side-card {
+  gap: 12px;
+  padding: 18px;
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.dash-side-title {
+  font-size: 16px;
+}
+
+.dash-profile-id strong {
+  font-size: 1rem;
+}
+
+.dash-profile-id span {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dash-profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dash-profile-stats {
+  gap: 24px;
+  justify-content: flex-start;
+  padding-top: 12px;
+}
+
+.dash-profile-stats span {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dash-profile-stats b {
+  font-size: 1.15rem;
+}
+
+.dash-available {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--color-text-light);
+  cursor: pointer;
+}
+
+/* El checkbox crudo (cuadro blanco sobre fondo oscuro) se lee como un error
+   de estilo. Se sustituye por un interruptor: misma semantica, mismo dato. */
+.dash-available input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-light);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease;
+}
+
+.dash-available input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: transform .18s var(--ease-out), background .18s ease;
+}
+
+.dash-available input:checked {
+  background: rgba(232, 84, 31, .28);
+  border-color: var(--color-brand-500);
+}
+
+.dash-available input:checked::after {
+  transform: translateX(16px);
+  background: var(--color-brand-500);
+}
+
+.dash-side-empty {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.dash-activity li {
+  font-size: 13.5px;
+  color: var(--color-text-light);
+}
+
+.dash-side-community p {
+  font-size: 13.5px;
+}
+
+/* Estado vacio: antes 298px de alto para una frase. Ahora es un panel
+   horizontal compacto, con borde punteado, que deja claro que es un hueco
+   esperado y no un fallo de carga. */
+.empty-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 14px;
+  padding: 18px 20px;
+  text-align: left;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-chip-bg);
+  color: var(--color-text-muted);
+}
+
+.empty-state-icon {
+  grid-row: span 2;
+  font-size: 1.5rem;
+  margin-bottom: 0;
+  opacity: .55;
+}
+
+.empty-state h3 {
+  font-size: 1rem;
+  color: var(--color-text-main);
+  margin-bottom: 0;
+}
+
+.empty-state p {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.empty-state-action {
+  grid-column: 2;
+  margin-top: 8px;
+}
+
+/* ==========================================================================
+   4. TARJETA DE PROYECTO
+   ========================================================================== */
+
+.project-card-body {
+  gap: 10px;
+  padding: 16px 18px 18px;
+}
+
+/* La descripcion se recorta a 2 lineas. styles.css la fijaba a 3 con un
+   selector mas especifico (.project-card .project-card-description). */
+.project-card .project-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* El rating del autor ya no ocupa una fila entera con un "(4.4)". */
+.stars-inline-value {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.project-card-footer-cta {
+  padding-top: 12px;
+}
+
+.project-card-footer-cta .project-actions {
+  gap: 8px;
+}
+
+/* La accion principal ocupa el ancho de la tarjeta: es la unica accion que
+   el usuario viene a pulsar. */
+.project-card-footer-cta .project-actions .btn {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+
+.project-status {
+  font-size: 12px;
+  padding: 0.28rem 0.7rem;
+}
+
+/* ==========================================================================
+   5. TARJETA DE GRUPO
+   ========================================================================== */
+
+.groups-grid {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.group-card {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.group-card:hover {
+  border-color: var(--color-border-light);
+  box-shadow: var(--shadow-md);
+}
+
+.group-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.group-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.group-card-id {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.group-card-title {
+  font-size: 1.08rem;
+  line-height: 1.3;
+  margin: 0;
+  color: var(--color-text-main);
+}
+
+.group-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+}
+
+/* styles.css fija el color de los <span> de la meta del grupo en text-dim
+   (selector mas especifico que .meta-chip). Aqui se devuelve el color de
+   chip, que si cumple contraste. */
+.group-card-meta .meta-chip {
+  color: var(--color-text-light);
+  font-size: 13px;
+}
+
+.group-card-desc {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.group-card-avatars {
+  display: flex;
+  margin-top: auto;
+}
+
+.group-card-body .btn-block {
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   6. RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 1100px) {
+  .dash-body-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .dash-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

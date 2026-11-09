@@ -3,8 +3,7 @@ import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { useApp, AppProvider } from './context/AppContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { ModalProvider } from './context/ModalManager.jsx';
-import { LoggedHeader, PublicHeader } from './components/Header.jsx';
-import Footer from './components/Footer.jsx';
+import WorkspaceShell from './components/WorkspaceShell.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -29,21 +28,29 @@ function RedirectIfAuthed({ children }) {
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   return null;
+}
+
+function AppRoutes({ logged }) {
+  return <Routes>
+    <Route path="/login" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
+    <Route path="/register" element={<RedirectIfAuthed><Register /></RedirectIfAuthed>} />
+    <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+    <Route path="/proyectos/*" element={<RequireAuth><Projects /></RequireAuth>} />
+    <Route path="/personas" element={<RequireAuth><People /></RequireAuth>} />
+    <Route path="/grupos/:groupId?" element={<RequireAuth><Groups /></RequireAuth>} />
+    <Route path="/perfil" element={<RequireAuth><Profile /></RequireAuth>} />
+    <Route path="/ajustes" element={<RequireAuth><Settings /></RequireAuth>} />
+    <Route path="/" element={<Landing />} />
+    <Route path="*" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
+  </Routes>;
 }
 
 function App() {
   const { user, lang } = useApp();
-
-  useEffect(() => {
-    document.documentElement.lang = lang;
-  }, [lang]);
-
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   const logged = !!user;
-
   const { pathname } = useLocation();
   const isAuthPage = ['/login', '/register'].includes(pathname);
   const isLandingPage = pathname === '/';
@@ -51,22 +58,13 @@ function App() {
   return (
     <>
       <ScrollToTop />
-      {!isAuthPage && !isLandingPage && (logged ? <LoggedHeader /> : <PublicHeader />)}
-      <main className={isAuthPage ? 'auth-main' : isLandingPage ? 'landing-main' : 'content-wrapper'}>
-        <Routes>
-          <Route path="/login" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
-          <Route path="/register" element={<RedirectIfAuthed><Register /></RedirectIfAuthed>} />
-          <Route path="/" element={<RedirectIfAuthed><Landing /></RedirectIfAuthed>} />
-          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-          <Route path="/proyectos/*" element={<RequireAuth><Projects /></RequireAuth>} />
-          <Route path="/personas" element={<RequireAuth><People /></RequireAuth>} />
-          <Route path="/grupos/:groupId?" element={<RequireAuth><Groups /></RequireAuth>} />
-          <Route path="/perfil" element={<RequireAuth><Profile /></RequireAuth>} />
-          <Route path="/ajustes" element={<RequireAuth><Settings /></RequireAuth>} />
-          <Route path="*" element={<Navigate to={logged ? '/dashboard' : '/login'} replace />} />
-        </Routes>
-      </main>
-      {!isAuthPage && !isLandingPage && <Footer />}
+      {isLandingPage ? (
+        <main className="landing-main"><AppRoutes logged={logged} /></main>
+      ) : isAuthPage ? (
+        <main className="auth-main"><AppRoutes logged={logged} /></main>
+      ) : (
+        <WorkspaceShell><AppRoutes logged={logged} /></WorkspaceShell>
+      )}
     </>
   );
 }

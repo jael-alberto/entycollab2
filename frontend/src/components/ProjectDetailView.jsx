@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { StatusPill, ProjectBanner, Stars, SkillTags } from './common.jsx';
+import { Icon, ProjectBanner, SkillTags, Stars, StatusPill } from './common.jsx';
 import { formatDeadline } from './ProjectCard.jsx';
 import {
   getUserAvgRating, getCategoryLabel, escapeHTML
@@ -134,7 +134,7 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
     ownerActions = (
       <div className="detail-owner-actions">
         <div className="detail-owner-buttons">
-          <button className="btn btn-warning btn-sm" onClick={() => openRate(project.id)}>{t('detail.rateParticipants')}</button>
+          <button className="btn btn-warning btn-sm" onClick={() => openRate(project.id)}><Icon name="star" size={14} />{t('detail.rateParticipants')}</button>
           <button className="btn btn-danger btn-sm" onClick={() => onStatusChange('completed')}>{t('detail.culminate')}</button>
         </div>
         <p className="detail-hint">
@@ -285,7 +285,7 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
             <div className="steam-fact">
               <dt>{t('detail.minRatingTitle')}</dt>
               <dd>
-                <span className="min-rating-stars">{'★'.repeat(project.minRating || 1)}{'☆'.repeat(5 - (project.minRating || 1))}</span>
+                <span className="min-rating-stars"><Stars rating={project.minRating || 1} showValue={false} size={12} /></span>
               </dd>
             </div>
             <div className="steam-fact">
