@@ -5,6 +5,16 @@ import { getAuthToken, getRefreshToken, setAuthTokens, clearAuthTokens } from '.
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// En despliegues (Vercel) el fallback a localhost rompe la app en silencio.
+// Avisa para que sea evidente que falta configurar VITE_API_URL.
+if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
+  console.error(
+    '[api] VITE_API_URL no está definida en este build. ' +
+    'Las peticiones irán a http://localhost:3001/api y fallarán. ' +
+    'Configura VITE_API_URL con la URL pública del backend.'
+  );
+}
+
 class ApiError extends Error {
   constructor(message, status, code, details) {
     super(message);
