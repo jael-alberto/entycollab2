@@ -208,13 +208,6 @@ export default function GameAuth({ initialMode }) {
     </div>
   );
 
-  const notice = (
-    <div className="ga-notice" role="note">
-      <Icon name="alert" size={16} />
-      <span>Prototipo visual. No introduzcas contraseñas reales. Cuenta demo: <b>maria@demo.com</b> / <b>123456</b>.</span>
-    </div>
-  );
-
   return (
     <div className="ga-page">
       <SkipLink targetId="ga-main" />
@@ -249,7 +242,7 @@ export default function GameAuth({ initialMode }) {
           {isRegister ? (
             <section className="ga-form-wrap" aria-labelledby="ga-register-title">
               <p className="ga-eyebrow">BIENVENIDO A ENTYTEC COLLAB</p>
-              <h1 id="ga-register-title">Crea tu cuenta demo</h1>
+              <h1 id="ga-register-title">Crea tu cuenta</h1>
               <p className="ga-lead">Crea tu cuenta y empieza a construir con la comunidad.</p>
               {stepError && <p className="ga-error" role="alert">{stepError}</p>}
 
@@ -354,7 +347,6 @@ export default function GameAuth({ initialMode }) {
                 </button>
               </form>
               <p className="ga-switch">{t('auth.newHere')} <Link to="/register">{t('auth.createOne')}</Link></p>
-              {notice}
             </section>
           )}
         </main>

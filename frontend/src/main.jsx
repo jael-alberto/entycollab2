@@ -9,8 +9,7 @@ import './components/ui/ui.css';
 import './styles/sec-projects.css';
 import './styles/ux.css';
 
-// Todos los datos vienen del backend (/api/bootstrap).
-// localStorage solo guarda tokens de sesión, tema, idioma y grupo activo.
+// Todos los datos provienen del backend propio y Supabase (/api/bootstrap).
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>

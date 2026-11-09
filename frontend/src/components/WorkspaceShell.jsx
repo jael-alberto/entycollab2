@@ -52,12 +52,12 @@ export default function WorkspaceShell({ children }) {
   const wsRef = useRef(null);
   const [wsOpen, setWsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => localStorage.getItem('devcollab_sidebar') === 'collapsed'
+    () => localStorage.getItem('entycollab_sidebar') === 'collapsed'
   );
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(prev => {
-      localStorage.setItem('devcollab_sidebar', prev ? 'expanded' : 'collapsed');
+      localStorage.setItem('entycollab_sidebar', prev ? 'expanded' : 'collapsed');
       return !prev;
     });
   }, []);

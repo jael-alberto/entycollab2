@@ -21,7 +21,7 @@ import {
   getActiveGroupId, setActiveGroupId,
   getTheme, setTheme as storeSetTheme,
   getLang, setLang as storeSetLang
-} from '../lib/store.js';
+} from '../lib/preferences.js';
 import { getAuthToken, setAuthTokens, clearAuthTokens } from '../lib/authToken.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { userCategories } from '../lib/helpers.js';
