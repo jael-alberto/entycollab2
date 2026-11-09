@@ -122,29 +122,10 @@ export const login = asyncHandler(async (req, res) => {
     !process.env.SUPABASE_SECRET_KEY.startsWith('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...')
   );
 
-  // Si Supabase está configurado y el auth falló, intentamos modo fallback:
-  // - Si el perfil existe, usamos modo demo (para cuentas VITE_USE_SUPABASE=false)
-  // - Si no, lanzamos error normal
+  // Con Supabase configurado, las credenciales deben ser válidas: no se emiten
+  // tokens sintéticos. Un token falso rompería las rutas protegidas (401).
   if (isSupabaseConfigured && (authError || !authData?.session)) {
-    // Fallback a modo demo: el perfil existe pero Supabase auth falló
-    // (ocurre cuando VITE_USE_SUPABASE=false y las cuentas son locales)
-    const fullProfile = await prisma.profile.findUnique({
-      where: { id: profile.id }
-    });
-
-    // Generar tokens sintéticos para modo demo
-    const demoAccessToken = 'demo-local-' + profile.id;
-    const demoRefreshToken = 'demo-refresh-' + profile.id;
-
-    res.json({
-      message: 'Inicio de sesión exitoso (modo local)',
-      user: serializeProfile(fullProfile, { includeEmail: true }),
-      session: {
-        access_token: demoAccessToken,
-        refresh_token: demoRefreshToken
-      }
-    });
-    return;
+    throw new UnauthorizedError('Correo o contraseña incorrectos');
   }
 
   // Si Supabase no está configurado, modo demo directo

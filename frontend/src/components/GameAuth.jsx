@@ -123,6 +123,10 @@ export default function GameAuth({ initialMode }) {
       setStep(1);
       return;
     }
+    if (result !== 'ok') {
+      setStepError(t('toast.registerError'));
+      return;
+    }
     showToast(t('toast.welcome', { name: username.replace(/^@/, '').trim() }), 'success');
     navigate('/perfil');
   };

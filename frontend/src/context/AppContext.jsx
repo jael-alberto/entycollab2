@@ -1,50 +1,249 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { api } from '../lib/api/client.js';
 import {
-  getUsers, getProjects, getApplications, getRatings,
-  getGroups, saveUsers, saveProjects, saveApplications, saveRatingsData, saveGroups,
-  getCurrentUserId, setCurrentUserId, clearCurrentUserId,
-  getActiveGroupId, setActiveGroupId, generateId, hashPassword, getTheme, setTheme as storeSetTheme, getLang, setLang as storeSetLang
+  createGroup as createGroupApi,
+  updateGroup as updateGroupApi,
+  deleteGroup as deleteGroupApi,
+  removeGroupMember as removeGroupMemberApi,
+  setGroupMemberRole as setGroupMemberRoleApi,
+  requestToJoinGroup as requestToJoinGroupApi,
+  decideGroupRequest as decideGroupRequestApi
+} from '../lib/api/groups.js';
+import { createProject as createProjectApi, changeProjectStatus as changeProjectStatusApi } from '../lib/api/projects.js';
+import {
+  applyToProject as applyToProjectApi,
+  sendInvite as sendInviteApi,
+  handleApplication as handleApplicationApi,
+  respondInvite as respondInviteApi
+} from '../lib/api/applications.js';
+import { saveRatings as saveRatingsApi } from '../lib/api/ratings.js';
+import {
+  getActiveGroupId, setActiveGroupId,
+  getTheme, setTheme as storeSetTheme,
+  getLang, setLang as storeSetLang
 } from '../lib/store.js';
+import { getAuthToken, setAuthTokens, clearAuthTokens } from '../lib/authToken.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
-import { getUserAvgRating, userCategories } from '../lib/helpers.js';
+import { userCategories } from '../lib/helpers.js';
 
 const AppContext = createContext(null);
 
+// ============================================================================
+// NORMALIZACIÓN: respuesta del backend -> modelo que usan las pantallas
+// El backend ya devuelve alias camelCase, pero completamos defaults para que
+// las vistas puedan asumir arrays/booleanos sin comprobaciones defensivas.
+// ============================================================================
+
+function toLocalized(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  const text = String(value ?? '');
+  return { es: text, en: text };
+}
+
+function profileFromApi(profile) {
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    name: profile.name || '',
+    username: profile.username || '',
+    email: profile.email || '',
+    avatar: profile.avatar || '',
+    skills: Array.isArray(profile.skills) ? profile.skills : [],
+    categories: Array.isArray(profile.categories) ? profile.categories : [],
+    bio: profile.bio ?? '',
+    githubUrl: profile.githubUrl ?? profile.github_url ?? '',
+    portfolioUrl: profile.portfolioUrl ?? profile.portfolio_url ?? '',
+    available: Boolean(profile.available),
+    featuredProjectIds: profile.featuredProjectIds ?? profile.featured_project_ids ?? [],
+    gameTypes: profile.gameTypes ?? profile.game_types ?? [],
+    languages: Array.isArray(profile.languages) ? profile.languages : [],
+    favoriteGenres: profile.favoriteGenres ?? profile.favorite_genres ?? [],
+    disciplines: Array.isArray(profile.disciplines) ? profile.disciplines : [],
+    createdAt: profile.createdAt ?? profile.created_at ?? null
+  };
+}
+
+function projectFromApi(project) {
+  if (!project) return null;
+  return {
+    ...project,
+    ownerId: project.ownerId ?? project.owner_id ?? null,
+    groupId: project.groupId ?? project.group_id ?? null,
+    minRating: project.minRating ?? project.min_rating ?? 0,
+    createdAt: project.createdAt ?? project.created_at ?? null,
+    tech: Array.isArray(project.tech) ? project.tech : [],
+    roles: Array.isArray(project.roles) ? project.roles : []
+  };
+}
+
+function groupFromApi(group) {
+  if (!group) return null;
+  return {
+    ...group,
+    ownerId: group.ownerId ?? group.owner_id ?? null,
+    isPrivate: Boolean(group.isPrivate ?? group.is_private),
+    createdAt: group.createdAt ?? group.created_at ?? null,
+    members: Array.isArray(group.members)
+      ? group.members
+        .map(member => ({
+          ...member,
+          userId: member.userId ?? member.user_id ?? null,
+          joinedAt: member.joinedAt ?? member.joined_at ?? null
+        }))
+        .filter(member => member.userId)
+      : [],
+    requests: Array.isArray(group.requests)
+      ? group.requests.map(request => ({
+        ...request,
+        userId: request.userId ?? request.user_id ?? null,
+        requestedAt: request.requestedAt ?? request.requested_at ?? null
+      }))
+      : []
+  };
+}
+
+function applicationFromApi(application) {
+  if (!application) return null;
+  return {
+    ...application,
+    projectId: application.projectId ?? application.project_id ?? null,
+    userId: application.userId ?? application.user_id ?? null,
+    projectRole: application.projectRole ?? application.project_role ?? '',
+    invitedBy: application.invitedBy ?? application.invited_by ?? null,
+    appliedAt: application.appliedAt ?? application.applied_at ?? null,
+    pitch: application.pitch ?? application.message ?? ''
+  };
+}
+
+function ratingFromApi(rating) {
+  if (!rating) return null;
+  return {
+    ...rating,
+    projectId: rating.projectId ?? rating.project_id ?? null,
+    ratedUserId: rating.ratedUserId ?? rating.rated_user_id ?? null,
+    ratedBy: rating.ratedBy ?? rating.rated_by ?? null,
+    stars: Number(rating.stars) || 0,
+    createdAt: rating.createdAt ?? rating.created_at ?? null,
+    updatedAt: rating.updatedAt ?? rating.updated_at ?? null
+  };
+}
+
+function errorMessage(error, fallback) {
+  if (!error) return fallback;
+  return error.message || fallback;
+}
+
 export function AppProvider({ children }) {
-  const [users, setUsers] = useState(() => getUsers());
-  const [projects, setProjects] = useState(() => getProjects());
-  const [applications, setApplications] = useState(() => getApplications());
-  const [ratings, setRatings] = useState(() => getRatings());
-  const [groups, setGroups] = useState(() => getGroups());
-  const [userId, setUserId] = useState(() => getCurrentUserId());
+  const [users, setUsers] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [ratings, setRatings] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [activeGroupId, setActiveGroupIdState] = useState(() => getActiveGroupId());
   const [lang, setLangState] = useState(() => getLang());
   const [theme, setThemeState] = useState(() => getTheme());
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
 
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedTechFilters, setSelectedTechFilters] = useState([]);
 
-  const user = users.find(u => u.id === userId) || null;
+  const user = useMemo(
+    () => users.find(u => u.id === userId) || currentUser || null,
+    [users, userId, currentUser]
+  );
   const activeGroup = groups.find(g => g.id === activeGroupId) || null;
   const activeMembership = activeGroup?.members?.find(m => m.userId === userId) || null;
   const isActiveGroupAdmin = activeMembership?.role === 'owner' || activeMembership?.role === 'admin';
 
-  // Resincronizar los datos tras cada cambio (localStorage siempre gana)
-  const refresh = useCallback(() => {
-    setUsers(getUsers());
-    setProjects(getProjects());
-    setApplications(getApplications());
-    setRatings(getRatings());
-    setGroups(getGroups());
-    setUserId(getCurrentUserId());
-    setActiveGroupIdState(getActiveGroupId());
+  // ========================================================================
+  // DATOS
+  // ========================================================================
+  const loadData = useCallback(async () => {
+    const data = await api.bootstrap.get();
+    const normalized = {
+      users: (data.profiles || []).map(profileFromApi).filter(Boolean),
+      projects: (data.projects || []).map(projectFromApi).filter(Boolean),
+      applications: (data.applications || []).map(applicationFromApi).filter(Boolean),
+      ratings: (data.ratings || []).map(ratingFromApi).filter(Boolean),
+      groups: (data.groups || []).map(groupFromApi).filter(Boolean)
+    };
+
+    setUsers(normalized.users);
+    setProjects(normalized.projects);
+    setApplications(normalized.applications);
+    setRatings(normalized.ratings);
+    setGroups(normalized.groups);
+    return normalized;
   }, []);
 
-  const setUserInStore = useCallback((id) => {
-    setCurrentUserId(id);
-    setUserId(id);
+  const refresh = useCallback(async () => {
+    try {
+      await loadData();
+    } catch (error) {
+      console.error('[AppContext] No se pudieron recargar los datos:', error);
+    }
+  }, [loadData]);
+
+  const replaceUser = useCallback((rawProfile) => {
+    const updated = profileFromApi(rawProfile);
+    if (!updated) return null;
+    setUsers(prev => {
+      const exists = prev.some(item => item.id === updated.id);
+      return exists
+        ? prev.map(item => (item.id === updated.id ? { ...item, ...updated } : item))
+        : [updated, ...prev];
+    });
+    setCurrentUser(prev => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+    return updated;
   }, []);
+
+  // Restaurar sesión + carga inicial. Se hace una sola vez al montar.
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      let restoredUser = null;
+
+      if (getAuthToken()) {
+        try {
+          const { user: me } = await api.auth.me();
+          restoredUser = profileFromApi(me);
+        } catch {
+          // Token caducado o inválido: seguimos como visitante.
+          clearAuthTokens();
+        }
+      }
+
+      if (cancelled) return;
+
+      if (restoredUser) {
+        setCurrentUser(restoredUser);
+        setUserId(restoredUser.id);
+      }
+
+      try {
+        await loadData();
+      } catch (error) {
+        console.error('[AppContext] No se pudo cargar el bootstrap:', error);
+      }
+
+      if (!cancelled) setAuthReady(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [loadData]);
+
+  // Si el grupo activo deja de existir o de ser visible, lo limpiamos.
+  useEffect(() => {
+    if (!authReady || !activeGroupId) return;
+    if (!groups.some(group => group.id === activeGroupId)) {
+      setActiveGroupId(null);
+      setActiveGroupIdState(null);
+    }
+  }, [authReady, activeGroupId, groups]);
 
   // ========================================================================
   // I18N / THEME
@@ -64,9 +263,6 @@ export function AppProvider({ children }) {
     setThemeState(next);
   }, []);
 
-  // Aplica theme + lang al <html> (igual que applyTheme/applyLanguage del vanilla)
-  // `dark` y `light` son excluyentes: `dark` mantiene vivos los overrides
-  // `:root.dark <selector>` de styles.css; `light` restaura la paleta clara.
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme);
     document.documentElement.classList.toggle('light', !theme);
@@ -77,393 +273,390 @@ export function AppProvider({ children }) {
   // ========================================================================
   const login = useCallback(async (identifier, password) => {
     const cleanIdentifier = String(identifier || '').trim().toLowerCase().replace(/^@/, '');
-    const current = getUsers();
-    const candidate = current.find(u =>
-      (u.email && u.email.toLowerCase() === cleanIdentifier) ||
-      (u.username && u.username.toLowerCase() === cleanIdentifier)
-    );
-    if (!candidate) return null;
 
-    const hash = await hashPassword(password);
-    const valid =
-      (candidate.passwordHash && candidate.passwordHash === hash) ||
-      (candidate.password && candidate.password === password) ||
-      (candidate.passwordHash && candidate.passwordHash === password) ||
-      (!candidate.passwordHash && !candidate.password);
-
-    if (!valid) return null;
-
-    setUserInStore(candidate.id);
-    return candidate;
-  }, [setUserInStore]);
+    try {
+      const data = await api.auth.login({ identifier: cleanIdentifier, password });
+      if (data.session?.access_token) {
+        setAuthTokens(data.session.access_token, data.session.refresh_token);
+      }
+      const profile = profileFromApi(data.user);
+      setCurrentUser(profile);
+      setUserId(profile?.id || null);
+      await loadData();
+      return profile;
+    } catch (error) {
+      console.warn('[AppContext] Login fallido:', errorMessage(error, 'Error de autenticación'));
+      clearAuthTokens();
+      setCurrentUser(null);
+      setUserId(null);
+      return null;
+    }
+  }, [loadData]);
 
   const register = useCallback(async (data) => {
-    const current = getUsers();
-    if (current.find(u => u.email === data.email)) return 'email';
-    if (current.find(u => u.username === data.username)) return 'username';
-    const hash = await hashPassword(data.password);
-    const newUser = {
-      id: generateId(),
-      name: data.name,
-      username: data.username,
-      email: data.email,
-      passwordHash: hash,
-      skills: data.skills,
-      categories: userCategories({ skills: data.skills }),
-      bio: data.bio,
-      // Perfil de talento: arranca vacío. Las cuentas nuevas no aparecen en
-      // los filtros hasta que completan tipo de juego y habilidad, y Ajustes
-      // avisa de ello. Las estrellas vienen de las reseñas, no se editan aquí.
-      languages: (data.languages || []).slice(),
-      disciplines: (data.disciplines || []).slice(),
-      gameTypes: (data.gameTypes || []).slice(),
-      favoriteGenres: (data.favoriteGenres || []).slice(),
-      createdAt: new Date().toISOString()
-    };
-    current.push(newUser);
-    saveUsers(current);
-    setUsers(current);
-    setUserInStore(newUser.id);
-    return 'ok';
-  }, [setUserInStore]);
+    try {
+      const payload = {
+        name: data.name,
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        bio: data.bio || '',
+        skills: data.skills || [],
+        categories: data.categories || userCategories({ skills: data.skills }),
+        gameTypes: data.gameTypes || [],
+        languages: data.languages || [],
+        favoriteGenres: data.favoriteGenres || [],
+        disciplines: data.disciplines || []
+      };
 
-  const logout = useCallback(() => {
-    clearCurrentUserId();
-    setActiveGroupId(null);
+      const result = await api.auth.register(payload);
+      if (result.session?.access_token) {
+        setAuthTokens(result.session.access_token, result.session.refresh_token);
+        setCurrentUser(profileFromApi(result.user));
+        setUserId(result.user?.id || null);
+        await loadData();
+      } else {
+        // La cuenta se creó pero no hubo sesión automática: entramos manualmente.
+        const profile = await login(payload.email, payload.password);
+        if (!profile) return 'error';
+      }
+      return 'ok';
+    } catch (error) {
+      const message = errorMessage(error, '');
+      if (/correo|email/i.test(message) && error?.status === 409) return 'email';
+      if (/usuario|username/i.test(message) && error?.status === 409) return 'username';
+      console.error('[AppContext] Registro fallido:', message);
+      return 'error';
+    }
+  }, [loadData, login]);
+
+  const logout = useCallback(async () => {
+    try {
+      await api.auth.logout();
+    } catch {
+      // El token puede haber caducado: cerramos sesión igualmente.
+    }
+    clearAuthTokens();
+    setCurrentUser(null);
     setUserId(null);
-    setActiveGroupIdState(null);
     setMenuOpen(false);
-  }, []);
+    setActiveGroupId(null);
+    setActiveGroupIdState(null);
+    await refresh();
+  }, [refresh]);
 
   // ========================================================================
   // PROFILE
   // ========================================================================
-  const saveProfile = useCallback((data) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx >= 0) {
-      current[idx].bio = data.bio;
-      current[idx].skills = data.skills.slice();
-      if (data.categories) current[idx].categories = data.categories.slice();
-      if (data.githubUrl !== undefined) current[idx].githubUrl = data.githubUrl;
-      if (data.portfolioUrl !== undefined) current[idx].portfolioUrl = data.portfolioUrl;
-      // Perfil de talento: es lo que usa el buscador de Personas
-      current[idx].gameTypes = (data.gameTypes || []).slice();
-      current[idx].languages = (data.languages || []).slice();
-      current[idx].favoriteGenres = (data.favoriteGenres || []).slice();
-      current[idx].disciplines = (data.disciplines || []).slice();
-      saveUsers(current);
-      setUsers(current);
-      refresh();
+  const saveProfile = useCallback(async (data) => {
+    if (!userId) return null;
+    try {
+      const { user: updated } = await api.profiles.update(userId, {
+        bio: toLocalized(data.bio),
+        skills: data.skills || [],
+        categories: data.categories,
+        githubUrl: data.githubUrl,
+        portfolioUrl: data.portfolioUrl,
+        gameTypes: data.gameTypes || [],
+        languages: data.languages || [],
+        favoriteGenres: data.favoriteGenres || [],
+        disciplines: data.disciplines || []
+      });
+      return replaceUser(updated);
+    } catch (error) {
+      console.error('[AppContext] No se pudo guardar el perfil:', errorMessage(error, 'Error guardando perfil'));
+      return null;
     }
-  }, [userId, refresh]);
+  }, [userId, replaceUser]);
 
-  // Edita los datos de la cuenta desde Ajustes. El correo y el usuario
-  // siguen siendo únicos, igual que en register(). La contraseña solo se
-  // cambia si viene una nueva.
   const updateAccount = useCallback(async ({ name, username, email, password }) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx < 0) return 'error';
+    if (!userId) return 'error';
 
     const cleanName = String(name || '').trim();
-    const cleanUsername = String(username || '').trim();
+    const cleanUsername = String(username || '').trim().toLowerCase();
     const cleanEmail = String(email || '').trim().toLowerCase();
     if (!cleanName || !cleanUsername || !cleanEmail) return 'incomplete';
 
-    if (current.some(u => u.id !== userId && u.email === cleanEmail)) return 'email';
-    if (current.some(u => u.id !== userId && u.username === cleanUsername)) return 'username';
+    try {
+      const { user: updated } = await api.profiles.update(userId, {
+        name: cleanName,
+        username: cleanUsername,
+        email: cleanEmail
+      });
+      replaceUser(updated);
 
-    const target = current[idx];
-    target.name = cleanName;
-    target.username = cleanUsername;
-    target.email = cleanEmail;
-    if (password) {
-      target.passwordHash = await hashPassword(password);
+      if (password) {
+        await api.auth.updatePassword({ password });
+      }
+
+      return 'ok';
+    } catch (error) {
+      const message = errorMessage(error, '');
+      if (/correo|email/i.test(message)) return 'email';
+      if (/usuario|username/i.test(message)) return 'username';
+      console.error('[AppContext] No se pudo actualizar la cuenta:', message);
+      return 'error';
     }
+  }, [userId, replaceUser]);
 
-    saveUsers(current);
-    setUsers(current);
-    refresh();
-    return 'ok';
-  }, [userId, refresh]);
-
-  const setAvatar = useCallback((avatar) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx >= 0) {
-      current[idx].avatar = avatar;
-      saveUsers(current);
-      setUsers(current);
-      refresh();
+  const setAvatar = useCallback(async (avatar) => {
+    if (!userId) return null;
+    try {
+      const { user: updated } = await api.profiles.update(userId, { avatar: avatar || null });
+      return replaceUser(updated);
+    } catch (error) {
+      console.error('[AppContext] No se pudo actualizar el avatar:', errorMessage(error, 'Error guardando avatar'));
+      return null;
     }
-  }, [userId, refresh]);
+  }, [userId, replaceUser]);
 
-  const toggleAvailability = useCallback(() => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx < 0) return;
-    current[idx].available = !(current[idx].available === true);
-    const on = current[idx].available;
-    saveUsers(current);
-    setUsers(current);
-    refresh();
-    return on;
-  }, [userId, refresh]);
-
-  const saveFeaturedProjects = useCallback((projectIds) => {
-    const current = getUsers();
-    const idx = current.findIndex(u => u.id === userId);
-    if (idx >= 0) {
-      current[idx].featuredProjectIds = projectIds.slice();
-      saveUsers(current);
-      setUsers(current);
-      refresh();
+  const toggleAvailability = useCallback(async () => {
+    if (!userId) return false;
+    try {
+      const { user: updated, available } = await api.profiles.toggleAvailability(userId);
+      replaceUser(updated);
+      return available;
+    } catch (error) {
+      console.error('[AppContext] No se pudo cambiar la disponibilidad:', errorMessage(error, 'Error'));
+      return null;
     }
-  }, [userId, refresh]);
+  }, [userId, replaceUser]);
+
+  const saveFeaturedProjects = useCallback(async (projectIds) => {
+    if (!userId) return null;
+    try {
+      const { user: updated } = await api.profiles.saveFeatured(userId, projectIds);
+      return replaceUser(updated);
+    } catch (error) {
+      console.error('[AppContext] No se pudieron guardar los destacados:', errorMessage(error, 'Error'));
+      return null;
+    }
+  }, [userId, replaceUser]);
 
   // ========================================================================
   // PROJECTS
   // ========================================================================
-  const createProject = useCallback((data) => {
+  const createProject = useCallback(async (data) => {
     if (activeGroup && !isActiveGroupAdmin) return null;
-    const project = {
-      id: generateId(),
-      ownerId: userId,
-      title: data.title,
+
+    const payload = {
+      title: toLocalized(data.title),
+      description: toLocalized(data.description),
       category: data.category,
-      slots: data.slots,
-      tech: data.tech,
-      minRating: data.minRating,
-      description: data.description,
+      slots: Number(data.slots) || 1,
+      tech: data.tech || [],
       deadline: data.deadline || null,
       repo: data.repo || null,
       image: data.image || null,
-      groupId: activeGroup?.id || null,
-      roles: (data.roles || []).filter(Boolean),
-      status: 'open',
-      createdAt: new Date().toISOString()
+      roles: (data.roles || []).filter(Boolean)
     };
-    const current = getProjects();
-    current.push(project);
-    saveProjects(current);
-    setProjects(current);
-    return project;
-  }, [userId, activeGroup, isActiveGroupAdmin]);
+    if (typeof data.minRating === 'number') payload.minRating = data.minRating;
+    if (activeGroup?.id) payload.groupId = activeGroup.id;
+
+    try {
+      const project = projectFromApi(await createProjectApi(payload));
+      if (project) setProjects(prev => [project, ...prev.filter(item => item.id !== project.id)]);
+      return project;
+    } catch (error) {
+      console.error('[AppContext] No se pudo crear el proyecto:', errorMessage(error, 'Error creando proyecto'));
+      throw new Error(errorMessage(error, 'No se pudo crear el proyecto'));
+    }
+  }, [activeGroup, isActiveGroupAdmin]);
+
+  const changeProjectStatus = useCallback(async (projectId, newStatus) => {
+    try {
+      const result = await changeProjectStatusApi(projectId, newStatus);
+      if (typeof result === 'string') return result;
+      const project = projectFromApi(result);
+      setProjects(prev => prev.map(item => (item.id === project.id ? { ...item, ...project } : item)));
+      return project;
+    } catch (error) {
+      console.error('[AppContext] No se pudo cambiar el estado:', errorMessage(error, 'Error'));
+      return null;
+    }
+  }, []);
 
   // ========================================================================
   // GROUPS
-  // Un grupo encapsula su membresía y sus solicitudes. El dueño es el único
-  // que puede nombrar administradores; los administradores gestionan solicitudes
-  // y pueden crear proyectos dentro del contexto del grupo.
   // ========================================================================
   const selectGroup = useCallback((groupId) => {
-    setActiveGroupId(groupId);
+    setActiveGroupId(groupId || null);
     setActiveGroupIdState(groupId || null);
   }, []);
 
-  const createGroup = useCallback(({ name, description }) => {
-    const group = {
-      id: generateId(), name: name.trim(), description: description.trim(), ownerId: userId,
-      createdAt: new Date().toISOString(),
-      members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
-      requests: []
-    };
-    const current = getGroups();
-    current.push(group);
-    saveGroups(current);
-    setGroups(current);
-    selectGroup(group.id);
-    return group;
-  }, [userId, selectGroup]);
-
-  const requestToJoinGroup = useCallback((groupId) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return 'missing';
-    if ((group.members || []).some(m => m.userId === userId)) return 'member';
-    if ((group.requests || []).some(r => r.userId === userId && r.status === 'pending')) return 'pending';
-    group.requests = [...(group.requests || []), { id: generateId(), userId, status: 'pending', requestedAt: new Date().toISOString() }];
-    saveGroups(current); setGroups(current); return 'ok';
-  }, [userId]);
-
-  const decideGroupRequest = useCallback((groupId, requestId, accepted) => {
-    const current = getGroups(); const group = current.find(g => g.id === groupId);
-    const me = group?.members?.find(m => m.userId === userId);
-    if (!group || !me || !['owner', 'admin'].includes(me.role)) return false;
-    const request = group.requests?.find(r => r.id === requestId);
-    if (!request || request.status !== 'pending') return false;
-    request.status = accepted ? 'accepted' : 'rejected';
-    if (accepted) group.members.push({ userId: request.userId, role: 'member', joinedAt: new Date().toISOString() });
-    saveGroups(current); setGroups(current); return true;
-  }, [userId]);
-
-  const setGroupMemberRole = useCallback((groupId, memberId, role) => {
-    const current = getGroups(); const group = current.find(g => g.id === groupId);
-    if (!group || group.ownerId !== userId || !['admin', 'member'].includes(role)) return false;
-    const member = group.members?.find(m => m.userId === memberId);
-    if (!member || member.role === 'owner') return false;
-    member.role = role; saveGroups(current); setGroups(current); return true;
-  }, [userId]);
-
-  const updateGroup = useCallback((groupId, { name, description }) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return false;
-    const me = group.members?.find(m => m.userId === userId);
-    if (!me || !['owner', 'admin'].includes(me.role)) return false;
-    if (name && name.trim()) group.name = name.trim();
-    if (description !== undefined) group.description = description.trim();
-    saveGroups(current);
-    setGroups(current);
-    return true;
-  }, [userId]);
-
-  const removeGroupMember = useCallback((groupId, memberId) => {
-    const current = getGroups();
-    const group = current.find(g => g.id === groupId);
-    if (!group) return false;
-    const me = group.members?.find(m => m.userId === userId);
-    if (!me || !['owner', 'admin'].includes(me.role)) return false;
-    if (group.ownerId === memberId) return false;
-    group.members = (group.members || []).filter(m => m.userId !== memberId);
-    saveGroups(current);
-    setGroups(current);
-    return true;
-  }, [userId]);
-
-  const changeProjectStatus = useCallback((projectId, newStatus) => {
-    const current = getProjects();
-    const idx = current.findIndex(p => p.id === projectId);
-    if (idx < 0) return null;
-    if (newStatus === 'completed') {
-      const accepted = getApplications().filter(a => a.projectId === projectId && a.status === 'accepted');
-      if (accepted.length === 0) return 'noParticipants';
+  const createGroup = useCallback(async ({ name, description, isPrivate }) => {
+    try {
+      const created = await createGroupApi({
+        name: String(name || '').trim(),
+        description: String(description || '').trim(),
+        isPrivate: Boolean(isPrivate)
+      });
+      const { groups: nextGroups } = await loadData();
+      const group = nextGroups.find(item => item.id === created.id) || groupFromApi(created);
+      if (group) selectGroup(group.id);
+      return group;
+    } catch (error) {
+      console.error('[AppContext] No se pudo crear el grupo:', errorMessage(error, 'Error creando grupo'));
+      return null;
     }
-    current[idx].status = newStatus;
-    saveProjects(current);
-    setProjects(current);
-    return current[idx];
-  }, []);
+  }, [loadData, selectGroup]);
+
+  const requestToJoinGroup = useCallback(async (groupId) => {
+    try {
+      const result = await requestToJoinGroupApi(groupId);
+      if (result === 'pending' || result === 'member') return result;
+      await loadData();
+      return 'ok';
+    } catch (error) {
+      console.error('[AppContext] No se pudo solicitar el ingreso:', errorMessage(error, 'Error'));
+      return 'error';
+    }
+  }, [loadData]);
+
+  const decideGroupRequest = useCallback(async (groupId, requestId, accepted) => {
+    try {
+      await decideGroupRequestApi(groupId, requestId, accepted);
+      await loadData();
+      return true;
+    } catch (error) {
+      console.error('[AppContext] No se pudo decidir la solicitud:', errorMessage(error, 'Error'));
+      return false;
+    }
+  }, [loadData]);
+
+  const setGroupMemberRole = useCallback(async (groupId, memberId, role) => {
+    if (!['admin', 'member'].includes(role)) return false;
+    try {
+      await setGroupMemberRoleApi(groupId, memberId, role);
+      await loadData();
+      return true;
+    } catch (error) {
+      console.error('[AppContext] No se pudo cambiar el rol:', errorMessage(error, 'Error'));
+      return false;
+    }
+  }, [loadData]);
+
+  const updateGroup = useCallback(async (groupId, { name, description, isPrivate } = {}) => {
+    const payload = {};
+    if (name && String(name).trim()) payload.name = String(name).trim();
+    if (description !== undefined) payload.description = String(description).trim();
+    if (isPrivate !== undefined) payload.isPrivate = Boolean(isPrivate);
+
+    try {
+      await updateGroupApi(groupId, payload);
+      await loadData();
+      return true;
+    } catch (error) {
+      console.error('[AppContext] No se pudo actualizar el grupo:', errorMessage(error, 'Error'));
+      return false;
+    }
+  }, [loadData]);
+
+  const deleteGroup = useCallback(async (groupId) => {
+    try {
+      await deleteGroupApi(groupId);
+      if (activeGroupId === groupId) selectGroup(null);
+      await loadData();
+      return true;
+    } catch (error) {
+      console.error('[AppContext] No se pudo eliminar el grupo:', errorMessage(error, 'Error'));
+      return false;
+    }
+  }, [activeGroupId, loadData, selectGroup]);
+
+  const removeGroupMember = useCallback(async (groupId, memberId) => {
+    try {
+      await removeGroupMemberApi(groupId, memberId);
+      await loadData();
+      return true;
+    } catch (error) {
+      console.error('[AppContext] No se pudo quitar al miembro:', errorMessage(error, 'Error'));
+      return false;
+    }
+  }, [loadData]);
 
   // ========================================================================
   // APPLICATIONS
   // ========================================================================
-  const applyToProject = useCallback((projectId, pitch = '') => {
-    const current = getApplications();
-    if (current.find(a => a.projectId === projectId && a.userId === userId)) return 'alreadyApplied';
-
-    const project = getProjects().find(p => p.id === projectId);
-    if (project && project.minRating) {
-      const userRating = getUserAvgRating(userId, ratings);
-      if (userRating < project.minRating) return 'minRating';
+  const applyToProject = useCallback(async (projectId, pitch = '') => {
+    try {
+      const result = await applyToProjectApi(projectId, pitch);
+      if (typeof result === 'string') return result;
+      const application = applicationFromApi(result);
+      if (application) {
+        setApplications(prev => [application, ...prev.filter(item => item.id !== application.id)]);
+      }
+      return 'ok';
+    } catch (error) {
+      console.error('[AppContext] No se pudo postular:', errorMessage(error, 'Error'));
+      return 'error';
     }
-
-    current.push({
-      id: generateId(),
-      projectId,
-      userId,
-      status: 'pending',
-      pitch: String(pitch || ''),
-      appliedAt: new Date().toISOString()
-    });
-    saveApplications(current);
-    setApplications(current);
-    return 'ok';
-  }, [userId, ratings]);
-
-  const handleApplication = useCallback((appId, newStatus, projectId, projectRole = '') => {
-    const current = getApplications();
-    const idx = current.findIndex(a => a.id === appId);
-    if (idx < 0) return null;
-    const project = getProjects().find(p => p.id === projectId);
-    if (!project) return null;
-
-    if (newStatus === 'accepted') {
-      const acceptedCount = current.filter(a => a.projectId === projectId && a.status === 'accepted').length;
-      if (acceptedCount >= project.slots) return 'slotsFull';
-    }
-
-    current[idx].status = newStatus;
-    if (newStatus === 'accepted') current[idx].projectRole = projectRole;
-    saveApplications(current);
-    setApplications(current);
-    const applicant = getUsers().find(u => u.id === current[idx].userId);
-    return applicant ? applicant.name : null;
   }, []);
 
-  const respondInvite = useCallback((appId, action) => {
-    const current = getApplications();
-    const idx = current.findIndex(a => a.id === appId);
-    if (idx < 0) return null;
-    const project = getProjects().find(p => p.id === current[idx].projectId);
-    if (!project) return null;
+  const handleApplication = useCallback(async (appId, newStatus, projectId, projectRole = '') => {
+    const existing = applications.find(item => item.id === appId);
+    const applicant = existing ? users.find(item => item.id === existing.userId) : null;
 
-    if (action === 'accepted') {
-      const acceptedCount = current.filter(a => a.projectId === current[idx].projectId && a.status === 'accepted').length;
-      if (acceptedCount >= project.slots) return 'slotsFull';
+    try {
+      const result = await handleApplicationApi(appId, newStatus, projectId, projectRole);
+      if (typeof result === 'string') return result;
+      const application = applicationFromApi(result);
+      if (application) {
+        setApplications(prev => prev.map(item => (item.id === application.id ? { ...item, ...application } : item)));
+      }
+      return applicant?.name || applicant?.username || application?.user?.name || null;
+    } catch (error) {
+      console.error('[AppContext] No se pudo gestionar la postulación:', errorMessage(error, 'Error'));
+      return null;
     }
+  }, [applications, users]);
 
-    current[idx].status = action === 'accepted' ? 'accepted' : 'rejected';
-    saveApplications(current);
-    setApplications(current);
-    return action;
+  const respondInvite = useCallback(async (appId, action) => {
+    try {
+      const result = await respondInviteApi(appId, action);
+      if (typeof result === 'string') return result;
+      const application = applicationFromApi(result);
+      if (application) {
+        setApplications(prev => prev.map(item => (item.id === application.id ? { ...item, ...application } : item)));
+      }
+      return action;
+    } catch (error) {
+      console.error('[AppContext] No se pudo responder la invitación:', errorMessage(error, 'Error'));
+      return null;
+    }
   }, []);
 
-  const sendInvite = useCallback((projectId, targetUserId, message) => {
-    const current = getApplications();
-    if (current.find(a => a.projectId === projectId && a.userId === targetUserId)) return 'already';
-
-    const project = getProjects().find(p => p.id === projectId);
-    if (!project) return 'error';
-    const acceptedCount = current.filter(a => a.projectId === projectId && a.status === 'accepted').length;
-    if (acceptedCount >= project.slots) return 'slotsFull';
-
-    current.push({
-      id: generateId(),
-      projectId,
-      userId: targetUserId,
-      status: 'pending',
-      invitedBy: userId,
-      message: message || '',
-      appliedAt: new Date().toISOString()
-    });
-    saveApplications(current);
-    setApplications(current);
-    return 'ok';
-  }, [userId]);
+  const sendInvite = useCallback(async (projectId, targetUserId, message) => {
+    try {
+      const result = await sendInviteApi(projectId, targetUserId, message);
+      if (typeof result === 'string') return result;
+      const application = applicationFromApi(result);
+      if (application) {
+        setApplications(prev => [application, ...prev.filter(item => item.id !== application.id)]);
+      }
+      return 'ok';
+    } catch (error) {
+      console.error('[AppContext] No se pudo enviar la invitación:', errorMessage(error, 'Error'));
+      return 'error';
+    }
+  }, []);
 
   // ========================================================================
   // RATINGS
   // ========================================================================
-  const saveRatings = useCallback((projectId, ratingMap) => {
-    const current = getRatings();
-    let saved = false;
-    Object.keys(ratingMap).forEach(ratedUserId => {
-      const stars = ratingMap[ratedUserId];
-      if (!stars) return;
-      const existing = current.findIndex(r => r.projectId === projectId && r.ratedUserId === ratedUserId);
-      if (existing >= 0) {
-        current[existing].stars = stars;
-        current[existing].updatedAt = new Date().toISOString();
-      } else {
-        current.push({
-          id: generateId(),
-          projectId,
-          ratedUserId,
-          ratedBy: userId,
-          stars,
-          createdAt: new Date().toISOString()
-        });
-      }
-      saved = true;
-    });
-    saveRatingsData(current);
-    setRatings(current);
-    return saved;
-  }, [userId]);
+  const saveRatings = useCallback(async (projectId, ratingMap) => {
+    try {
+      const saved = await saveRatingsApi(projectId, ratingMap);
+      await loadData();
+      return Array.isArray(saved) && saved.length > 0;
+    } catch (error) {
+      console.error('[AppContext] No se pudieron guardar las calificaciones:', errorMessage(error, 'Error'));
+      return false;
+    }
+  }, [loadData]);
 
   const value = {
+    authReady,
     user, users, projects, applications, ratings, groups, activeGroup, activeGroupId, activeMembership, isActiveGroupAdmin,
     lang, theme, menuOpen, setMenuOpen,
     selectedCategories, setSelectedCategories,
@@ -472,7 +665,7 @@ export function AppProvider({ children }) {
     login, register, logout,
     saveProfile, updateAccount, setAvatar, toggleAvailability, saveFeaturedProjects,
     createProject, changeProjectStatus,
-    selectGroup, createGroup, updateGroup, removeGroupMember, requestToJoinGroup, decideGroupRequest, setGroupMemberRole,
+    selectGroup, createGroup, updateGroup, deleteGroup, removeGroupMember, requestToJoinGroup, decideGroupRequest, setGroupMemberRole,
     applyToProject, handleApplication, respondInvite, sendInvite,
     saveRatings, refresh
   };

@@ -4,6 +4,7 @@ import { useApp, AppProvider } from './context/AppContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { ModalProvider } from './context/ModalManager.jsx';
 import WorkspaceShell from './components/WorkspaceShell.jsx';
+import { Spinner } from './components/common.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -14,14 +15,28 @@ import Settings from './pages/Settings.jsx';
 import Landing from './pages/Landing.jsx';
 import Groups from './pages/Groups.jsx';
 
+function AuthLoading() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}
+    >
+      <Spinner />
+    </div>
+  );
+}
+
 function RequireAuth({ children }) {
-  const { user } = useApp();
+  const { user, authReady } = useApp();
+  if (!authReady) return <AuthLoading />;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
 function RedirectIfAuthed({ children }) {
-  const { user } = useApp();
+  const { user, authReady } = useApp();
+  if (!authReady) return <AuthLoading />;
   if (user) return <Navigate to="/dashboard" replace />;
   return children;
 }
