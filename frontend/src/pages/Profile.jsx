@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { primaryRoleLabel } from '../components/PersonCard.jsx';
-import { Avatar, SkillTags, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
+import { Avatar, Icon, SkillTags, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
 import PeekRating from '../components/PeekRating.jsx';
 import {
   getUserAvgRating, getUserRatingCount, escapeHTML,

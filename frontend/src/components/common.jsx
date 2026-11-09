@@ -1,6 +1,7 @@
 import { Children, cloneElement, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { getCategoryMeta, getCategoryLabel, avatarColorClass, escapeHTML, profileLinks } from '../lib/helpers.js';
+import { useLeaveTransition } from '../lib/useLeaveTransition.js';
 import PeekRating from './PeekRating.jsx';
 
 // ==========================================================================

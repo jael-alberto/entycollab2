@@ -24,38 +24,6 @@ export default function Dashboard() {
     selectGroup(null);
   }, [selectGroup]);
 
-  const myGroups = useMemo(
-    () => groups.filter(g => g.members?.some(m => m.userId === user.id)),
-    [groups, user.id]
-  );
-
-  const otherGroups = useMemo(
-    () => groups.filter(g => !g.members?.some(m => m.userId === user.id)),
-    [groups, user.id]
-  );
-
-  const matchGroup = (g) => {
-    if (!groupSearch.trim()) return true;
-    const q = groupSearch.trim().toLowerCase();
-    return g.name.toLowerCase().includes(q) || g.description?.toLowerCase().includes(q);
-  };
-
-  const filteredMine = useMemo(() => myGroups.filter(matchGroup), [myGroups, groupSearch, matchGroup]);
-  const filteredOther = useMemo(() => otherGroups.filter(matchGroup), [otherGroups, groupSearch, matchGroup]);
-
-  const openGroup = (groupId) => {
-    // Solo se activa como grupo de trabajo si el usuario es miembro; los
-    // grupos públicos de los que no forma parte se abren en modo vista previa.
-    const group = groups.find(g => g.id === groupId);
-    if (group?.members?.some(m => m.userId === user.id)) selectGroup(groupId);
-    navigate(`/grupos/${groupId}`);
-  };
-
-  const openGlobal = () => {
-    selectGroup(null);
-    setSearchParams({ view: 'global' });
-  };
-
   const backHome = () => {
     selectGroup(null);
     setSearchParams({});

@@ -43,7 +43,7 @@ const steps = [
 ];
 
 export default function Landing() {
-  const { user, selectGroup } = useApp();
+  const { user, theme, toggleTheme, selectGroup } = useApp();
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [step, setStep] = useState(0);
