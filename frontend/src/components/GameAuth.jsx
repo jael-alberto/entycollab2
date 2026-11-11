@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { Field, Icon, Modal, SkipLink, Spinner } from './common.jsx';
+import GenreGamesPanel from './GenreGamesPanel.jsx';
 import { LegalContent } from '../pages/Legal.jsx';
-import { ALL_LANGUAGES, DISCIPLINES, FAVORITE_GENRES, GAME_TYPES, disciplineLabel, favoriteGenreLabel, gameTypeLabel } from '../lib/talent.js';
+import { DISCIPLINES, FAVORITE_GENRES, disciplineLabel, favoriteGenreLabel } from '../lib/talent.js';
 import { emailKey, nameKey, passwordKey, requiredKey, usernameKey } from '../lib/validation.js';
+import { setFavoriteGames as saveFavoriteGames } from '../lib/favoriteGames.js';
 import { supabase } from '../lib/supabaseClient.js';
 
 function ChoiceGrid({ items, selected, onChange, label, describedBy }) {
@@ -16,7 +18,7 @@ function ChoiceGrid({ items, selected, onChange, label, describedBy }) {
         const active = selected.includes(val);
         return (
           <button key={val} type="button" className={active ? 'is-active' : ''} aria-pressed={active} onClick={() => onChange(val)}>
-            <i aria-hidden="true">{active ? <Icon name="check" size={12} /> : ''}</i>
+            <i aria-hidden="true">{active ? <Icon name="check" size={13} /> : ''}</i>
             {item.label || item}
           </button>
         );
@@ -66,8 +68,8 @@ export default function GameAuth({ initialMode }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
-  const [gameTypes, setGameTypes] = useState([]);
   const [favoriteGenres, setFavoriteGenres] = useState([]);
+  const [favoriteGames, setFavoriteGames] = useState([]);
   const [disciplines, setDisciplines] = useState([]);
   const [available, setAvailable] = useState(true);
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -77,6 +79,9 @@ export default function GameAuth({ initialMode }) {
 
   const toggle = (setter, selected, value) =>
     setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]);
+
+  const toggleGame = (gameId) =>
+    setFavoriteGames(prev => prev.includes(gameId) ? prev.filter(id => id !== gameId) : [...prev, gameId]);
 
   const signInWithProvider = async (provider) => {
     if (!supabase) {
@@ -121,8 +126,10 @@ export default function GameAuth({ initialMode }) {
   };
 
   const submitRegister = async () => {
-    if (!gameTypes.length || !favoriteGenres.length) {
-      setStepError(t('auth.chooseAtLeastOne'));
+    // En el registro solo se piden juegos y disciplinas; la disciplina es lo
+    // único imprescindible para saber desde qué rol puede colaborar la persona.
+    if (!disciplines.length) {
+      setStepError(t('auth.chooseDiscipline'));
       return;
     }
     setLoading(true);
@@ -133,7 +140,6 @@ export default function GameAuth({ initialMode }) {
       password,
       skills: [...new Set(disciplines.map(value => disciplineLabel(lang, value)))],
       bio: '',
-      gameTypes,
       favoriteGenres,
       disciplines,
       languages: [],
@@ -150,10 +156,19 @@ export default function GameAuth({ initialMode }) {
       setStep(1);
       return;
     }
-    if (result !== 'ok') {
+    // La API no respondio (caida, puerto equivocado, 5xx): el problema no esta
+    // en los campos, asi que no se pide revisarlos.
+    if (result === 'server') {
+      setStepError(t('toast.registerUnreachable'));
+      return;
+    }
+    if (!result || typeof result !== 'object') {
       setStepError(t('toast.registerError'));
       return;
     }
+    // El perfil aún no guarda juegos concretos: se dejan en el navegador con
+    // la cuenta recién creada para que la selección no se pierda al entrar.
+    saveFavoriteGames(result.id, favoriteGames);
     showToast(t('toast.welcome', { name: username.replace(/^@/, '').trim() }), 'success');
     navigate('/perfil');
   };
@@ -287,26 +302,30 @@ export default function GameAuth({ initialMode }) {
 
               {step === 2 && (
                 <div className="ga-form">
-                  <section aria-labelledby="ga-gt-title">
-                    <h3 id="ga-gt-title">¿Qué te gusta crear?</h3>
-                    <ChoiceGrid items={GAME_TYPES.map(item => ({ ...item, label: gameTypeLabel(lang, item.value) }))} selected={gameTypes} onChange={v => toggle(setGameTypes, gameTypes, v)} label={t('filters.gameTypes')} />
+                  <section aria-labelledby="ga-disc-title">
+                    <h3 id="ga-disc-title">{t('auth.disciplineQuestion')}</h3>
+                    <ChoiceGrid items={DISCIPLINES.map(item => ({ ...item, label: disciplineLabel(lang, item.value) }))} selected={disciplines} onChange={v => toggle(setDisciplines, disciplines, v)} label={t('auth.disciplines')} />
                   </section>
                   <section aria-labelledby="ga-fg-title">
-                    <h3 id="ga-fg-title">¿Con qué disciplina colaboras?</h3>
+                    <h3 id="ga-fg-title">{t('auth.genreQuestion')}</h3>
                     <ChoiceGrid items={FAVORITE_GENRES.map(item => ({ ...item, label: favoriteGenreLabel(lang, item.value) }))} selected={favoriteGenres} onChange={v => toggle(setFavoriteGenres, favoriteGenres, v)} label={t('filters.favGenres')} />
-                    <div className="ga-extra">
-                      <ChoiceGrid items={DISCIPLINES.map(item => ({ ...item, label: disciplineLabel(lang, item.value) }))} selected={disciplines} onChange={v => toggle(setDisciplines, disciplines, v)} label={t('auth.skillsTitle')} />
-                    </div>
+                    <GenreGamesPanel
+                      selectedGenres={favoriteGenres}
+                      selectedGames={favoriteGames}
+                      onToggleGame={toggleGame}
+                    />
                   </section>
                   <label className="ga-check">
                     <input type="checkbox" checked={available} onChange={e => setAvailable(e.target.checked)} />
-                    <span>Disponible para colaborar</span>
+                    <span>{t('person.availableToCollab')}</span>
                   </label>
                   <div className="ga-actions">
-                    <button type="button" className="ga-ghost" onClick={() => { setStepError(''); setStep(1); }}>{t('auth.back')}</button>
+                    <button type="button" className="ga-ghost" onClick={() => { setStepError(''); setStep(1); }}>
+                      <Icon name="arrow-left" size={16} /> {t('auth.back')}
+                    </button>
                     <button type="button" className="ga-primary" onClick={submitRegister} disabled={loading} aria-busy={loading}>
                       {loading && <Spinner />}
-                      {loading ? t('auth.creating') : t('register.submit')} <span aria-hidden="true">→</span>
+                      {loading ? t('auth.creating') : t('register.submit')} <Icon name="arrow-right" size={16} />
                     </button>
                   </div>
                 </div>
@@ -343,7 +362,7 @@ export default function GameAuth({ initialMode }) {
                 </div>
                 <button className="ga-primary" type="submit" disabled={loading} aria-busy={loading}>
                   {loading && <Spinner />}
-                  {loading ? t('auth.signingIn') : t('login.submit')} <span aria-hidden="true">→</span>
+                  {loading ? t('auth.signingIn') : t('login.submit')} <Icon name="arrow-right" size={16} />
                 </button>
               </form>
               <p className="ga-switch">{t('auth.newHere')} <Link to="/register">{t('auth.createOne')}</Link></p>

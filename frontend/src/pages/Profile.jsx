@@ -19,6 +19,8 @@ import {
   userGameTypes,
   userLanguages
 } from '../lib/talent.js';
+import { gamesByIds } from '../lib/gameCatalog.js';
+import { getFavoriteGames } from '../lib/favoriteGames.js';
 
 // /perfil (ruta intacta, sin :username): perfil propio con header
 // (avatar, rol, disponibilidad, valoración, links) y tabs
@@ -38,6 +40,8 @@ export default function Profile() {
   const languages = userLanguages(user);
   const role = primaryRoleLabel(user, lang);
   const techCount = languages.length > 0 ? languages.length : (user.skills || []).length;
+  // Los juegos marcados viven en el navegador (ver lib/favoriteGames.js).
+  const favoriteGameTitles = gamesByIds(getFavoriteGames(user.id)).map(game => game.title);
 
   const tabs = [
     { id: 'projects', label: lang === 'en' ? 'Projects' : 'Proyectos' },
@@ -208,6 +212,11 @@ export default function Profile() {
         <TalentRow
           label={t('settings.favoriteGenresLabel')}
           values={userFavoriteGenres(user).map(v => favoriteGenreLabel(lang, v))}
+        />
+        <TalentRow
+          label={t('games.favoriteLabel')}
+          values={favoriteGameTitles}
+          limit={6}
         />
 
         {categories.length > 0 && (

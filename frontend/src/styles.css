@@ -7722,7 +7722,9 @@ button[aria-busy="true"] {
 .ga-form input::placeholder { color: var(--color-text-dim); }
 .ga-form input:focus { border-color: var(--color-brand-500); box-shadow: 0 0 0 3px rgba(232, 84, 31, .22); }
 .ga-form h3 { margin: 0; font-size: 16px; font-weight: 700; }
-.ga-extra { margin-top: 12px; }
+/* Cada bloque del paso 2 (titulo + opciones + juegos) respira con el mismo
+   ritmo; antes el titulo quedaba pegado a los chips. */
+.ga-form section { display: grid; gap: 10px; }
 
 .ga-password { position: relative; display: block; }
 .ga-password input { padding-right: 44px; }
@@ -7755,9 +7757,22 @@ button[aria-busy="true"] {
 
 .ga-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .ga-grid button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 999px; border: 1.5px solid var(--color-border); background: var(--color-surface); color: var(--color-text-main); cursor: pointer; font: 600 13px var(--font-primary); transition: border-color .2s ease, background .2s ease; }
-.ga-grid button i { display: grid; place-items:center; width: 15px; height: 15px; border-radius: 50%; font-style: normal; font-size: 10px; }
-.ga-grid button.is-active { border-color: var(--color-brand-500); background: rgba(232, 84, 31, .12); color: #fff; }
-.ga-grid button.is-active i { background: var(--color-brand-500); }
+.ga-grid button i {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--color-border-light);
+  border-radius: 50%;
+  background: transparent;
+  font-style: normal;
+  font-size: 10px;
+}
+/* Sin marcar la casilla se dibuja vacia: un circulo de 18px sin nada dentro
+   parecia un icono roto. Al pasar el raton el borde se acerca al texto. */
+.ga-grid button:not(.is-active):hover i { border-color: var(--color-text-dim); }
+/* El estado activo (color y relleno del check) se define al final de este
+   archivo, en el bloque de correcciones del registro. */
 
 .ga-switch { margin: 0; text-align: center; font-size: 14px; color: var(--color-text-muted); }
 .ga-switch a { color: var(--color-brand-500); font-weight: 700; text-decoration: none; }
@@ -8439,14 +8454,25 @@ button[aria-busy="true"] {
     color 160ms var(--ease-out);
 }
 .ga-grid button i {
-  transition: transform 120ms var(--ease-out), background-color 160ms var(--ease-out);
+  transition:
+    transform 120ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
 }
 .ga-grid button.is-active {
   border-color: var(--color-brand-500);
   background: var(--color-accent-soft);
   color: var(--color-accent);
 }
-.ga-grid button.is-active i { background: var(--color-brand-500); }
+/* El check heredaba el color del boton (--color-accent, naranja claro en
+   oscuro) sobre el relleno brand-500: contraste ~1.5:1 y se perdia. Sobre el
+   relleno naranja el trazo va en blanco (>=3:1 en ambos temas). */
+.ga-grid button.is-active i {
+  border-color: var(--color-brand-500);
+  background: var(--color-brand-500);
+  color: var(--color-on-brand);
+}
 
 /* ---- Movimiento reducido ------------------------------------------------
    Se sigue el patron ya usado en el proyecto (animation: none), pero sin
@@ -9313,4 +9339,175 @@ button[aria-busy="true"] {
 @media (max-width: 420px) {
   .tcl-nav { padding-inline: 16px; }
   .tcl-nav .tcl-brand-logo { height: 24px; }
+}
+
+/* ==========================================================================
+   SELECTOR DE JUEGOS — registro y ajustes
+   La seleccion de generos no debe ser un campo ciego: debajo de las opciones
+   se puede marcar juegos concretos del catalogo. Sin caja contenedora (nada de
+   card dentro de card): solo una linea superior, filas separadas por un
+   hairline y una casilla de marca por fila.
+   ========================================================================== */
+.genre-games {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.genre-games-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.genre-games-count {
+  font: 600 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+/* Contador de elegidos: se anuncia al cambiar y desaparece cuando no hay
+   ninguno, para no dejar un cero ruidoso en el encabezado. */
+.genre-games-selected {
+  font: 600 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+
+.genre-games-selected:empty { display: none; }
+
+.genre-games-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  max-height: 248px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-light) transparent;
+}
+
+/* Barra fina: en Windows la barra por defecto dentro de un bloque tan
+   pequeño tapa el texto de la derecha. */
+.genre-games-list::-webkit-scrollbar { width: 8px; }
+.genre-games-list::-webkit-scrollbar-track { background: transparent; }
+.genre-games-list::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: var(--radius-full);
+}
+
+.genre-games-item + .genre-games-item {
+  border-top: 1px solid var(--color-border);
+}
+
+/* Toda la fila es el control: un solo boton por juego, con aria-pressed. */
+.genre-games-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 10px;
+  width: 100%;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-out);
+}
+
+.genre-games-row:hover { background: var(--color-surface-hover); }
+.genre-games-row.is-selected { background: var(--color-accent-soft); }
+
+.genre-games-row:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.genre-games-box {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--color-border-light);
+  border-radius: 5px;
+  color: var(--color-on-brand);
+  transition:
+    background-color 140ms var(--ease-out),
+    border-color 140ms var(--ease-out);
+}
+
+.genre-games-row:hover .genre-games-box { border-color: var(--color-text-muted); }
+
+.genre-games-row.is-selected .genre-games-box {
+  border-color: var(--color-brand-500);
+  background: var(--color-brand-500);
+  color: var(--color-on-brand);
+}
+
+.genre-games-text {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.genre-games-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.genre-games-meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* El genero de cada ficha se identifica siempre, tambien cuando la lista
+   mezcla los diez generos. */
+.genre-games-tag {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  padding: 2px 8px;
+  border: 1px solid var(--color-chip-border);
+  border-radius: var(--radius-full);
+  background: var(--color-chip-bg);
+  font: 600 10px/1.6 var(--font-mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  /* En pantallas estrechas la etiqueta de género baja a su propia línea:
+     así el título del juego no se corta a la mitad. */
+  .genre-games-row {
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 0 8px;
+    padding: 9px 6px;
+  }
+  .genre-games-box { grid-row: 1 / span 3; }
+  .genre-games-text { grid-row: 1 / span 2; }
+  .genre-games-tag {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+    margin-top: 4px;
+  }
+  .genre-games-list { max-height: 288px; }
 }

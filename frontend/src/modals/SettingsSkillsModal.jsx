@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { EmptyState, Icon, Modal } from '../components/common.jsx';
+import GenreGamesPanel from '../components/GenreGamesPanel.jsx';
+import { getFavoriteGames, setFavoriteGames } from '../lib/favoriteGames.js';
 import { escapeHTML, userCategories } from '../lib/helpers.js';
 import { availablePeopleCategoriesList, availablePeopleTechList } from '../lib/filters.js';
 import {
@@ -50,6 +52,7 @@ export default function SettingsSkillsModal() {
   const [draftGameTypes, setDraftGameTypes] = useState(() => userGameTypes(user).slice());
   const [draftLanguages, setDraftLanguages] = useState(() => userLanguages(user).slice());
   const [draftGenres, setDraftGenres] = useState(() => userFavoriteGenres(user).slice());
+  const [draftGames, setDraftGames] = useState(() => getFavoriteGames(user?.id));
   const [draftDisciplines, setDraftDisciplines] = useState(() => userDisciplines(user).slice());
   const [search, setSearch] = useState('');
 
@@ -64,6 +67,12 @@ export default function SettingsSkillsModal() {
 
   const toggleIn = (setter) => (value) => {
     setter(prev => prev.includes(value) ? prev.filter(x => x !== value) : [...prev, value]);
+  };
+
+  // Los juegos seleccionados no viajan al perfil (la API todavía no tiene ese
+  // campo): se guardan en el navegador al confirmar, junto al resto de cambios.
+  const toggleGame = (gameId) => {
+    setDraftGames(prev => prev.includes(gameId) ? prev.filter(id => id !== gameId) : [...prev, gameId]);
   };
 
   // Al cambiar el tipo de juego se recalculan los lenguajes disponibles: los
@@ -101,6 +110,7 @@ export default function SettingsSkillsModal() {
       disciplines: draftDisciplines
     });
     if (!saved) return;
+    setFavoriteGames(user.id, draftGames);
     closeSkillsSettings();
     showToast(t('profile.saved'), 'success');
   };
@@ -181,6 +191,11 @@ export default function SettingsSkillsModal() {
           selected={draftGenres}
           onToggle={toggleIn(setDraftGenres)}
           renderLabel={opt => t(`fg.${opt.value}`)}
+        />
+        <GenreGamesPanel
+          selectedGenres={draftGenres}
+          selectedGames={draftGames}
+          onToggleGame={toggleGame}
         />
       </div>
 

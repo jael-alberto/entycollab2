@@ -31,6 +31,7 @@
   --color-brand-600: #CE4415; /* hover de CTA */
   --color-brand-700: #C2410C; /* texto naranja (modo claro) */
   --color-brand-ink: #9A3412; /* texto naranja fuerte (modo claro) */
+  --color-on-brand: #FFFFFF; /* encima de brand-500: iconos y texto de CTA */
 
   /* ---- Superficies (grafito) ---------------------------------------------
      El fondo es MÁS OSCURO que las superficies: la separación se consigue

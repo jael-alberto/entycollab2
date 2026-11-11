@@ -89,7 +89,9 @@ export default function WorkspaceShell({ children }) {
   const crumb = (CRUMB.find(([re]) => re.test(pathname)) || [, 'Mi panel'])[1];
   const activeItem = resolveActiveNav(pathname);
 
-  const doLogout = () => { logout(); showToast(t('toast.logout'), 'info'); navigate('/login'); };
+  // Al cerrar sesión se vuelve a la portada de la plataforma, no al formulario
+  // de acceso: quien sale puede querer seguir explorando como visitante.
+  const doLogout = () => { logout(); showToast(t('toast.logout'), 'info'); navigate('/'); };
 
   return (
     <div className={`ws-shell${menuOpen ? ' is-open' : ''}${sidebarCollapsed ? ' is-collapsed' : ''}`}>

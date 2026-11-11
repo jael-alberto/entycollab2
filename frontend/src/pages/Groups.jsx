@@ -336,7 +336,8 @@ function GroupWorkspace({ groupId }) {
   const handleInviteSubmit = async (e) => {
     e.preventDefault();
     if (!inviteUsername.trim() || !inviteProjectId) return;
-    const targetUser = users.find(u => u.username.toLowerCase() === inviteUsername.toLowerCase() || u.email.toLowerCase() === inviteUsername.toLowerCase());
+    const needle = inviteUsername.trim().replace(/^@/, '').toLowerCase();
+    const targetUser = users.find(u => u.username.toLowerCase() === needle || u.email.toLowerCase() === needle);
     if (!targetUser) {
       showToast('Usuario no encontrado', 'error');
       return;
@@ -681,7 +682,7 @@ function GroupWorkspace({ groupId }) {
           <form onSubmit={handleInviteSubmit}>
             <div className="form-group">
               <label>Usuario o email</label>
-              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="@usuario o email" required />
+              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="usuario o email" required />
             </div>
             <div className="form-group">
               <label>Proyecto (opcional)</label>

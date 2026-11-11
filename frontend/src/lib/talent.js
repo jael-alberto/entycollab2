@@ -31,33 +31,26 @@ export const GAME_TYPES = [
   { value: 'card-board', icon: '🃏' }
 ];
 
-// Géneros de juegos más jugados del mundo ("Juegos favoritos")
+// Los diez géneros más famosos, en orden de peso comercial y de audiencia:
+// disparos y aventura mandan en PC y consola, el rol es el mayor de móvil, y
+// estrategia, deportes, puzles, carreras, peleas, simulación y plataformas
+// completan la lista. Salen de los informes de Newzoo 2025-2026 y de la
+// taxonomía de géneros de Wikipedia; no incluyen subgéneros (battle royale,
+// MOBA) ni la sombrilla "acción", que duplicaría a disparos y peleas.
+//
+// `icon` es el nombre de un icono de Tabler, no un emoji: se resuelve con
+// <Icon /> en la interfaz.
 export const FAVORITE_GENRES = [
-  { value: 'casual', icon: '🍬' },
-  { value: 'adventure', icon: '🧭' },
-  { value: 'shooter', icon: '🔫' },
-  { value: 'survival', icon: '🔥' },
-  { value: 'horror', icon: '💀' },
-  { value: 'rpg', icon: '✨' },
-  { value: 'strategy', icon: '♟️' },
-  { value: 'simulation', icon: '🚜' },
-  { value: 'sports', icon: '⚽' },
-  { value: 'racing', icon: '🏁' },
-  { value: 'platformer', icon: '🍄' },
-  { value: 'puzzle', icon: '🔢' },
-  { value: 'multiplayer', icon: '🤝' },
-  { value: 'co-op', icon: '👥' },
-  { value: 'battle-royale', icon: '🪂' },
-  { value: 'moba', icon: '🏟️' },
-  { value: 'sandbox', icon: '⛏️' },
-  { value: 'metroidvania', icon: '🧬' },
-  { value: 'roguelike', icon: '🎲' },
-  { value: 'soulslike', icon: '⚔️' },
-  { value: 'narrative', icon: '📖' },
-  { value: 'rhythm', icon: '🎵' },
-  { value: 'tower-defense', icon: '🛡️' },
-  { value: 'open-world', icon: '🌍' },
-  { value: 'card-board', icon: '🂡' }
+  { value: 'shooter', icon: 'crosshair' },
+  { value: 'adventure', icon: 'compass' },
+  { value: 'rpg', icon: 'sword' },
+  { value: 'strategy', icon: 'chess' },
+  { value: 'sports', icon: 'ball' },
+  { value: 'puzzle', icon: 'puzzle' },
+  { value: 'racing', icon: 'steering-wheel' },
+  { value: 'fighting', icon: 'karate' },
+  { value: 'simulation', icon: 'plant' },
+  { value: 'platformer', icon: 'stairs' }
 ];
 
 // Habilidades de la persona dentro de un equipo de videojuegos
@@ -141,7 +134,9 @@ export function disciplineLabel(lang, value) {
   return t(lang, `disc.${value}`);
 }
 
-// Emojis de cada taxonomía, para usar las etiquetas como icono + texto.
+// Icono declarado en cada taxonomía. Los géneros favoritos usan nombres de
+// Tabler; el resto de listas conserva emojis históricos que ninguna vista
+// pinta (las opciones se renderizan sin icono).
 function iconOf(list, value) {
   const found = list.find(o => o.value === value);
   return found ? found.icon : '';

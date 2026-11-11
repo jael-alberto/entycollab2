@@ -133,6 +133,18 @@ function errorMessage(error, fallback) {
   return error.message || fallback;
 }
 
+// Distingue "no hay servidor con quien hablar" de "los datos estan mal".
+// `fetch` falla con TypeError cuando la API no responde (caida, DNS, CORS), y
+// el cliente convierte un 404 o un 5xx en ApiError con `status`. Ninguno de los
+// dos casos se arregla corrigiendo el formulario, asi que no deben compartir
+// mensaje.
+function isApiUnreachable(error) {
+  if (!error) return false;
+  if (error instanceof TypeError) return true;
+  if (typeof error.status !== 'number') return false;
+  return error.status === 404 || error.status >= 500;
+}
+
 export function AppProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -310,23 +322,27 @@ export function AppProvider({ children }) {
       };
 
       const result = await api.auth.register(payload);
+      let profile = null;
       if (result.session?.access_token) {
         setAuthTokens(result.session.access_token, result.session.refresh_token);
-        setCurrentUser(profileFromApi(result.user));
+        profile = profileFromApi(result.user);
+        setCurrentUser(profile);
         setUserId(result.user?.id || null);
         await loadData();
       } else {
         // La cuenta se creó pero no hubo sesión automática: entramos manualmente.
-        const profile = await login(payload.email, payload.password);
+        profile = await login(payload.email, payload.password);
         if (!profile) return 'error';
       }
-      return 'ok';
+      // Devolvemos el perfil para que el registro pueda asociar datos de la
+      // pantalla (por ejemplo los juegos marcados) a la cuenta recién creada.
+      return profile;
     } catch (error) {
       const message = errorMessage(error, '');
       if (/correo|email/i.test(message) && error?.status === 409) return 'email';
       if (/usuario|username/i.test(message) && error?.status === 409) return 'username';
-      console.error('[AppContext] Registro fallido:', message);
-      return 'error';
+      console.error('[AppContext] Registro fallido:', error?.status ?? 'sin respuesta', message);
+      return isApiUnreachable(error) ? 'server' : 'error';
     }
   }, [loadData, login]);
 

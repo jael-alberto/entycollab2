@@ -254,12 +254,13 @@ export function Stars({ rating, size = 13, showValue = true }) {
 // Set de iconos SVG en línea (sin dependencias). Reutilizable en toda la app.
 // Sin `label` el icono es decorativo (aria-hidden); con `label` se anuncia.
 import {
-  IconAlertTriangle, IconArrowLeft, IconArrowRight, IconArrowUpRight, IconBox,
-  IconCheck, IconCode, IconCompass, IconDeviceGamepad2, IconDeviceMobile, IconFolder,
-  IconGlobe, IconHome, IconInbox, IconLeaf, IconLock, IconLogout, IconMail, IconMoon,
-  IconBell, IconMenu2, IconChevronDown, IconChevronUp,
-  IconMusic, IconPalette, IconPencil, IconPhoto, IconPlus, IconSearch, IconSend,
-  IconSettings, IconSparkles, IconStar, IconSun, IconTag, IconUserPlus, IconUsers, IconX
+  IconAlertTriangle, IconArrowLeft, IconArrowRight, IconArrowUpRight, IconBallFootball, IconBox,
+  IconCheck, IconChess, IconCode, IconCompass, IconCrosshair, IconDeviceGamepad2, IconDeviceMobile,
+  IconFolder, IconGlobe, IconHome, IconInbox, IconKarate, IconLeaf, IconLock, IconLogout, IconMail,
+  IconMoon, IconBell, IconMenu2, IconChevronDown, IconChevronUp, IconPlant2,
+  IconMusic, IconPalette, IconPencil, IconPhoto, IconPlus, IconPuzzle, IconSearch, IconSend,
+  IconSettings, IconSparkles, IconStairsUp, IconStar, IconSteeringWheel, IconSun, IconSword,
+  IconTag, IconUserPlus, IconUsers, IconX
 } from '@tabler/icons-react';
 
 const TABLER_ICONS = {
@@ -272,7 +273,10 @@ const TABLER_ICONS = {
   smartphone: IconDeviceMobile, tag: IconTag, 'arrow-right': IconArrowRight,
   'arrow-up-right': IconArrowUpRight, palette: IconPalette, music: IconMusic,
   'chevron-down': IconChevronDown, 'chevron-up': IconChevronUp,
-  pencil: IconPencil, leaf: IconLeaf, menu: IconMenu2, bell: IconBell
+  pencil: IconPencil, leaf: IconLeaf, menu: IconMenu2, bell: IconBell,
+  crosshair: IconCrosshair, sword: IconSword, chess: IconChess, ball: IconBallFootball,
+  puzzle: IconPuzzle, 'steering-wheel': IconSteeringWheel, karate: IconKarate,
+  plant: IconPlant2, stairs: IconStairsUp
 };
 
 export function Icon({ name, size = 18, label, cls }) {
@@ -329,13 +333,16 @@ export function ProfileLinks({ user }) {
 }
 
 // Fila de "perfil de talento": título + etiquetas del usuario.
-export function TalentRow({ label, values, centered = false }) {
+export function TalentRow({ label, values, centered = false, limit }) {
   if (!values || values.length === 0) return null;
+  const shown = limit ? values.slice(0, limit) : values;
+  const rest = values.length - shown.length;
   return (
     <div className="person-chips-row">
       <span className="person-chips-label">{label}</span>
       <div className={'person-categories' + (centered ? ' profile-links' : '')}>
-        {values.map(v => <span key={v} className="person-cat-chip">{escapeHTML(v)}</span>)}
+        {shown.map(v => <span key={v} className="person-cat-chip">{escapeHTML(v)}</span>)}
+        {rest > 0 && <span className="person-cat-chip">+{rest}</span>}
       </div>
     </div>
   );
