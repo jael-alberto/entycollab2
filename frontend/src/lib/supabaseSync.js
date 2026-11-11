@@ -198,7 +198,7 @@ export async function fetchSupabaseData() {
   try {
     const [projRes, profRes, grpRes, appRes, ratRes] = await Promise.allSettled([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, name, username, avatar, skills, categories, bio, github_url, portfolio_url, available, featured_project_ids, game_types, languages, favorite_genres, disciplines, created_at').order('created_at', { ascending: false }),
       supabase.from('groups').select('*, group_members(*), group_requests(*)'),
       supabase.from('applications').select('*'),
       supabase.from('ratings').select('*')

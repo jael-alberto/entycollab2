@@ -4,7 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
   // Opcional pero recomendado en Supabase para que Prisma vea el esquema 'auth'
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
   schemas  = ["public", "auth"]
