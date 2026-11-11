@@ -4,6 +4,7 @@
 import { getAuthToken, getRefreshToken, setAuthTokens, clearAuthTokens } from '../authToken.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 8000;
 
 // En despliegues (Vercel) el fallback a localhost rompe la app en silencio.
 // Avisa para que sea evidente que falta configurar VITE_API_URL.
@@ -26,12 +27,31 @@ class ApiError extends Error {
 
 let refreshPromise = null;
 
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new ApiError('La solicitud tardó demasiado. Verifica que el servidor esté activo.', 408, 'REQUEST_TIMEOUT');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function refreshSession() {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
 
   if (!refreshPromise) {
-    refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
+    refreshPromise = fetchWithTimeout(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken })
@@ -73,7 +93,7 @@ async function request(endpoint, options = {}, retry = true) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
     ...options,
     headers
   });

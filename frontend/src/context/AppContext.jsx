@@ -507,15 +507,18 @@ export function AppProvider({ children }) {
         description: String(description || '').trim(),
         isPrivate: Boolean(isPrivate)
       });
-      const { groups: nextGroups } = await loadData();
-      const group = nextGroups.find(item => item.id === created.id) || groupFromApi(created);
-      if (group) selectGroup(group.id);
+      const group = groupFromApi(created);
+      if (!group) return null;
+      // Evita una segunda descarga completa de bootstrap después de crear.
+      // La respuesta de POST ya contiene el grupo recién creado.
+      setGroups(prev => [group, ...prev.filter(item => item.id !== group.id)]);
+      selectGroup(group.id);
       return group;
     } catch (error) {
       console.error('[AppContext] No se pudo crear el grupo:', errorMessage(error, 'Error creando grupo'));
       return null;
     }
-  }, [loadData, selectGroup]);
+  }, [selectGroup]);
 
   const requestToJoinGroup = useCallback(async (groupId) => {
     try {

@@ -52,7 +52,7 @@ export function Modal({ open, onClose, size = '', title, subtitle, layer = 0, ch
 
   // La salida se anima: el nodo sigue montado mientras corre y solo entonces
   // se avisa al padre para que lo desmonte.
-  const { leaving, close } = useLeaveTransition(open, onClose, 180);
+  const { leaving, close } = useLeaveTransition(open, onClose, 120);
 
   // Bloquea el scroll del fondo (body) mientras haya al menos un modal abierto
   useEffect(() => {
