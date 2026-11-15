@@ -35,7 +35,7 @@ function ratingProgress(projectId, accepted, ratings) {
 // Layout estilo Steam: columna principal + sidebar sticky con el CTA.
 // ==========================================================================
 export default function ProjectDetailView({ project, onStatusChanged }) {
-  const { user, users, applications, ratings, lang, t, l10n, changeProjectStatus, handleApplication, applyToProject } = useApp();
+  const { user, users, applications, ratings, lang, t, l10n, changeProjectStatus, toggleProjectFeatured, handleApplication, applyToProject } = useApp();
   const { showToast } = useToast();
   const { openRate, openUserDetail } = useModals();
   const navigate = useNavigate();
@@ -80,6 +80,14 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
     }
     if (name) {
       showToast(newStatus === 'accepted' ? t('toast.acceptedUser', { name }) : t('toast.rejectedUser', { name }), newStatus === 'accepted' ? 'success' : 'info');
+    }
+  };
+
+  const onToggleFeatured = async () => {
+    if (!toggleProjectFeatured) return;
+    const res = await toggleProjectFeatured(project.id);
+    if (res) {
+      showToast(res.isFeatured ? (lang === 'en' ? 'Project featured on home page' : 'Proyecto fijado como destacado en el inicio') : (lang === 'en' ? 'Project unfeatured' : 'Proyecto retirado de destacados'), 'success');
     }
   };
 
@@ -230,9 +238,30 @@ export default function ProjectDetailView({ project, onStatusChanged }) {
       <div className="steam-detail-head">
         <div className="steam-title-row">
           <h2>{escapeHTML(l10n(project.title))}</h2>
-          <StatusPill status={project.status} label={t(statusLabelKey(project.status))} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {project.isFeatured && (
+              <span className="status-pill status-pill--featured" style={{ background: '#f59e0b', color: '#111', fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.75rem' }}>
+                ★ {lang === 'en' ? 'Featured' : 'Destacado'}
+              </span>
+            )}
+            <StatusPill status={project.status} label={t(statusLabelKey(project.status))} />
+          </div>
         </div>
-        <span className="project-category-badge">{getCategoryLabel(lang, project.category)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.35rem' }}>
+          <span className="project-category-badge">{getCategoryLabel(lang, project.category)}</span>
+          {isOwner && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onToggleFeatured}
+              style={{ fontSize: '0.78rem', padding: '0.2rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              title={project.isFeatured ? 'Quitar de destacados' : 'Fijar como destacado en el inicio'}
+            >
+              <Icon name="star" size={13} />
+              <span>{project.isFeatured ? (lang === 'en' ? 'Unfeature from home' : 'Quitar de destacados') : (lang === 'en' ? 'Feature on home' : 'Fijar en inicio')}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="steam-detail-grid">

@@ -29,6 +29,7 @@ export function projectToDb(p) {
     image: p.image || null,
     roles: Array.isArray(p.roles) ? p.roles : [],
     status: p.status || 'open',
+    is_featured: Boolean(p.isFeatured),
     created_at: p.createdAt || new Date().toISOString()
   };
 }
@@ -49,6 +50,7 @@ export function projectFromDb(row) {
     image: row.image,
     roles: row.roles || [],
     status: row.status,
+    isFeatured: Boolean(row.is_featured),
     createdAt: row.created_at
   };
 }

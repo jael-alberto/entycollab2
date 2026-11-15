@@ -9,7 +9,7 @@ import {
   requestToJoinGroup as requestToJoinGroupApi,
   decideGroupRequest as decideGroupRequestApi
 } from '../lib/api/groups.js';
-import { createProject as createProjectApi, changeProjectStatus as changeProjectStatusApi } from '../lib/api/projects.js';
+import { createProject as createProjectApi, updateProject as updateProjectApi, changeProjectStatus as changeProjectStatusApi } from '../lib/api/projects.js';
 import {
   applyToProject as applyToProjectApi,
   sendInvite as sendInviteApi,
@@ -70,6 +70,7 @@ function projectFromApi(project) {
     ownerId: project.ownerId ?? project.owner_id ?? null,
     groupId: project.groupId ?? project.group_id ?? null,
     minRating: project.minRating ?? project.min_rating ?? 0,
+    isFeatured: Boolean(project.isFeatured ?? project.is_featured),
     createdAt: project.createdAt ?? project.created_at ?? null,
     tech: Array.isArray(project.tech) ? project.tech : [],
     roles: Array.isArray(project.roles) ? project.roles : []
@@ -467,6 +468,7 @@ export function AppProvider({ children }) {
       roles: (data.roles || []).filter(Boolean)
     };
     if (typeof data.minRating === 'number') payload.minRating = data.minRating;
+    if (typeof data.isFeatured === 'boolean') payload.isFeatured = data.isFeatured;
     if (activeGroup?.id) payload.groupId = activeGroup.id;
 
     try {
@@ -491,6 +493,22 @@ export function AppProvider({ children }) {
       return null;
     }
   }, []);
+
+  const toggleProjectFeatured = useCallback(async (projectId) => {
+    const proj = projects.find(p => p.id === projectId);
+    if (!proj) return null;
+    const nextFeatured = !proj.isFeatured;
+    try {
+      const updated = projectFromApi(await updateProjectApi(projectId, { isFeatured: nextFeatured }));
+      if (updated) {
+        setProjects(prev => prev.map(p => (p.id === projectId ? { ...p, ...updated } : p)));
+      }
+      return updated;
+    } catch (error) {
+      console.error('[AppContext] No se pudo cambiar estado de destacado:', errorMessage(error, 'Error'));
+      return null;
+    }
+  }, [projects]);
 
   // ========================================================================
   // GROUPS
@@ -683,7 +701,7 @@ export function AppProvider({ children }) {
     t, l10n, toggleLang, toggleTheme,
     login, register, logout,
     saveProfile, updateAccount, setAvatar, toggleAvailability, saveFeaturedProjects,
-    createProject, changeProjectStatus,
+    createProject, changeProjectStatus, toggleProjectFeatured,
     selectGroup, createGroup, updateGroup, deleteGroup, removeGroupMember, requestToJoinGroup, decideGroupRequest, setGroupMemberRole,
     applyToProject, handleApplication, respondInvite, sendInvite,
     saveRatings, refresh

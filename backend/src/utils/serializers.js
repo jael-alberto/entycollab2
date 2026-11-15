@@ -102,6 +102,7 @@ export function serializeProject(project) {
   if (has(project, 'image')) result.image = project.image;
   if (has(project, 'roles')) result.roles = toArray(project.roles);
   if (has(project, 'status')) result.status = project.status;
+  if (has(project, 'isFeatured')) result.is_featured = Boolean(project.isFeatured);
   if (has(project, 'createdAt')) result.created_at = toIso(project.createdAt);
 
   if (has(project, 'owner')) {
@@ -125,6 +126,7 @@ export function serializeProject(project) {
     ownerId: 'owner_id',
     groupId: 'group_id',
     minRating: 'min_rating',
+    isFeatured: 'is_featured',
     createdAt: 'created_at'
   });
 }
@@ -346,6 +348,9 @@ export function projectInputToPrisma(input = {}) {
 
   const status = read(input, 'status');
   if (status !== undefined) data.status = status;
+
+  const isFeatured = read(input, 'isFeatured', 'is_featured');
+  if (isFeatured !== undefined) data.isFeatured = Boolean(isFeatured);
 
   return data;
 }

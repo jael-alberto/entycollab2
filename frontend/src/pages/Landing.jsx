@@ -27,6 +27,57 @@ const games = [
   { id: 'valhalla', title: 'Echoes of Valhalla', image: '/img/games/valhalla.jpg', cat: 'art', genre: 'Aventura Nórdica', engine: 'Unity 6', stage: 'Reclutando', roles: ['Narrative Writer', 'Shader Specialist', 'Foley'], tech: ['Unity 6', 'C#', 'Wwise'], summary: 'Aventura de navegación nórdica, supervivencia oceánica y mitología viva.' },
 ];
 
+function inferProjectCategory(p) {
+  const text = [
+    ...(p.roles || []),
+    ...(p.tech || []),
+    p.category || ''
+  ].join(' ').toLowerCase();
+
+  if (text.match(/audio|sound|fmod|wwise|música|sonido|compos/)) return 'music';
+  if (text.match(/art|pixel|3d|anim|ilustr|diseño|shader|vfx|textur/)) return 'art';
+  if (text.match(/design|narrat|level|guion|game design/)) return 'design';
+  return 'code';
+}
+
+function projectToLandingCard(proj, lang = 'es') {
+  const getLocalized = (val) => {
+    if (!val) return '';
+    if (typeof val === 'string') return val;
+    return val[lang] || val.es || val.en || '';
+  };
+
+  const title = getLocalized(proj.title);
+  const summary = getLocalized(proj.description);
+  const cat = inferProjectCategory(proj);
+
+  let stage = 'Reclutando';
+  if (proj.status === 'in-progress') stage = 'En desarrollo';
+  else if (proj.status === 'completed') stage = 'Finalizado';
+  else if (proj.status === 'closed') stage = 'Cerrado';
+
+  const categoryName = typeof proj.category === 'string' && proj.category.trim()
+    ? (proj.category.charAt(0).toUpperCase() + proj.category.slice(1))
+    : 'Videojuego';
+
+  return {
+    id: proj.id,
+    isReal: true,
+    title: title || 'Sin título',
+    image: proj.image || '',
+    cat,
+    genre: categoryName,
+    engine: (proj.tech && proj.tech[0]) || 'Motor gamedev',
+    stage,
+    roles: Array.isArray(proj.roles) ? proj.roles : [],
+    tech: Array.isArray(proj.tech) ? proj.tech : [],
+    summary: summary || '',
+    isFeatured: Boolean(proj.isFeatured),
+    hasImage: Boolean(proj.image),
+    createdAt: proj.createdAt ? new Date(proj.createdAt).getTime() : 0
+  };
+}
+
 const filters = [
   { value: 'all', label: 'Todos', icon: null },
   { value: 'code', label: 'Programación', icon: 'code' },
@@ -43,7 +94,7 @@ const steps = [
 ];
 
 export default function Landing() {
-  const { user, theme, toggleTheme, selectGroup } = useApp();
+  const { user, projects, lang, theme, toggleTheme, selectGroup } = useApp();
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [step, setStep] = useState(0);
@@ -56,11 +107,46 @@ export default function Landing() {
   }, [selectGroup]);
   const exploreTarget = user ? '/proyectos' : '#explorar';
 
-  const visibleGames = useMemo(() => games.filter(game => {
+  const hasRealProjects = Array.isArray(projects) && projects.length > 0;
+
+  const featuredGames = useMemo(() => {
+    if (!hasRealProjects) {
+      return games;
+    }
+
+    const cards = projects.map(p => projectToLandingCard(p, lang));
+
+    return cards.sort((a, b) => {
+      // 1. Proyectos fijados manualmente como destacados (isFeatured = true)
+      if (a.isFeatured !== b.isFeatured) {
+        return a.isFeatured ? -1 : 1;
+      }
+      // 2. Proyectos en estado 'Reclutando' (open)
+      const aRecruit = a.stage === 'Reclutando';
+      const bRecruit = b.stage === 'Reclutando';
+      if (aRecruit !== bRecruit) {
+        return aRecruit ? -1 : 1;
+      }
+      // 3. Proyectos que tienen imagen de portada
+      if (a.hasImage !== b.hasImage) {
+        return a.hasImage ? -1 : 1;
+      }
+      // 4. Proyectos que tienen roles activos
+      const aRoles = a.roles.length > 0;
+      const bRoles = b.roles.length > 0;
+      if (aRoles !== bRoles) {
+        return aRoles ? -1 : 1;
+      }
+      // 5. Los más recientes primero
+      return b.createdAt - a.createdAt;
+    });
+  }, [projects, hasRealProjects, lang]);
+
+  const visibleGames = useMemo(() => featuredGames.filter(game => {
     const term = query.trim().toLowerCase();
     const matchesFilter = filter === 'all' || game.cat === filter;
-    return matchesFilter && (!term || [game.title, game.genre, game.engine, game.summary, ...game.tech].join(' ').toLowerCase().includes(term));
-  }), [filter, query]);
+    return matchesFilter && (!term || [game.title, game.genre, game.engine, game.summary, ...game.tech, ...(game.roles || [])].join(' ').toLowerCase().includes(term));
+  }), [featuredGames, filter, query]);
 
   const scrollToShowcase = event => {
     event.preventDefault();
@@ -128,12 +214,16 @@ export default function Landing() {
             </div>
             <div className="tcl-hero-card">
               <div className="tcl-browser-bar"><i /><i /><i /><span>PROYECTO_01</span></div>
-              <Cover src="/img/games/aetheria.jpg" alt="" label="Aetheria" variant="hero" />
+              <Cover src={featuredGames[0]?.image || '/img/games/aetheria.jpg'} alt="" label={featuredGames[0]?.title || 'Aetheria'} variant="hero" />
               <div className="tcl-hero-overlay">
-                <span className="tcl-pill-recruit"><i />Reclutando</span>
-                <div className="tcl-hero-title">Ecos del bosque</div>
-                <div className="tcl-hero-tags"><span>RPG</span><span>Godot</span><span>Pixel art</span></div>
-                <div className="tcl-hero-cardnav"><span>←</span><b>01 / 03</b><span>→</span></div>
+                <span className="tcl-pill-recruit"><i />{featuredGames[0]?.stage || 'Reclutando'}</span>
+                <div className="tcl-hero-title">{featuredGames[0]?.title || 'Ecos del bosque'}</div>
+                <div className="tcl-hero-tags">
+                  {(featuredGames[0]?.tech && featuredGames[0].tech.length > 0 ? featuredGames[0].tech.slice(0, 3) : ['RPG', 'Godot', 'Pixel art']).map(t => (
+                    <span key={t}>{t}</span>
+                  ))}
+                </div>
+                <div className="tcl-hero-cardnav"><span>←</span><b>01 / {Math.min(featuredGames.length, 9).toString().padStart(2, '0')}</b><span>→</span></div>
               </div>
             </div>
             <div className="tcl-hero-avatars">
@@ -179,7 +269,7 @@ export default function Landing() {
           </div>
           <div className="tcl-projects-meta">
             <span>Explorando desde <b>{filters.find(f => f.value === filter).label.toLowerCase()}</b></span>
-            <span>Selección ilustrativa · datos demo</span>
+            <span>{hasRealProjects ? 'Proyectos destacados de la comunidad' : 'Selección ilustrativa · datos demo'}</span>
           </div>
           <div className="tcl-games">
             {visibleGames.map(game => <article className="tcl-game" key={game.id}>
@@ -188,12 +278,18 @@ export default function Landing() {
                 <span className="tcl-game-arrow" aria-hidden="true"><Icon name="arrow-up-right" size={17} /></span>
               </div>
               <div className="tcl-game-body">
-                <div className="tcl-game-head"><h3>{game.title}</h3><span className={`tcl-game-stage s-${game.cat}`}><i />{game.stage}</span></div>
+                <div className="tcl-game-head">
+                  <h3>{game.title}</h3>
+                  <span className={`tcl-game-stage s-${game.cat}`}>
+                    {game.isFeatured && <span title="Proyecto destacado" style={{ marginRight: '0.35rem', color: '#f59e0b' }}>★</span>}
+                    <i />{game.stage}
+                  </span>
+                </div>
                 <p className="tcl-game-summary">{game.summary}</p>
                 <div className="tcl-game-tags">{game.tech.map(t => <span key={t}>{t}</span>)}</div>
                 <div className="tcl-game-foot">
                   <span>{game.genre}</span>
-                  <Link to={destination} className="tcl-link-arrow">Ver proyecto <Icon name="arrow-up-right" size={15} /></Link>
+                  <Link to={user && game.isReal ? `/proyectos?id=${game.id}` : destination} className="tcl-link-arrow">Ver proyecto <Icon name="arrow-up-right" size={15} /></Link>
                 </div>
               </div>
             </article>)}

@@ -129,6 +129,7 @@ model Project {
   image       String?
   roles       String[]  @default([])
   status      String    @default("open") // Validar en backend: 'open' | 'in-progress' | 'completed' | 'closed'
+  isFeatured  Boolean   @default(false) @map("is_featured")
   createdAt   DateTime  @default(now()) @map("created_at")
 
   owner       Profile   @relation("ProjectOwner", fields: [ownerId], references: [id])

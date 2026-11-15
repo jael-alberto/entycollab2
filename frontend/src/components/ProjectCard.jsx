@@ -82,7 +82,12 @@ export default function ProjectCard({ project, currentUser }) {
               {escapeHTML(l10n(project.title))}
             </button>
           </h3>
-          <StatusPill status={project.status} label={t(statusLabelKey(project.status))} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            {project.isFeatured && (
+              <span title={lang === 'en' ? 'Featured on home' : 'Destacado en el inicio'} style={{ color: '#f59e0b', fontSize: '0.85rem' }}>★</span>
+            )}
+            <StatusPill status={project.status} label={t(statusLabelKey(project.status))} />
+          </div>
         </div>
         <div className="project-card-owner">
           {owner && (

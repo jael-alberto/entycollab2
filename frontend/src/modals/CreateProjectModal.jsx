@@ -23,6 +23,7 @@ export default function CreateProjectModal() {
   const [repo, setRepo] = useState('');
   const [image, setImage] = useState(null);
   const [rolesText, setRolesText] = useState('');
+  const [isFeatured, setIsFeatured] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
@@ -81,7 +82,8 @@ export default function CreateProjectModal() {
         deadline: deadline || null,
         repo: repo.trim() || null,
         image,
-        roles: rolesText.split(',').map(role => role.trim()).filter(Boolean)
+        roles: rolesText.split(',').map(role => role.trim()).filter(Boolean),
+        isFeatured
       });
       closeCreate();
       showToast(t('toast.published'), 'success');
@@ -240,6 +242,17 @@ export default function CreateProjectModal() {
             <Field label={t('createProject.repo')} htmlFor="proj-repo" error={errors.repo}>
               <input id="proj-repo" type="url" value={repo} onChange={e => setRepo(e.target.value)} placeholder={t('createProject.repoPh')} />
             </Field>
+            <div className="form-group form-check" style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                id="proj-featured"
+                type="checkbox"
+                checked={isFeatured}
+                onChange={e => setIsFeatured(e.target.checked)}
+              />
+              <label htmlFor="proj-featured" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+                {lang === 'en' ? 'Feature on home page (highlighted)' : 'Fijar como proyecto destacado en el inicio'}
+              </label>
+            </div>
           </div>
         )}
       </form>

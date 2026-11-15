@@ -172,7 +172,8 @@ export const schemas = {
       repo: optionalUrl,
       image: optionalUrl,
       roles: z.array(z.string()).max(50).optional(),
-      groupId: uuid.optional().nullable()
+      groupId: uuid.optional().nullable(),
+      isFeatured: z.boolean().optional()
     })
   }),
 
@@ -188,7 +189,8 @@ export const schemas = {
       repo: optionalUrl,
       image: optionalUrl,
       roles: z.array(z.string()).max(50).optional(),
-      groupId: uuid.optional().nullable()
+      groupId: uuid.optional().nullable(),
+      isFeatured: z.boolean().optional()
     }),
     params: z.object({ id: uuid })
   }),
