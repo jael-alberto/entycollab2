@@ -91,7 +91,11 @@ export default function WorkspaceShell({ children }) {
 
   // Al cerrar sesión se vuelve a la portada de la plataforma, no al formulario
   // de acceso: quien sale puede querer seguir explorando como visitante.
-  const doLogout = () => { logout(); showToast(t('toast.logout'), 'info'); navigate('/'); };
+  const doLogout = async () => {
+    await logout();
+    showToast(t('toast.logout'), 'info');
+    navigate('/');
+  };
 
   return (
     <div className={`ws-shell${menuOpen ? ' is-open' : ''}${sidebarCollapsed ? ' is-collapsed' : ''}`}>
