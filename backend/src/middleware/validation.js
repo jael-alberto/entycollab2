@@ -58,7 +58,8 @@ export const schemas = {
       gameTypes: z.array(z.string()).max(50).optional(),
       languages: z.array(z.string()).max(50).optional(),
       favoriteGenres: z.array(z.string()).max(50).optional(),
-      disciplines: z.array(z.string()).max(50).optional()
+      disciplines: z.array(z.string()).max(50).optional(),
+      available: z.boolean().optional()
     })
   }),
 
@@ -92,7 +93,8 @@ export const schemas = {
       gameTypes: z.array(z.string()).max(50).optional(),
       languages: z.array(z.string()).max(50).optional(),
       favoriteGenres: z.array(z.string()).max(50).optional(),
-      disciplines: z.array(z.string()).max(50).optional()
+      disciplines: z.array(z.string()).max(50).optional(),
+      available: z.boolean().optional()
     })
   }),
 
@@ -113,6 +115,7 @@ export const schemas = {
       languages: z.array(z.string()).max(50).optional(),
       favoriteGenres: z.array(z.string()).max(50).optional(),
       disciplines: z.array(z.string()).max(50).optional(),
+      available: z.boolean().optional(),
       featuredProjectIds: z.array(uuid).max(5).optional()
     }),
     params: z.object({ id: uuid })

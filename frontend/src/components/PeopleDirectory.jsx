@@ -18,9 +18,9 @@ import {
 // no toca el filtrado facetado ni el orden, solo pagina `results`.
 const PAGE_SIZE = 12;
 
-// Solo se listan quienes activaron "Estoy disponible para colaborar".
+// Solo se listan quienes no hayan desactivado su disponibilidad para colaborar.
 function availableUsers(users) {
-  return users.filter(u => u.available === true);
+  return users.filter(u => u.available !== false);
 }
 
 // Buscador facetado de personas (sidebar + tarjetas). Se reutiliza tanto en la

@@ -217,17 +217,12 @@ export default function GameAuth({ initialMode }) {
 
   const passwordToggleLabel = showPassword ? t('auth.hidePassword') : t('auth.showPassword');
 
-  const visual = (
-    <div className="ga-visual ga-visual--art" aria-hidden="true">
-      <img className="ga-visual-img" src="/img/antrio-space.jpg" alt="" />
-    </div>
-  );
+  
 
   return (
     <div className="ga-page">
       <SkipLink targetId="ga-main" />
       <div className="ga-split">
-        {visual}
         <main className="ga-panel" id="ga-main" tabIndex={-1}>
           <div className="ga-panel-top">
             <Link className="ga-back" to="/">{t('auth.backHome')}</Link>
@@ -278,7 +273,7 @@ export default function GameAuth({ initialMode }) {
                     <span className="ga-password">
                       <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('register.passwordPh')} autoComplete="new-password" />
                       <button type="button" onClick={() => setShowPassword(v => !v)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
-                        <Icon name={showPassword ? 'x' : 'search'} size={15} />
+                        <Icon name={showPassword ? 'eye-off' : 'eye'} size={15} />
                       </button>
                     </span>
                   </Field>
@@ -348,7 +343,7 @@ export default function GameAuth({ initialMode }) {
                   <span className="ga-password">
                     <input type={showPassword ? 'text' : 'password'} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder={t('auth.passwordPh')} autoComplete="current-password" />
                     <button type="button" onClick={() => setShowPassword(v => !v)} aria-label={passwordToggleLabel} aria-pressed={showPassword}>
-                      <Icon name={showPassword ? 'x' : 'search'} size={15} />
+                      <Icon name={showPassword ? 'eye-off' : 'eye'} size={15} />
                     </button>
                   </span>
                 </Field>

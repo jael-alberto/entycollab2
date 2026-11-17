@@ -11,7 +11,8 @@ import { asyncHandler, UnauthorizedError, ConflictError } from '../middleware/er
 export const register = asyncHandler(async (req, res) => {
   const {
     name, username, email, password, bio, skills = [],
-    categories = [], gameTypes = [], languages = [], favoriteGenres = [], disciplines = []
+    categories = [], gameTypes = [], languages = [], favoriteGenres = [], disciplines = [],
+    available = true
   } = req.validated.body;
 
   // Verificar si email/username ya existen en profiles
@@ -48,7 +49,8 @@ export const register = asyncHandler(async (req, res) => {
       gameTypes,
       languages,
       favoriteGenres,
-      disciplines
+      disciplines,
+      available: available ?? true
     },
     create: {
       id: userId,
@@ -61,7 +63,8 @@ export const register = asyncHandler(async (req, res) => {
       gameTypes,
       languages,
       favoriteGenres,
-      disciplines
+      disciplines,
+      available: available ?? true
     }
   });
 

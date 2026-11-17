@@ -256,7 +256,7 @@ export function Stars({ rating, size = 13, showValue = true }) {
 import {
   IconAlertTriangle, IconArrowLeft, IconArrowRight, IconArrowUpRight, IconBallFootball, IconBox,
   IconCheck, IconChess, IconCode, IconCompass, IconCrosshair, IconDeviceGamepad2, IconDeviceMobile,
-  IconFolder, IconGlobe, IconHome, IconInbox, IconKarate, IconLeaf, IconLock, IconLogout, IconMail,
+  IconEye, IconEyeOff, IconFolder, IconGlobe, IconHome, IconInbox, IconKarate, IconLeaf, IconLock, IconLogout, IconMail,
   IconMoon, IconBell, IconMenu2, IconChevronDown, IconChevronUp, IconPlant2,
   IconMusic, IconPalette, IconPencil, IconPhoto, IconPlus, IconPuzzle, IconSearch, IconSend,
   IconSettings, IconSparkles, IconStairsUp, IconStar, IconSteeringWheel, IconSun, IconSword,
@@ -276,7 +276,7 @@ const TABLER_ICONS = {
   pencil: IconPencil, leaf: IconLeaf, menu: IconMenu2, bell: IconBell,
   crosshair: IconCrosshair, sword: IconSword, chess: IconChess, ball: IconBallFootball,
   puzzle: IconPuzzle, 'steering-wheel': IconSteeringWheel, karate: IconKarate,
-  plant: IconPlant2, stairs: IconStairsUp
+  plant: IconPlant2, stairs: IconStairsUp, eye: IconEye, 'eye-off': IconEyeOff
 };
 
 export function Icon({ name, size = 18, label, cls }) {

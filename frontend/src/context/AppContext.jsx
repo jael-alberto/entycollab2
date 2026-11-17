@@ -246,7 +246,9 @@ export function AppProvider({ children }) {
       if (!cancelled) setAuthReady(true);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loadData]);
 
   // Si el grupo activo deja de existir o de ser visible, lo limpiamos.
@@ -319,7 +321,8 @@ export function AppProvider({ children }) {
         gameTypes: data.gameTypes || [],
         languages: data.languages || [],
         favoriteGenres: data.favoriteGenres || [],
-        disciplines: data.disciplines || []
+        disciplines: data.disciplines || [],
+        available: data.available !== undefined ? Boolean(data.available) : true
       };
 
       const result = await api.auth.register(payload);
