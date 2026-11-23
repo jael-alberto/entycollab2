@@ -23,6 +23,7 @@ import {
   getLang, setLang as storeSetLang
 } from '../lib/preferences.js';
 import { getAuthToken, setAuthTokens, clearAuthTokens } from '../lib/authToken.js';
+import { supabase } from '../lib/supabaseClient.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { userCategories } from '../lib/helpers.js';
 
@@ -246,7 +247,9 @@ export function AppProvider({ children }) {
       if (!cancelled) setAuthReady(true);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loadData]);
 
   // Si el grupo activo deja de existir o de ser visible, lo limpiamos.
@@ -319,7 +322,8 @@ export function AppProvider({ children }) {
         gameTypes: data.gameTypes || [],
         languages: data.languages || [],
         favoriteGenres: data.favoriteGenres || [],
-        disciplines: data.disciplines || []
+        disciplines: data.disciplines || [],
+        available: data.available !== undefined ? Boolean(data.available) : true
       };
 
       const result = await api.auth.register(payload);
@@ -348,18 +352,34 @@ export function AppProvider({ children }) {
   }, [loadData, login]);
 
   const logout = useCallback(async () => {
-    try {
-      await api.auth.logout();
-    } catch {
-      // El token puede haber caducado: cerramos sesión igualmente.
-    }
+    // 1. Limpiar estado de autenticación INMEDIATAMENTE de forma síncrona
     clearAuthTokens();
+    if (supabase) {
+      try {
+        supabase.auth.signOut().catch(() => {});
+      } catch {
+        // Ignorar
+      }
+    }
     setCurrentUser(null);
     setUserId(null);
     setMenuOpen(false);
     setActiveGroupId(null);
     setActiveGroupIdState(null);
-    await refresh();
+
+    // 2. Notificar al backend en segundo plano (no bloqueante)
+    try {
+      api.auth.logout().catch(() => {});
+    } catch {
+      // Ignorar
+    }
+
+    // 3. Refrescar datos públicos del bootstrap
+    try {
+      await refresh();
+    } catch {
+      // Ignorar
+    }
   }, [refresh]);
 
   // ========================================================================

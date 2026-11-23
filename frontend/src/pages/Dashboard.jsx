@@ -10,7 +10,7 @@ import { scoreProject, escapeHTML, getUserAvgRating } from '../lib/helpers.js';
 import { completedProjectsCount } from '../lib/talent.js';
 import { l10nValue } from '../lib/i18n.js';
 
-const availableUsers = (users) => users.filter(u => u.available === true);
+const availableUsers = (users) => users.filter(u => u.available !== false);
 
 export default function Dashboard() {
   const { user, projects, applications, users, ratings, groups, lang, t, l10n, selectGroup, activeGroup } = useApp();

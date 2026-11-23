@@ -15,6 +15,7 @@ import Settings from './pages/Settings.jsx';
 import Landing from './pages/Landing.jsx';
 import Groups from './pages/Groups.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
+import { hasAuthToken } from './lib/authToken.js';
 
 function AuthLoading() {
   return (
@@ -31,14 +32,14 @@ function AuthLoading() {
 function RequireAuth({ children }) {
   const { user, authReady } = useApp();
   if (!authReady) return <AuthLoading />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user || !hasAuthToken()) return <Navigate to="/login" replace />;
   return children;
 }
 
 function RedirectIfAuthed({ children }) {
   const { user, authReady } = useApp();
   if (!authReady) return <AuthLoading />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user && hasAuthToken()) return <Navigate to="/dashboard" replace />;
   return children;
 }
 

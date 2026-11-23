@@ -38,7 +38,7 @@ model Profile {
   bio                Json?
   githubUrl          String?         @map("github_url")
   portfolioUrl       String?         @map("portfolio_url")
-  available          Boolean         @default(false)
+  available          Boolean         @default(true)
   featuredProjectIds String[]        @default([]) @map("featured_project_ids") @db.Uuid
   gameTypes          String[]        @default([]) @map("game_types")
   languages          String[]        @default([])

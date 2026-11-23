@@ -178,7 +178,19 @@ export function LoggedHeader() {
                 <Link to="/proyectos/postulaciones" onClick={() => setMenuOpen(false)}>{t('menu.myApps')}</Link>
                 <Link to="/ajustes" onClick={() => setMenuOpen(false)}>{t('menu.settings')}</Link>
                 <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.5rem 0' }} />
-                <a href="#" className="user-bubble-menu-danger" onClick={e => { e.preventDefault(); setMenuOpen(false); logout(); showToast(t('toast.logout'), 'info'); navigate('/'); }}>{t('menu.logout')}</a>
+                <a
+                  href="#"
+                  className="user-bubble-menu-danger"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    setMenuOpen(false);
+                    await logout();
+                    showToast(t('toast.logout'), 'info');
+                    navigate('/');
+                  }}
+                >
+                  {t('menu.logout')}
+                </a>
               </div>
             )}
           </div>

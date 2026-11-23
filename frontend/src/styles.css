@@ -7664,7 +7664,7 @@ button[aria-busy="true"] {
    Panel visual a la izquierda con arte real + scrim; formulario a la derecha.
    ========================================================================== */
 .ga-page { min-height: 100dvh; background: var(--color-bg); color: var(--color-text-main); font-family: var(--font-primary); }
-.ga-split { display: grid; grid-template-columns: 1.05fr .95fr; min-height: 100dvh; }
+.ga-split { display: flex; justify-content: center; align-items: center; min-height: 100dvh; padding: 32px 16px; }
 
 /* ---- Panel visual ---- */
 .ga-visual { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 28px; color: #fff; }
@@ -7691,7 +7691,7 @@ button[aria-busy="true"] {
 .ga-visual-foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font: 700 10px var(--font-mono); letter-spacing: .08em; color: rgba(255,255,255,.55); }
 
 /* ---- Panel de formulario ---- */
-.ga-panel { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 22px; padding: clamp(32px, 6vw, 72px); background: var(--color-bg-alt); overflow-y: auto; }
+.ga-panel { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 22px; padding: clamp(28px, 4vw, 44px); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 18px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28); max-width: 460px; width: 100%; overflow-y: auto; }
 .ga-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--color-text-muted); font-size: 13px; font-weight: 600; }
 .ga-back:hover { color: var(--color-text-main); }
 .ga-panel-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
