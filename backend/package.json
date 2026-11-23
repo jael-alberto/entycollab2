@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
+    "build": "prisma generate",
+    "postinstall": "prisma generate",
     "lint": "oxlint",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",

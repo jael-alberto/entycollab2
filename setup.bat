@@ -9,11 +9,11 @@ timeout /t 1 /nobreak >nul
 echo Done killing node processes.
 
 echo === Step 2: Starting Backend server ===
-start "EntyCollab Backend" cmd /k "cd /d C:\Users\Luis Javier\Documents\GitHub\entycollab2\backend && node --env-file=.env src/index.js"
+start "EntyCollab Backend" cmd /k "cd /d \"%~dp0backend\" && node --env-file=.env src/index.js"
 timeout /t 2 /nobreak >nul
 
 echo === Step 3: Starting Vite development server ===
-cd /d "C:\Users\Luis Javier\Documents\GitHub\entycollab2\frontend"
+cd /d "%~dp0frontend"
 npx vite --host localhost --port 5175
 
 echo === Setup complete! ===
