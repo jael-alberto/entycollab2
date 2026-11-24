@@ -44,6 +44,11 @@ const usernameParams = z.object({ params: z.object({ username: z.string().min(3)
 const optionalUrl = z.union([z.string().url(), z.literal('')]).optional().nullable();
 const queryBoolean = z.enum(['true', 'false']).transform(v => v === 'true');
 
+// Juegos favoritos por tipo/género: como máximo 2 nombres por categoría.
+const favoriteGames = z.record(
+  z.array(z.string().trim().min(1).max(80)).max(2)
+).refine(value => Object.keys(value).length <= 50).optional();
+
 export const schemas = {
   // Auth
   register: z.object({
@@ -58,6 +63,7 @@ export const schemas = {
       gameTypes: z.array(z.string()).max(50).optional(),
       languages: z.array(z.string()).max(50).optional(),
       favoriteGenres: z.array(z.string()).max(50).optional(),
+      favoriteGames,
       disciplines: z.array(z.string()).max(50).optional(),
       available: z.boolean().optional()
     })
@@ -93,6 +99,7 @@ export const schemas = {
       gameTypes: z.array(z.string()).max(50).optional(),
       languages: z.array(z.string()).max(50).optional(),
       favoriteGenres: z.array(z.string()).max(50).optional(),
+      favoriteGames,
       disciplines: z.array(z.string()).max(50).optional(),
       available: z.boolean().optional()
     })
@@ -114,6 +121,7 @@ export const schemas = {
       gameTypes: z.array(z.string()).max(50).optional(),
       languages: z.array(z.string()).max(50).optional(),
       favoriteGenres: z.array(z.string()).max(50).optional(),
+      favoriteGames,
       disciplines: z.array(z.string()).max(50).optional(),
       available: z.boolean().optional(),
       featuredProjectIds: z.array(uuid).max(5).optional()
@@ -149,7 +157,6 @@ export const schemas = {
       search: z.string().max(100).optional(),
       gameTypes: z.string().optional(),
       languages: z.string().optional(),
-      favoriteGenres: z.string().optional(),
       disciplines: z.string().optional(),
       completed: z.string().optional(),
       rating: z.string().optional(),

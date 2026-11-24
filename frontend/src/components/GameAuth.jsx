@@ -3,11 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { Field, Icon, Modal, SkipLink, Spinner } from './common.jsx';
-import GenreGamesPanel from './GenreGamesPanel.jsx';
+import FavoriteGamesTags from './FavoriteGamesTags.jsx';
 import { LegalContent } from '../pages/Legal.jsx';
 import { DISCIPLINES, FAVORITE_GENRES, disciplineLabel, favoriteGenreLabel } from '../lib/talent.js';
 import { emailKey, nameKey, passwordKey, requiredKey, usernameKey } from '../lib/validation.js';
-import { setFavoriteGames as saveFavoriteGames } from '../lib/favoriteGames.js';
+import { pruneFavoriteGames, withoutGenre } from '../lib/favoriteGames.js';
 import { supabase } from '../lib/supabaseClient.js';
 
 function ChoiceGrid({ items, selected, onChange, label, describedBy }) {
@@ -69,7 +69,7 @@ export default function GameAuth({ initialMode }) {
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [favoriteGenres, setFavoriteGenres] = useState([]);
-  const [favoriteGames, setFavoriteGames] = useState([]);
+  const [favoriteGames, setFavoriteGames] = useState({});
   const [disciplines, setDisciplines] = useState([]);
   const [available, setAvailable] = useState(true);
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -80,8 +80,11 @@ export default function GameAuth({ initialMode }) {
   const toggle = (setter, selected, value) =>
     setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]);
 
-  const toggleGame = (gameId) =>
-    setFavoriteGames(prev => prev.includes(gameId) ? prev.filter(id => id !== gameId) : [...prev, gameId]);
+  const toggleGenre = (genre) => {
+    const removing = favoriteGenres.includes(genre);
+    setFavoriteGenres(prev => removing ? prev.filter(value => value !== genre) : [...prev, genre]);
+    if (removing) setFavoriteGames(current => withoutGenre(current, genre));
+  };
 
   const signInWithProvider = async (provider) => {
     if (!supabase) {
@@ -141,6 +144,7 @@ export default function GameAuth({ initialMode }) {
       skills: [...new Set(disciplines.map(value => disciplineLabel(lang, value)))],
       bio: '',
       favoriteGenres,
+      favoriteGames: pruneFavoriteGames(favoriteGames, favoriteGenres),
       disciplines,
       languages: [],
       available
@@ -166,9 +170,6 @@ export default function GameAuth({ initialMode }) {
       setStepError(t('toast.registerError'));
       return;
     }
-    // El perfil aún no guarda juegos concretos: se dejan en el navegador con
-    // la cuenta recién creada para que la selección no se pierda al entrar.
-    saveFavoriteGames(result.id, favoriteGames);
     showToast(t('toast.welcome', { name: username.replace(/^@/, '').trim() }), 'success');
     navigate('/perfil');
   };
@@ -303,11 +304,11 @@ export default function GameAuth({ initialMode }) {
                   </section>
                   <section aria-labelledby="ga-fg-title">
                     <h3 id="ga-fg-title">{t('auth.genreQuestion')}</h3>
-                    <ChoiceGrid items={FAVORITE_GENRES.map(item => ({ ...item, label: favoriteGenreLabel(lang, item.value) }))} selected={favoriteGenres} onChange={v => toggle(setFavoriteGenres, favoriteGenres, v)} label={t('filters.favGenres')} />
-                    <GenreGamesPanel
-                      selectedGenres={favoriteGenres}
-                      selectedGames={favoriteGames}
-                      onToggleGame={toggleGame}
+                    <ChoiceGrid items={FAVORITE_GENRES.map(item => ({ ...item, label: favoriteGenreLabel(lang, item.value) }))} selected={favoriteGenres} onChange={toggleGenre} label={t('filters.favGenres')} />
+                    <FavoriteGamesTags
+                      categories={favoriteGenres}
+                      value={favoriteGames}
+                      onChange={setFavoriteGames}
                     />
                   </section>
                   <label className="ga-check">

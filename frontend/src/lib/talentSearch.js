@@ -8,33 +8,29 @@
 import {
   COMPLETED_BUCKETS,
   DISCIPLINES,
-  FAVORITE_GENRES,
   GAME_TYPES,
   RATING_BUCKETS,
   completedProjectsCount,
   disciplineIcon,
   disciplineLabel,
-  favoriteGenreIcon,
-  favoriteGenreLabel,
   gameTypeIcon,
   gameTypeLabel,
   languagesForGameTypes,
   optionTerms,
   userDisciplines,
-  userFavoriteGenres,
   userGameTypes,
   userLanguages
 } from './talent.js';
 import { getUserAvgRating } from './helpers.js';
+import { normalizeFavoriteGames } from './favoriteGames.js';
 import { t } from './i18n.js';
 
-export const FACET_KEYS = ['gameTypes', 'languages', 'favoriteGenres', 'disciplines', 'completed', 'rating'];
+export const FACET_KEYS = ['gameTypes', 'languages', 'disciplines', 'completed', 'rating'];
 
 export function emptyFilters() {
   return {
     gameTypes: [],
     languages: [],
-    favoriteGenres: [],
     disciplines: [],
     completed: [],
     rating: []
@@ -68,11 +64,6 @@ function matchesLanguage(user, values) {
   return values.some(v => own.includes(v));
 }
 
-function matchesFavoriteGenre(user, values) {
-  const own = userFavoriteGenres(user);
-  return values.some(v => own.includes(v));
-}
-
 function matchesDiscipline(user, values) {
   const own = userDisciplines(user);
   return values.some(v => own.includes(v));
@@ -97,7 +88,6 @@ function matchesRating(user, values, ctx) {
 const MATCHERS = {
   gameTypes: matchesGameType,
   languages: matchesLanguage,
-  favoriteGenres: matchesFavoriteGenre,
   disciplines: matchesDiscipline,
   completed: matchesCompleted,
   rating: matchesRating
@@ -143,12 +133,17 @@ function facetOptions(user, lang) {
     ...userLanguages(user).map(v => ({
       key: 'languages', value: v, text: v, icon: ''
     })),
-    ...userFavoriteGenres(user).map(v => ({
-      key: 'favoriteGenres', value: v, text: favoriteGenreLabel(lang, v), icon: favoriteGenreIcon(v)
-    })),
     ...userDisciplines(user).map(v => ({
       key: 'disciplines', value: v, text: disciplineLabel(lang, v), icon: disciplineIcon(v)
-    }))
+    })),
+    // Los juegos escritos por la persona también son opciones buscables. El
+    // value lleva la categoría para que dos juegos iguales en tipos distintos
+    // no choquen al pintar los tags.
+    ...Object.entries(normalizeFavoriteGames(user.favoriteGames)).flatMap(([category, names]) =>
+      names.map(name => ({
+        key: 'favoriteGames', value: `${category}:${name}`, text: name, icon: '🎮'
+      }))
+    )
   ];
 }
 
@@ -162,7 +157,7 @@ export function searchIndex(user, lang) {
     ? [user.bio]
     : Object.values(user.bio || {});
 
-  const terms = facetOptions(user, lang).flatMap(o => optionTerms(lang, o.key, o.value));
+  const terms = facetOptions(user, lang).flatMap(o => optionTerms(lang, o.key, o.value, o.text));
 
   return [
     user.name,
@@ -193,19 +188,14 @@ export function revealedOptions(user, filters, query, lang) {
 
   const tokens = searchTokens(query);
 
-  // Solo palabras completas: "2d" no tiene que aparecer dentro de "pixel art".
-  const matchesToken = (term, tok) => new RegExp(`(^|[^a-z0-9+#])${escapeRegExp(tok)}([^a-z0-9+#]|$)`).test(term);
-
   return facetOptions(user, lang).filter(o => {
     if (selected.has(`${o.key}:${o.value}`)) return true;
     if (tokens.length === 0) return false;
-    const terms = optionTerms(lang, o.key, o.value).map(normalizeText);
-    return tokens.some(tok => terms.some(term => matchesToken(term, tok)));
+    const terms = optionTerms(lang, o.key, o.value, o.text).map(normalizeText);
+    // Coincidencia parcial: al escribir "mov" ya aparece Móvil, y al escribir
+    // "free fire" aparece ese juego (o cualquier tag que contenga esas letras).
+    return tokens.some(tok => terms.some(term => term.includes(tok)));
   });
-}
-
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // --------------------------------------------------------------------------
@@ -280,7 +270,6 @@ export function facetCounts(users, filters, query, lang, ctx) {
   return {
     gameTypes: countsFor('gameTypes', GAME_TYPES),
     languages: countsFor('languages', languagesForGameTypes(filters.gameTypes)),
-    favoriteGenres: countsFor('favoriteGenres', FAVORITE_GENRES),
     disciplines: countsFor('disciplines', DISCIPLINES),
     completed: countsFor('completed', COMPLETED_BUCKETS),
     rating: countsFor('rating', RATING_BUCKETS)
@@ -296,7 +285,6 @@ export function activeChips(filters, lang) {
   const chips = [];
   filters.gameTypes.forEach(v => chips.push({ key: 'gameTypes', value: v, label: gameTypeLabel(lang, v) }));
   filters.languages.forEach(v => chips.push({ key: 'languages', value: v, label: v }));
-  filters.favoriteGenres.forEach(v => chips.push({ key: 'favoriteGenres', value: v, label: favoriteGenreLabel(lang, v) }));
   filters.disciplines.forEach(v => chips.push({ key: 'disciplines', value: v, label: disciplineLabel(lang, v) }));
   filters.completed.forEach(v => chips.push({ key: 'completed', value: v, label: `+${v}` }));
   filters.rating.forEach(v => chips.push({

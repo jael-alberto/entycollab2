@@ -3,17 +3,16 @@ import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
 import { Avatar, Field, Icon, SkillTags, SkipLink, Spinner } from '../components/common.jsx';
-import { fileToDataURL, userCategories, getCategoryLabel, normalizeLinkUrl, escapeHTML } from '../lib/helpers.js';
+import { fileToDataURL, normalizeLinkUrl, escapeHTML } from '../lib/helpers.js';
 import { emailKey, nameKey, passwordKey, usernameKey } from '../lib/validation.js';
 import {
   disciplineLabel,
-  favoriteGenreLabel,
   gameTypeLabel,
   userDisciplines,
-  userFavoriteGenres,
   userGameTypes,
   userLanguages
 } from '../lib/talent.js';
+import { allFavoriteGameNames } from '../lib/favoriteGames.js';
 
 const BIO_MAX = 220;
 
@@ -25,7 +24,7 @@ function isValidLink(value) {
 export default function Settings() {
   const { user, lang, t, l10n, saveProfile, updateAccount, setAvatar } = useApp();
   const { showToast } = useToast();
-  const { openSkillsSettings } = useModals();
+  const { openSkillsSettings, openTalentSettings } = useModals();
   const avatarInputRef = useRef(null);
 
   const [acc, setAcc] = useState({
@@ -43,7 +42,6 @@ export default function Settings() {
 
   if (!user) return null;
 
-  const categories = userCategories(user);
   const setAccField = (field) => (e) => {
     setAcc(prev => ({ ...prev, [field]: e.target.value }));
     if (accErrors[field]) setAccErrors(prev => ({ ...prev, [field]: '' }));
@@ -92,17 +90,17 @@ export default function Settings() {
     const githubUrl = normalizeLinkUrl(github);
     const portfolioUrl = normalizeLinkUrl(portfolio);
 
-    // Habilidades y categorías no se editan acá: se reenvían como están
+    // Tecnologías y categorías no se editan acá: se reenvían como están
     // guardadas para no pisar lo que se cambió desde el modal.
     await saveProfile({
       bio: bio.trim(),
       skills: (user.skills || []).slice(),
-      categories,
+      categories: user.categories || [],
       githubUrl,
       portfolioUrl,
       gameTypes: userGameTypes(user),
       languages: userLanguages(user),
-      favoriteGenres: userFavoriteGenres(user),
+      favoriteGenres: user.favoriteGenres || [],
       disciplines: userDisciplines(user)
     });
     setAcc(prev => ({ ...prev, password: '' }));
@@ -226,19 +224,19 @@ export default function Settings() {
         </header>
 
         <div className="settings-skills-summary">
-          <span className="settings-summary-label">{t('skillsModal.catLabel')}</span>
-          {categories.length === 0
-            ? <span className="form-hint">{t('profile.selectCat')}</span>
-            : categories.map(c => (
-              <span key={c} className="person-cat-chip">{getCategoryLabel(lang, c)}</span>
-            ))}
+          <span className="settings-summary-label">{t('settings.languagesLabel')}</span>
+          {userLanguages(user).length === 0
+            ? <span className="form-hint">{t('settings.noLanguages')}</span>
+            : <SkillTags skills={userLanguages(user)} limit={999} />}
         </div>
 
         <div className="settings-skills-summary">
-          <span className="settings-summary-label">{t('skillsModal.techLabel')}</span>
-          {(user.skills || []).length === 0
-            ? <span className="form-hint">{t('settings.noSkills')}</span>
-            : <SkillTags skills={user.skills} limit={999} />}
+          <span className="settings-summary-label">{t('settings.disciplinesLabel')}</span>
+          {userDisciplines(user).length === 0
+            ? <span className="form-hint">{t('settings.noDisciplines')}</span>
+            : userDisciplines(user).map(v => (
+              <span key={v} className="person-cat-chip">{escapeHTML(disciplineLabel(lang, v))}</span>
+            ))}
         </div>
 
         <div className="edit-skills-actions">
@@ -271,33 +269,17 @@ export default function Settings() {
         </div>
 
         <div className="settings-skills-summary">
-          <span className="settings-summary-label">{t('settings.languagesLabel')}</span>
-          {userLanguages(user).length === 0
-            ? <span className="form-hint">{t('settings.noLanguages')}</span>
-            : <SkillTags skills={userLanguages(user)} limit={999} />}
-        </div>
-
-        <div className="settings-skills-summary">
-          <span className="settings-summary-label">{t('settings.favoriteGenresLabel')}</span>
-          {userFavoriteGenres(user).length === 0
-            ? <span className="form-hint">{t('settings.noGenres')}</span>
-            : userFavoriteGenres(user).map(v => (
-              <span key={v} className="person-cat-chip">{escapeHTML(favoriteGenreLabel(lang, v))}</span>
-            ))}
-        </div>
-
-        <div className="settings-skills-summary">
-          <span className="settings-summary-label">{t('settings.disciplinesLabel')}</span>
-          {userDisciplines(user).length === 0
-            ? <span className="form-hint">{t('settings.noDisciplines')}</span>
-            : userDisciplines(user).map(v => (
-              <span key={v} className="person-cat-chip">{escapeHTML(disciplineLabel(lang, v))}</span>
+          <span className="settings-summary-label">{t('games.favoriteLabel')}</span>
+          {allFavoriteGameNames(user.favoriteGames).length === 0
+            ? <span className="form-hint">{t('games.noGamesYet')}</span>
+            : allFavoriteGameNames(user.favoriteGames).map(name => (
+              <span key={name} className="person-cat-chip">{escapeHTML(name)}</span>
             ))}
         </div>
 
         <div className="edit-skills-actions">
-          <button type="button" className="btn btn-primary btn-sm" onClick={openSkillsSettings}>
-            {t('settings.editSkills')}
+          <button type="button" className="btn btn-primary btn-sm" onClick={openTalentSettings}>
+            {t('settings.editGameProfile')}
           </button>
         </div>
       </section>

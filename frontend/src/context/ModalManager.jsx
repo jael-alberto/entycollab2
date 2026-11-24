@@ -19,7 +19,7 @@ export function ModalProvider({ children }) {
   const [invitePersonId, setInvitePersonId] = useState(null);
   const [userDetailId, setUserDetailId] = useState(null);
   const [featuredOpen, setFeaturedOpen] = useState(false);
-  const [skillsSettingsOpen, setSkillsSettingsOpen] = useState(false);
+  const [skillsSettingsMode, setSkillsSettingsMode] = useState(null);
   const [catOpen, setCatOpen] = useState(false);
   const [techOpen, setTechOpen] = useState(false);
 
@@ -37,8 +37,9 @@ export function ModalProvider({ children }) {
   const closeUserDetail = useCallback(() => setUserDetailId(null), []);
   const openFeatured = useCallback(() => setFeaturedOpen(true), []);
   const closeFeatured = useCallback(() => setFeaturedOpen(false), []);
-  const openSkillsSettings = useCallback(() => setSkillsSettingsOpen(true), []);
-  const closeSkillsSettings = useCallback(() => setSkillsSettingsOpen(false), []);
+  const openSkillsSettings = useCallback(() => setSkillsSettingsMode('skills'), []);
+  const openTalentSettings = useCallback(() => setSkillsSettingsMode('talent'), []);
+  const closeSkillsSettings = useCallback(() => setSkillsSettingsMode(null), []);
   const openCategoryFilter = useCallback(() => setCatOpen(true), []);
   const closeCategoryFilter = useCallback(() => setCatOpen(false), []);
   const openTechFilter = useCallback(() => setTechOpen(true), []);
@@ -52,7 +53,7 @@ export function ModalProvider({ children }) {
     openInvite, closeInvite, invitePersonId,
     openUserDetail, closeUserDetail, userDetailId,
     openFeatured, closeFeatured, featuredOpen,
-    openSkillsSettings, closeSkillsSettings, skillsSettingsOpen,
+    openSkillsSettings, openTalentSettings, closeSkillsSettings,
     openCategoryFilter, closeCategoryFilter, catOpen,
     openTechFilter, closeTechFilter, techOpen
   };
@@ -67,7 +68,7 @@ export function ModalProvider({ children }) {
       {invitePersonId && <InviteModal />}
       {userDetailId && <UserDetailModal />}
       {featuredOpen && <FeaturedModal />}
-      {skillsSettingsOpen && <SettingsSkillsModal />}
+      {skillsSettingsMode && <SettingsSkillsModal mode={skillsSettingsMode} />}
       {catOpen && <SelectFilterModal kind="category" />}
       {techOpen && <SelectFilterModal kind="tech" />}
       {createOpen && <CreateProjectModal />}

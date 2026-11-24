@@ -25,12 +25,6 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
-      - key: SUPABASE_PUBLISHABLE_KEY
-        sync: false
-      - key: SUPABASE_JWKS_URL
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true
       - key: RATE_LIMIT_WINDOW_MS
         value: "900000"
       - key: RATE_LIMIT_MAX_REQUESTS

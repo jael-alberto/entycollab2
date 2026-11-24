@@ -38,9 +38,8 @@ Ten a mano estos valores:
 | `DATABASE_URL` | Supabase → Connect → **Session pooler** (ver aviso abajo) |
 | `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
 | `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API → `service_role` / secret |
-| `SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API → `anon` / publishable |
-| `VITE_SUPABASE_URL` | Igual que `SUPABASE_URL` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Igual que `SUPABASE_PUBLISHABLE_KEY` |
+| `VITE_SUPABASE_URL` | Igual que `SUPABASE_URL` (frontend) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase → API → `anon` / publishable (frontend) |
 
 Los valores de `VITE_*` ya están en tu `frontend/.env` local.
 
@@ -103,11 +102,10 @@ Los valores de `VITE_*` ya están en tu `frontend/.env` local.
    | `DATABASE_URL` | Session pooler de Supabase |
    | `SUPABASE_URL` | `https://<ref>.supabase.co` |
    | `SUPABASE_SECRET_KEY` | secret / service_role |
-   | `SUPABASE_PUBLISHABLE_KEY` | publishable / anon |
 
-   `JWT_SECRET` se genera solo. `NODE_ENV`, `ALLOW_VERCEL_PREVIEWS` y los límites
-   de rate limit ya vienen en el YAML. Render inyecta `PORT` automáticamente: no
-   lo definas.
+
+   `NODE_ENV`, `ALLOW_VERCEL_PREVIEWS` y los límites de rate limit ya vienen en
+   el YAML. Render inyecta `PORT` automáticamente: no lo definas.
 
 6. Espera el primer deploy y abre:
    `https://entycollab-backend-staging.onrender.com/health`
@@ -192,10 +190,10 @@ mismos y las pruebas pueden ensuciar producción. Si quieres aislarlo:
 
 1. Crea un proyecto Supabase nuevo (región cercana a Oregon).
 2. Ejecuta en orden `database/supabase/migrations/0001_init.sql`,
-   `0002_storage.sql`, `0003_security_hardening.sql`.
+   `0002_storage.sql`, `0003_security_hardening.sql`, `0004_favorite_games.sql`.
 3. Copia la nueva cadena **Session pooler** y actualiza `DATABASE_URL` en Render.
-4. Actualiza `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_PUBLISHABLE_KEY`
-   en Render, y `VITE_SUPABASE_*` en Vercel.
+4. Actualiza `SUPABASE_URL` y `SUPABASE_SECRET_KEY` en Render, y `VITE_SUPABASE_*`
+   en Vercel.
 5. Redeploy de ambos.
 
 Ojo: cambiar de proyecto Supabase invalida los usuarios existentes (Auth vive en

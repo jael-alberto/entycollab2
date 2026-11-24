@@ -5,16 +5,13 @@ import { config } from 'dotenv';
 config();
 
 const isProduction = process.env.NODE_ENV === 'production';
-const frontendUrls = (process.env.FRONTEND_URL || 'http://localhost:5173')
+const frontendUrls = (process.env.FRONTEND_URL || 'http://localhost:5173,http://127.0.0.1:5173,http://[::1]:5173')
   .split(',')
   .map((value) => value.trim().replace(/\/$/, ''))
   .filter(Boolean);
-let supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-let supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
-const jwtSecret = process.env.JWT_SECRET || 'devcollab-secret-key-change-in-production';
+let supabaseUrl = process.env.SUPABASE_URL;
+let supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 const databaseUrl = process.env.DATABASE_URL || '';
-const shadowDatabaseUrl = process.env.SHADOW_DATABASE_URL || '';
 
 const isSupabaseConfigured = Boolean(
   supabaseUrl && 
@@ -25,13 +22,13 @@ const isSupabaseConfigured = Boolean(
 
 if (!supabaseUrl) {
   if (isProduction) {
-    throw new Error('Variable de entorno requerida faltante: SUPABASE_URL (o VITE_SUPABASE_URL)');
+    throw new Error('Variable de entorno requerida faltante: SUPABASE_URL');
   }
   supabaseUrl = 'https://placeholder.supabase.co';
 }
 if (!supabaseSecretKey) {
   if (isProduction) {
-    throw new Error('Variable de entorno requerida faltante: SUPABASE_SECRET_KEY (o SUPABASE_SERVICE_ROLE_KEY)');
+    throw new Error('Variable de entorno requerida faltante: SUPABASE_SECRET_KEY');
   }
   supabaseSecretKey = 'placeholder-secret-key';
 }
@@ -57,21 +54,9 @@ export const env = {
   
   supabase: {
     url: supabaseUrl,
-    serviceRoleKey: supabaseSecretKey,
-    anonKey: supabaseAnonKey || '',
-    jwksUrl: process.env.SUPABASE_JWKS_URL || `${supabaseUrl}/auth/v1/.well-known/jwks.json`
+    serviceRoleKey: supabaseSecretKey
   },
 
-  prisma: {
-    databaseUrl,
-    shadowDatabaseUrl
-  },
-  
-  jwt: {
-    secret: jwtSecret,
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
-  },
-  
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10)

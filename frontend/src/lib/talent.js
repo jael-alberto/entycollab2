@@ -130,6 +130,15 @@ export function favoriteGenreLabel(lang, value) {
   return t(lang, `fg.${value}`);
 }
 
+// Los juegos favoritos pueden estar agrupados por tipo de juego (perfil) o
+// por género (registro). Esta etiqueta resuelve cualquiera de los dos.
+export function gameCategoryLabel(lang, value) {
+  const type = t(lang, `gt.${value}`);
+  if (type !== `gt.${value}`) return type;
+  const genre = t(lang, `fg.${value}`);
+  return genre !== `fg.${value}` ? genre : value;
+}
+
 export function disciplineLabel(lang, value) {
   return t(lang, `disc.${value}`);
 }
@@ -190,12 +199,14 @@ const SEARCH_ALIASES = {
   }
 };
 
-// Etiqueta visible + alias de una opción de una faceta.
-export function optionTerms(lang, key, value) {
+// Etiqueta visible + alias de una opción de una faceta. `label` se usa para
+// los juegos favoritos, cuyo `value` es una clave compuesta (categoría:juego).
+export function optionTerms(lang, key, value, label) {
   const base = key === 'gameTypes' ? gameTypeLabel(lang, value)
     : key === 'favoriteGenres' ? favoriteGenreLabel(lang, value)
       : key === 'disciplines' ? disciplineLabel(lang, value)
-        : value;
+        : key === 'favoriteGames' ? (label || value)
+          : value;
   return [base, ...((SEARCH_ALIASES[key] || {})[value] || [])];
 }
 

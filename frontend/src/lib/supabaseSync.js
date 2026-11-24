@@ -2,6 +2,7 @@
 // Capa de sincronización y acceso directo a Supabase
 import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 import { setAuthTokens } from './authToken.js';
+import { normalizeFavoriteGames } from './favoriteGames.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -72,6 +73,7 @@ export function profileToDb(u) {
     game_types: Array.isArray(u.gameTypes) ? u.gameTypes : [],
     languages: Array.isArray(u.languages) ? u.languages : [],
     favorite_genres: Array.isArray(u.favoriteGenres) ? u.favoriteGenres : [],
+    favorite_games: normalizeFavoriteGames(u.favoriteGames),
     disciplines: Array.isArray(u.disciplines) ? u.disciplines : [],
     created_at: u.createdAt || new Date().toISOString()
   };
@@ -94,6 +96,7 @@ export function profileFromDb(row) {
     gameTypes: row.game_types || [],
     languages: row.languages || [],
     favoriteGenres: row.favorite_genres || [],
+    favoriteGames: normalizeFavoriteGames(row.favorite_games),
     disciplines: row.disciplines || [],
     createdAt: row.created_at
   };
@@ -382,7 +385,7 @@ export async function supabaseAuthLogin(identifier, password) {
 export async function supabaseAuthRegister(regData) {
   if (!isSupabaseConfigured() || !supabase) return null;
   try {
-    const { email, password, name, username, skills, bio, gameTypes, favoriteGenres, disciplines, languages } = regData;
+    const { email, password, name, username, skills, bio, gameTypes, favoriteGenres, favoriteGames, disciplines, languages } = regData;
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -414,6 +417,7 @@ export async function supabaseAuthRegister(regData) {
       bio,
       gameTypes: gameTypes || [],
       favoriteGenres: favoriteGenres || [],
+      favoriteGames: normalizeFavoriteGames(favoriteGames),
       disciplines: disciplines || [],
       languages: languages || [],
       createdAt: new Date().toISOString()

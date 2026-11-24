@@ -38,6 +38,24 @@ function normalizeOptionalUrl(value) {
   return clean === '' ? null : clean;
 }
 
+// Los juegos favoritos se guardan como { tipo: [nombre, nombre] }. Se
+// normaliza aquí para que ninguna entrada mal formada llegue a Prisma ni al
+// frontend (los perfiles antiguos pueden no tener el campo).
+function toFavoriteGames(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const result = {};
+  for (const [genre, games] of Object.entries(value)) {
+    if (!Array.isArray(games)) continue;
+    const clean = games
+      .filter(game => typeof game === 'string')
+      .map(game => game.trim())
+      .filter(Boolean)
+      .slice(0, 2);
+    if (clean.length > 0) result[genre] = clean;
+  }
+  return result;
+}
+
 function addAliases(target, aliases) {
   for (const [camel, snake] of Object.entries(aliases)) {
     if (has(target, snake)) target[camel] = target[snake];
@@ -71,6 +89,7 @@ export function serializeProfile(profile, { includeEmail = false } = {}) {
   if (has(profile, 'gameTypes')) result.game_types = toArray(profile.gameTypes);
   if (has(profile, 'languages')) result.languages = toArray(profile.languages);
   if (has(profile, 'favoriteGenres')) result.favorite_genres = toArray(profile.favoriteGenres);
+  if (has(profile, 'favoriteGames')) result.favorite_games = toFavoriteGames(profile.favoriteGames);
   if (has(profile, 'disciplines')) result.disciplines = toArray(profile.disciplines);
   if (has(profile, 'createdAt')) result.created_at = toIso(profile.createdAt);
 
@@ -80,6 +99,7 @@ export function serializeProfile(profile, { includeEmail = false } = {}) {
     featuredProjectIds: 'featured_project_ids',
     gameTypes: 'game_types',
     favoriteGenres: 'favorite_genres',
+    favoriteGames: 'favorite_games',
     createdAt: 'created_at'
   });
 }
@@ -387,6 +407,9 @@ export function profileInputToPrisma(input = {}) {
     const value = read(input, field, snake);
     if (value !== undefined) data[field] = toArray(value);
   }
+
+  const favoriteGames = read(input, 'favoriteGames', 'favorite_games');
+  if (favoriteGames !== undefined) data.favoriteGames = toFavoriteGames(favoriteGames);
 
   return data;
 }

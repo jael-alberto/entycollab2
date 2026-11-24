@@ -26,6 +26,7 @@ import { getAuthToken, setAuthTokens, clearAuthTokens } from '../lib/authToken.j
 import { supabase } from '../lib/supabaseClient.js';
 import { t as i18nT, l10nValue } from '../lib/i18n.js';
 import { userCategories } from '../lib/helpers.js';
+import { normalizeFavoriteGames } from '../lib/favoriteGames.js';
 
 const AppContext = createContext(null);
 
@@ -59,6 +60,7 @@ function profileFromApi(profile) {
     gameTypes: profile.gameTypes ?? profile.game_types ?? [],
     languages: Array.isArray(profile.languages) ? profile.languages : [],
     favoriteGenres: profile.favoriteGenres ?? profile.favorite_genres ?? [],
+    favoriteGames: normalizeFavoriteGames(profile.favoriteGames ?? profile.favorite_games),
     disciplines: Array.isArray(profile.disciplines) ? profile.disciplines : [],
     createdAt: profile.createdAt ?? profile.created_at ?? null
   };
@@ -322,6 +324,7 @@ export function AppProvider({ children }) {
         gameTypes: data.gameTypes || [],
         languages: data.languages || [],
         favoriteGenres: data.favoriteGenres || [],
+        favoriteGames: normalizeFavoriteGames(data.favoriteGames),
         disciplines: data.disciplines || [],
         available: data.available !== undefined ? Boolean(data.available) : true
       };
@@ -397,6 +400,7 @@ export function AppProvider({ children }) {
         gameTypes: data.gameTypes || [],
         languages: data.languages || [],
         favoriteGenres: data.favoriteGenres || [],
+        favoriteGames: normalizeFavoriteGames(data.favoriteGames),
         disciplines: data.disciplines || []
       });
       return replaceUser(updated);

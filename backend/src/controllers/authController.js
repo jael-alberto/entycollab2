@@ -11,7 +11,7 @@ import { asyncHandler, UnauthorizedError, ConflictError } from '../middleware/er
 export const register = asyncHandler(async (req, res) => {
   const {
     name, username, email, password, bio, skills = [],
-    categories = [], gameTypes = [], languages = [], favoriteGenres = [], disciplines = [],
+    categories = [], gameTypes = [], languages = [], favoriteGenres = [], favoriteGames = {}, disciplines = [],
     available = true
   } = req.validated.body;
 
@@ -49,6 +49,7 @@ export const register = asyncHandler(async (req, res) => {
       gameTypes,
       languages,
       favoriteGenres,
+      favoriteGames,
       disciplines,
       available: available ?? true
     },
@@ -63,6 +64,7 @@ export const register = asyncHandler(async (req, res) => {
       gameTypes,
       languages,
       favoriteGenres,
+      favoriteGames,
       disciplines,
       available: available ?? true
     }
@@ -258,6 +260,7 @@ export const ensureProfile = asyncHandler(async (req, res) => {
     gameTypes: data.gameTypes ?? [],
     languages: data.languages ?? [],
     favoriteGenres: data.favoriteGenres ?? [],
+    favoriteGames: data.favoriteGames ?? {},
     disciplines: data.disciplines ?? []
   };
 

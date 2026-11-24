@@ -3,24 +3,19 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { primaryRoleLabel } from '../components/PersonCard.jsx';
-import { Avatar, Icon, SkillTags, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
+import { Avatar, Icon, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
 import PeekRating from '../components/PeekRating.jsx';
-import {
-  getUserAvgRating, getUserRatingCount, escapeHTML,
-  userCategories, getCategoryLabel
-} from '../lib/helpers.js';
+import { getUserAvgRating, getUserRatingCount, escapeHTML } from '../lib/helpers.js';
 import {
   completedProjectsCount,
   disciplineLabel,
-  favoriteGenreLabel,
+  gameCategoryLabel,
   gameTypeLabel,
   userDisciplines,
-  userFavoriteGenres,
   userGameTypes,
   userLanguages
 } from '../lib/talent.js';
-import { gamesByIds } from '../lib/gameCatalog.js';
-import { getFavoriteGames } from '../lib/favoriteGames.js';
+import { normalizeFavoriteGames } from '../lib/favoriteGames.js';
 
 // /perfil (ruta intacta, sin :username): perfil propio con header
 // (avatar, rol, disponibilidad, valoración, links) y tabs
@@ -33,15 +28,12 @@ export default function Profile() {
 
   const avg = getUserAvgRating(user.id, ratings);
   const count = getUserRatingCount(user.id, ratings);
-  const categories = userCategories(user);
-  const bio = l10n(user.bio);
   const receivedRatings = ratings.filter(r => r.ratedUserId === user.id);
   const completed = completedProjectsCount(user.id, projects, applications);
   const languages = userLanguages(user);
   const role = primaryRoleLabel(user, lang);
   const techCount = languages.length > 0 ? languages.length : (user.skills || []).length;
-  // Los juegos marcados viven en el navegador (ver lib/favoriteGames.js).
-  const favoriteGameTitles = gamesByIds(getFavoriteGames(user.id)).map(game => game.title);
+  const favoriteGameGroups = Object.entries(normalizeFavoriteGames(user.favoriteGames));
 
   const tabs = [
     { id: 'projects', label: lang === 'en' ? 'Projects' : 'Proyectos' },
@@ -199,37 +191,23 @@ export default function Profile() {
         hidden={tab !== 'about'}
         className="profile-panel"
       >
-        {bio && <p className="profile-bio">{bio}</p>}
-
-        <TalentRow
-          label={t('settings.gameTypesLabel')}
-          values={userGameTypes(user).map(v => gameTypeLabel(lang, v))}
-        />
         <TalentRow
           label={t('filters.disciplines')}
           values={userDisciplines(user).map(v => disciplineLabel(lang, v))}
         />
+        <TalentRow label={t('settings.languagesLabel')} values={userLanguages(user)} />
         <TalentRow
-          label={t('settings.favoriteGenresLabel')}
-          values={userFavoriteGenres(user).map(v => favoriteGenreLabel(lang, v))}
+          label={t('settings.gameTypesLabel')}
+          values={userGameTypes(user).map(v => gameTypeLabel(lang, v))}
         />
-        <TalentRow
-          label={t('games.favoriteLabel')}
-          values={favoriteGameTitles}
-          limit={6}
-        />
-
-        {categories.length > 0 && (
-          <div className="person-categories profile-links">
-            {categories.map(c => <span key={c} className="person-cat-chip">{escapeHTML(getCategoryLabel(lang, c))}</span>)}
-          </div>
-        )}
-
-        <div className="profile-skills">
-          {languages.length > 0
-            ? <SkillTags skills={languages} limit={999} />
-            : <SkillTags skills={user.skills} limit={999} />}
-        </div>
+        {favoriteGameGroups.map(([category, names]) => (
+          <TalentRow
+            key={category}
+            label={t('games.favoriteOf', { category: gameCategoryLabel(lang, category) })}
+            values={names}
+            limit={6}
+          />
+        ))}
       </section>
     </div>
   );

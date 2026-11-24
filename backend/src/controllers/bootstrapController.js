@@ -26,6 +26,7 @@ const PUBLIC_PROFILE_SELECT = {
   gameTypes: true,
   languages: true,
   favoriteGenres: true,
+  favoriteGames: true,
   disciplines: true,
   createdAt: true
 };

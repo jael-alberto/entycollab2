@@ -161,7 +161,8 @@ export const GAME_CATALOG = Object.entries(GAMES_BY_GENRE).flatMap(([genre, rows
 // marcados devuelve una lista vacía: quien elige los juegos decide si, sin
 // filtro, muestra el catálogo completo (`GAME_CATALOG`).
 export function gamesForGenres(genres) {
-  const chosen = new Set((genres || []).filter(value => GAMES_BY_GENRE[value]));
+  const list = Array.isArray(genres) ? genres : genres ? [genres] : [];
+  const chosen = new Set(list.filter(value => GAMES_BY_GENRE[value]));
   if (chosen.size === 0) return [];
   return GAME_CATALOG.filter(game => chosen.has(game.genre));
 }

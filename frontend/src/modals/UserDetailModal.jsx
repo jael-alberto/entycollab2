@@ -2,26 +2,20 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useModals } from '../context/ModalManager.jsx';
-import { Avatar, Icon, Modal, ProfileLinks, SkillTags, Stars, TalentRow } from '../components/common.jsx';
+import { Avatar, Icon, Modal, ProfileLinks, Stars, TalentRow } from '../components/common.jsx';
 import UserHistory from '../components/UserHistory.jsx';
 import { primaryRoleLabel } from '../components/PersonCard.jsx';
 import {
   completedProjectsCount,
   disciplineLabel,
-  favoriteGenreLabel,
+  gameCategoryLabel,
   gameTypeLabel,
   userDisciplines,
-  userFavoriteGenres,
   userGameTypes,
   userLanguages
 } from '../lib/talent.js';
-import {
-  getUserAvgRating,
-  getUserRatingCount,
-  escapeHTML,
-  userCategories,
-  getCategoryLabel
-} from '../lib/helpers.js';
+import { getUserAvgRating, getUserRatingCount, escapeHTML } from '../lib/helpers.js';
+import { normalizeFavoriteGames } from '../lib/favoriteGames.js';
 
 // Ficha de colaborador (se abre desde la tarjeta o el historial): header
 // (avatar, rol, disponibilidad, valoración, links) + tabs
@@ -38,9 +32,8 @@ export default function UserDetailModal() {
 
   const rating = getUserAvgRating(u.id, ratings);
   const ratingCount = getUserRatingCount(u.id, ratings);
-  const bio = l10n(u.bio);
   const isSelf = me && me.id === u.id;
-  const categories = userCategories(u);
+  const favoriteGameGroups = Object.entries(normalizeFavoriteGames(u.favoriteGames));
   const completed = completedProjectsCount(u.id, projects, applications);
   const role = primaryRoleLabel(u, lang);
   const receivedRatings = ratings.filter(r => r.ratedUserId === u.id);
@@ -165,23 +158,17 @@ export default function UserDetailModal() {
         hidden={tab !== 'about'}
         className="profile-panel"
       >
-        <p className="profile-bio">{bio ? escapeHTML(bio) : t('person.noBio')}</p>
-
-        <TalentRow label={t('settings.gameTypesLabel')} values={userGameTypes(u).map(v => gameTypeLabel(lang, v))} />
         <TalentRow label={t('filters.disciplines')} values={userDisciplines(u).map(v => disciplineLabel(lang, v))} />
-        <TalentRow label={t('settings.favoriteGenresLabel')} values={userFavoriteGenres(u).map(v => favoriteGenreLabel(lang, v))} />
-
-        {categories.length > 0 && (
-          <div className="person-categories">
-            {categories.map(c => <span key={c} className="person-cat-chip">{escapeHTML(getCategoryLabel(lang, c))}</span>)}
-          </div>
-        )}
-
         <TalentRow label={t('settings.languagesLabel')} values={userLanguages(u)} />
+        <TalentRow label={t('settings.gameTypesLabel')} values={userGameTypes(u).map(v => gameTypeLabel(lang, v))} />
 
-        <div className="profile-skills">
-          {userLanguages(u).length === 0 && <SkillTags skills={u.skills} limit={999} />}
-        </div>
+        {favoriteGameGroups.map(([category, names]) => (
+          <TalentRow
+            key={category}
+            label={t('games.favoriteOf', { category: gameCategoryLabel(lang, category) })}
+            values={names}
+          />
+        ))}
       </section>
 
       {isSelf ? (

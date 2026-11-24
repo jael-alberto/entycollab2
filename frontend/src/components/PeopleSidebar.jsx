@@ -4,7 +4,6 @@ import { useLeaveTransition } from '../lib/useLeaveTransition.js';
 import {
   COMPLETED_BUCKETS,
   DISCIPLINES,
-  FAVORITE_GENRES,
   GAME_TYPES,
   RATING_BUCKETS,
   languagesForGameTypes
@@ -104,8 +103,8 @@ function OptionList({ options, selected, counts, onToggle, renderLabel }) {
   );
 }
 
-// Facetas de talento reutilizables: tipos de juego, lenguajes, juegos
-// favoritos, habilidades, proyectos completados y valoración.
+// Facetas de talento reutilizables: tipos de juego, lenguajes, habilidades,
+// proyectos completados y valoración.
 // La lógica de conteos y toggles no se toca: solo se añaden ids estables
 // para la accesibilidad del acordeón.
 export function TalentFacets({ filters, counts, onChange }) {
@@ -144,16 +143,6 @@ export function TalentFacets({ filters, counts, onChange }) {
           selected={filters.languages}
           counts={counts.languages}
           onToggle={v => toggle('languages', v)}
-        />
-      </Facet>
-
-      <Facet id="facet-genres" title={t('people.facetGenres')}>
-        <OptionList
-          options={FAVORITE_GENRES}
-          selected={filters.favoriteGenres}
-          counts={counts.favoriteGenres}
-          onToggle={v => toggle('favoriteGenres', v)}
-          renderLabel={opt => t(`fg.${opt.value}`)}
         />
       </Facet>
 

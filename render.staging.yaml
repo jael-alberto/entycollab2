@@ -30,13 +30,9 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
-      - key: SUPABASE_PUBLISHABLE_KEY
-        sync: false
       # Permite previews de Vercel (*.vercel.app) mientras se fija el dominio exacto.
       - key: ALLOW_VERCEL_PREVIEWS
         value: "true"
-      - key: JWT_SECRET
-        generateValue: true
       - key: RATE_LIMIT_WINDOW_MS
         value: "900000"
       - key: RATE_LIMIT_MAX_REQUESTS

@@ -132,9 +132,6 @@ FRONTEND_URL=http://localhost:5173
 DATABASE_URL=postgresql://postgres.PROYECTO:PASSWORD@HOST:5432/postgres
 SUPABASE_URL=https://PROYECTO.supabase.co
 SUPABASE_SECRET_KEY=tu_secret_key
-SUPABASE_PUBLISHABLE_KEY=tu_publishable_key
-
-JWT_SECRET=un-secreto-largo-y-aleatorio
 ```
 
 **`frontend/.env`**
@@ -151,7 +148,7 @@ Notas:
 - Si la contraseña tiene caracteres como `@`, `#` o `%`, hay que codificarla en la URL (`@` → `%40`).
 - `SUPABASE_SECRET_KEY` es equivalente a `service_role`: solo backend, nunca frontend.
 - `.env` está ignorado por Git; `.env.example` sí se commitea y solo debe tener placeholders.
-- `SHADOW_DATABASE_URL` solo es necesario para `prisma migrate dev`.
+- Prisma solo necesita `DATABASE_URL`; las migraciones están versionadas en `database/supabase/migrations/`.
 
 ### 3. Aplicar migraciones
 
@@ -160,6 +157,7 @@ En Supabase SQL Editor o con `psql`, ejecutar en orden:
 1. `database/supabase/migrations/0001_init.sql`
 2. `database/supabase/migrations/0002_storage.sql`
 3. `database/supabase/migrations/0003_security_hardening.sql`
+4. `database/supabase/migrations/0004_favorite_games.sql`
 
 `database/supabase/seed.sql` está vacío actualmente. Para probar con datos compartidos hay que crear usuarios y datos manualmente o implementar el seed.
 
@@ -426,7 +424,7 @@ Guía paso a paso de staging (Render + Vercel + Supabase): [`docs/DEPLOY_STAGING
 - [ ] Variables `VITE_*` configuradas en Vercel.
 - [ ] `vercel.json` de la raíz reescribe rutas profundas al `index.html`.
 - [ ] Backend desplegado en Render (staging: `render.staging.yaml`; producción: `render.yaml`).
-- [ ] `DATABASE_URL`, `SUPABASE_*`, `JWT_SECRET`, `FRONTEND_URL` configuradas en el backend.
+- [ ] `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `FRONTEND_URL` configuradas en el backend.
 - [ ] CORS usa la URL real del frontend.
 - [ ] El backend responde `/health` en producción.
 - [ ] Migraciones aplicadas en producción.

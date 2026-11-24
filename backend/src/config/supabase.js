@@ -17,26 +17,6 @@ export const supabaseAdmin = createClient(
   }
 );
 
-// Cliente con Anon Key - respeta RLS
-// Úsalo cuando necesites validar permisos del usuario autenticado
-export function createSupabaseClient(userToken) {
-  return createClient(
-    env.supabase.url,
-    env.supabase.anonKey,
-    {
-      global: {
-        headers: {
-          Authorization: `Bearer ${userToken}`
-        }
-      },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    }
-  );
-}
-
 // Helper para verificar token JWT de Supabase Auth
 export async function verifyAuthToken(token) {
   try {

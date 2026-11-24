@@ -157,22 +157,16 @@ PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 
-# Base de datos (Prisma)
-DATABASE_URL=postgresql://entylab:entylabpass@localhost:5432/entylab?schema=public
-SHADOW_DATABASE_URL=postgresql://entylab:entylabpass@localhost:5432/entylab?schema=public
+# Base de datos (Prisma): una sola variable, copiada de Supabase → Connect → Session pooler
+DATABASE_URL=postgresql://postgres.tu-proyecto:TU_PASSWORD@aws-0-region.pooler.supabase.com:5432/postgres
 
-# Supabase (Service Role Key - SOLO BACKEND)
+# Supabase (service_role / secret key - SOLO BACKEND)
 SUPABASE_URL=https://tu-proyecto.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-# JWT
-JWT_SECRET=tu-secreto-super-seguro
-JWT_EXPIRES_IN=7d
+SUPABASE_SECRET_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX=100
+RATE_LIMIT_MAX_REQUESTS=100
 ```
 
 ## Instalación

@@ -77,7 +77,7 @@ export const searchProfiles = asyncHandler(async (req, res) => {
 // GET /api/profiles/available
 export const getAvailablePeople = asyncHandler(async (req, res) => {
   const {
-    gameTypes, languages, favoriteGenres, disciplines,
+    gameTypes, languages, disciplines,
     completed, rating, page, pageSize
   } = req.validated.query;
 
@@ -85,7 +85,6 @@ export const getAvailablePeople = asyncHandler(async (req, res) => {
 
   if (gameTypes) where.gameTypes = { hasSome: gameTypes.split(',') };
   if (languages) where.languages = { hasSome: languages.split(',') };
-  if (favoriteGenres) where.favoriteGenres = { hasSome: favoriteGenres.split(',') };
   if (disciplines) where.disciplines = { hasSome: disciplines.split(',') };
 
   const [data, total] = await prisma.$transaction([
