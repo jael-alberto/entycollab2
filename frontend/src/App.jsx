@@ -16,6 +16,7 @@ import Landing from './pages/Landing.jsx';
 import Groups from './pages/Groups.jsx';
 import AuthCallback from './pages/AuthCallback.jsx';
 import { hasAuthToken } from './lib/authToken.js';
+import { REGISTRATION_FORM_URL } from './lib/registration.js';
 
 function AuthLoading() {
   return (
@@ -49,10 +50,27 @@ function ScrollToTop() {
   return null;
 }
 
+// Registro temporalmente apagado: la ruta /register sigue existiendo y el
+// componente Register sigue intacto, pero mientras haya URL de formulario se
+// redirige a él. Basta con vaciar REGISTRATION_FORM_URL para reactivarlo.
+function RegisterGate({ children }) {
+  const { t } = useApp();
+  useEffect(() => {
+    if (REGISTRATION_FORM_URL) window.location.replace(REGISTRATION_FORM_URL);
+  }, []);
+
+  if (!REGISTRATION_FORM_URL) return children;
+  return (
+    <div role="status" aria-live="polite" style={{ minHeight: '40vh', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 13 }}>
+      {t('auth.registerRedirect')}
+    </div>
+  );
+}
+
 function AppRoutes({ logged }) {
   return <Routes>
     <Route path="/login" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
-    <Route path="/register" element={<RedirectIfAuthed><Register /></RedirectIfAuthed>} />
+    <Route path="/register" element={<RedirectIfAuthed><RegisterGate><Register /></RegisterGate></RedirectIfAuthed>} />
     <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
     <Route path="/proyectos/*" element={<RequireAuth><Projects /></RequireAuth>} />
     <Route path="/personas" element={<RequireAuth><People /></RequireAuth>} />

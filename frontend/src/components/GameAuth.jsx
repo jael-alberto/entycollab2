@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { Field, Icon, Modal, SkipLink, Spinner } from './common.jsx';
 import FavoriteGamesTags from './FavoriteGamesTags.jsx';
+import RegisterLink from './RegisterLink.jsx';
 import { LegalContent } from '../pages/Legal.jsx';
 import { DISCIPLINES, FAVORITE_GENRES, disciplineLabel, favoriteGenreLabel } from '../lib/talent.js';
 import { emailKey, nameKey, passwordKey, requiredKey, usernameKey } from '../lib/validation.js';
@@ -361,7 +362,7 @@ export default function GameAuth({ initialMode }) {
                   {loading ? t('auth.signingIn') : t('login.submit')} <Icon name="arrow-right" size={16} />
                 </button>
               </form>
-              <p className="ga-switch">{t('auth.newHere')} <Link to="/register">{t('auth.createOne')}</Link></p>
+              <p className="ga-switch">{t('auth.newHere')} <RegisterLink>{t('auth.createOne')}</RegisterLink></p>
             </section>
           )}
         </main>

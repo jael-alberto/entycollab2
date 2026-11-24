@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { Icon, GroupAvatar } from './common.jsx';
+import RegisterLink from './RegisterLink.jsx';
 import { getUserAvgRating, avatarColorClass, escapeHTML } from '../lib/helpers.js';
 
 // Agente B: navegación única compartida por LoggedHeader y PublicHeader.
@@ -222,7 +223,7 @@ export function PublicHeader() {
 
         <div className="header-right">
           <Link to="/login" className="btn btn-ghost btn-sm">Iniciar sesión</Link>
-          <Link to="/register" className="btn btn-primary btn-sm">Crear cuenta</Link>
+          <RegisterLink className="btn btn-primary btn-sm">Crear cuenta</RegisterLink>
         </div>
       </div>
     </header>

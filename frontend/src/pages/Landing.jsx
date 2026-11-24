@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 import { Icon } from '../components/common.jsx';
+import RegisterLink from '../components/RegisterLink.jsx';
 
 // Portada con respaldo de marca: si el archivo de imagen no existe (assets
 // demo no incluidos), se dibuja un panel grafito con retícula en lugar de
@@ -167,7 +168,7 @@ export default function Landing() {
         <a href="#comunidad" onClick={() => setMenuOpen(false)}>Comunidad</a>
         <div className="tcl-mobile-auth">
           <Link to="/login" onClick={() => setMenuOpen(false)}>Iniciar sesión</Link>
-          <Link to="/register" className="is-primary tcl-mobile-register" onClick={() => setMenuOpen(false)}>Crear cuenta</Link>
+          <RegisterLink className="is-primary tcl-mobile-register" onClick={() => setMenuOpen(false)}>Crear cuenta</RegisterLink>
         </div>
       </nav>
       <div className="tcl-nav-actions">
@@ -182,7 +183,7 @@ export default function Landing() {
           <Icon name={theme ? 'sun' : 'moon'} size={17} />
         </button>
         <Link to="/login" className="tcl-login">Iniciar sesión</Link>
-        <Link to="/register" className="tcl-btn tcl-btn-primary tcl-nav-cta">Crear cuenta <Icon name="arrow-up-right" size={15} /></Link>
+        <RegisterLink className="tcl-btn tcl-btn-primary tcl-nav-cta">Crear cuenta <Icon name="arrow-up-right" size={15} /></RegisterLink>
         <button
           type="button"
           className="tcl-burger"
@@ -350,7 +351,7 @@ export default function Landing() {
             <a href="#explorar">Proyectos</a>
             <a href="#como-funciona">Cómo funciona</a>
             <a href="#comunidad">Comunidad</a>
-            <Link to="/register" className="tcl-link-arrow">Crear cuenta <Icon name="arrow-up-right" size={15} /></Link>
+            <RegisterLink className="tcl-link-arrow">Crear cuenta <Icon name="arrow-up-right" size={15} /></RegisterLink>
           </nav>
         </div>
         <p className="tcl-footer-blurb">Para las personas detrás del próximo juego.</p>
